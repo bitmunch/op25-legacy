@@ -1,19 +1,24 @@
 #!/usr/bin/python
 import struct, sys
+from gnuradio.eng_option import eng_option
+from optparse import OptionParser
 
 """
 prototype P25 frame decoder
 
-input: short 48 ksps frequency demodulated signal capture including at least one frame
-       (output of c4fm_demod.py)
+input: short frequency demodulated signal capture including at least one frame (output of c4fm_demod.py)
 output: symbols of a single frame (plus some excess)
 """
-	
-samples_per_symbol = 10
+
+parser = OptionParser(option_class=eng_option)
+parser.add_option("-i", "--input-file", type="string", default="demod.dat", help="specify the input file")
+parser.add_option("-s", "--samples-per-symbol", type="int", default=10, help="samples per symbol of the input file")
+(options, args) = parser.parse_args()
+
 # frame synchronization header (in form most useful for correlation)
 frame_sync = [1, 1, 1, 1, 1, -1, 1, 1, -1, -1, 1, 1, -1, -1, -1, -1, 1, -1, 1, -1, -1, -1, -1, -1]
 minimum_span = 5 # minimum number of adjacent correlations required to convince us
-data = open('demod').read()
+data = open(options.input_file).read()
 input_samples = struct.unpack('f1'*(len(data)/4), data)
 sync_samples = [] # subset of input samples synchronized with respect to frame sync
 symbols = [] # recovered symbols (including frame sync)
@@ -39,10 +44,10 @@ first = 0
 last = 0
 interesting = 0
 correlation_threshold = len(frame_sync) * mean_deviation
-for i in range(len(input_samples) - len(frame_sync) * samples_per_symbol):
+for i in range(len(input_samples) - len(frame_sync) * options.samples_per_symbol):
 	correlation = 0
 	for j in range(len(frame_sync)):
-		correlation += frame_sync[j] * (input_samples[i + j * samples_per_symbol] - mean_value)
+		correlation += frame_sync[j] * (input_samples[i + j * options.samples_per_symbol] - mean_value)
 	#print i, correlation
 	if interesting:
 		if correlation < correlation_threshold:
@@ -61,13 +66,13 @@ if last:
 	# use center point of several adjacent correlations
 	center = first + ((last - first) // 2)
 	# grab samples for symbol thereafter
-	for i in range(center, len(input_samples), samples_per_symbol):
+	for i in range(center, len(input_samples), options.samples_per_symbol):
 		# "integrate and dump"
 		# Add up several (samples_per_symbol) adjacent samples to create a single
 		# (downsampled) sample as specified by the P25 CAI standard.
 		total = 0.0
-		start = i - (samples_per_symbol/2)
-		end = i + 1 + (samples_per_symbol/2)
+		start = i - (options.samples_per_symbol/2)
+		end = i + 1 + (options.samples_per_symbol/2)
 		for sample in input_samples[start:end]: total += sample
 		sync_samples.append(total)
 		#print i, sync_samples[-1]
