@@ -17,7 +17,7 @@ parser.add_option("-s", "--samples-per-symbol", type="int", default=10, help="sa
 
 # frame synchronization header (in form most useful for correlation)
 frame_sync = [1, 1, 1, 1, 1, -1, 1, 1, -1, -1, 1, 1, -1, -1, -1, -1, 1, -1, 1, -1, -1, -1, -1, -1]
-minimum_span = 5 # minimum number of adjacent correlations required to convince us
+minimum_span = options.samples_per_symbol // 2 # minimum number of adjacent correlations required to convince us
 data = open(options.input_file).read()
 input_samples = struct.unpack('f1'*(len(data)/4), data)
 sync_samples = [] # subset of input samples synchronized with respect to frame sync
