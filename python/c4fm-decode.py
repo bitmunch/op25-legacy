@@ -8,6 +8,8 @@ prototype P25 frame decoder
 
 input: short frequency demodulated signal capture including at least one frame (output of c4fm_demod.py)
 output: symbols of a single frame (plus some excess)
+
+This horrifying mess is a prototype for stuff that will most likely end up as gnuradio signal processing blocks.
 """
 
 parser = OptionParser(option_class=eng_option)
@@ -28,6 +30,55 @@ def average(list):
 	total = 0.0
 	for num in list: total += num
 	return total / len(list)
+
+# return integer represented by sequence of symbols (dibits)
+def symbols_to_integer(symbols):
+	integer = 0
+	for symbol in symbols:
+		integer = integer << 2
+		integer += symbol
+	return integer
+
+# de-interleave a sequence of 98 symbols
+def deinterleave(input):
+	output = []
+	for i in range(0,23,2):
+		for j in (0, 26, 50, 74):
+			output.extend(input[i+j:i+j+2])
+	output.extend(input[24:26])
+	return output
+
+# 1/2 rate trellis decode a sequence of symbols
+# TODO: Use soft symbols instead of hard symbols.
+def trellis_1_2_decode(input):
+	output = []
+	# state transition table, including constellation to dibit pair mapping
+	next_words = (
+		(0x2, 0xC, 0x1, 0xF),
+		(0xE, 0x0, 0xD, 0x3),
+		(0x9, 0x7, 0xA, 0x4),
+		(0x5, 0xB, 0x6, 0x8))
+	state = 0
+	# cycle through 2 symbol codewords in input
+	for i in range(0,len(input),2):
+		codeword = symbols_to_integer(input[i:i+2])
+		#print "codeword", codeword
+		similarity = [0, 0, 0, 0]
+		# compare codeword against each of four candidates for the current state
+		for candidate in range(4):
+			# increment similarity result for each bit in codeword that matches candidate
+			for bit in range(4):
+				if ((~codeword ^ next_words[state][candidate]) & (1 << bit)) > 0:
+					similarity[candidate] += 1
+		#print "candidates", next_words[state]
+		#print "similarity", similarity
+		# find the dibit that matches all four codeword bits
+		# TODO: exception handling: at least try the next best match
+		state = similarity.index(4)
+		output.append(state)
+		#print "new state", state
+		#print output
+	return output
 
 # collect input sample statistics for normalization
 total_value = 0.0
@@ -111,5 +162,67 @@ for sample in sync_samples:
 		# dibit 0b01
 		symbols.append(1)
 
-# hey, it's a start. . .
-print symbols[:500]
+# We have to do a little decoding in order to know how long the frame is.
+# Plus, we may want to use soft values for error correction decoding.  Then we
+# can dump the complete frame to wireshark.
+#
+# basic map:
+# frame_sync = symbols[0:24]
+# network_identifier = symbols[24:57] (including status symbol at symbols[35])
+# unknown_blocks = symbols[57:?] (including status symbols after every 35 symbols)
+
+print "frame sync: 0x%012x" % symbols_to_integer(symbols[0:24])
+# extract Network Identifier from in between status symbols
+nid_symbols = symbols[24:35] + symbols[36:57]
+
+# TODO: This is terrible.  Until we have a BCH decoder, just trust that the first 16 bits are correct
+address = symbols_to_integer(nid_symbols[:6])
+data_unit_id = symbols_to_integer(nid_symbols[6:8])
+
+print "NID codeword: 0x%016x" % (symbols_to_integer(nid_symbols))
+print "address: 0x%03x, Data Unit ID: 0x%01x, first Status Symbol: 0x%01x" % (address, data_unit_id, symbols[35])
+
+if data_unit_id == 7:
+	# this is a trunking control channel packet in the single block format aka a Trunking Signaling Block (TSBK)
+	print "found a TSBK"
+	# spec indicates status symbol at symbols[158] (if no more TSBKs), but I've only found nulls
+	#print "Status Symbols: 0x%01x, 0x%01x, 0x%01x, 0x%01x" % (symbols[71], symbols[107], symbols[143], symbols[158])
+	print "Status Symbols: 0x%01x, 0x%01x, 0x%01x" % (symbols[71], symbols[107], symbols[143])
+	tsbk_symbols = symbols[57:71] + symbols[72:107] + symbols[108:143] + symbols[144:158]
+	#print "TSBK symbols: 0x%049x" % (symbols_to_integer(tsbk_symbols))
+	#print "TSBK deinterleaved: 0x%049x" % (symbols_to_integer(deinterleave(tsbk_symbols)))
+	tsbk_decoded = trellis_1_2_decode(deinterleave(tsbk_symbols))
+	# TODO: verify with CRC
+	print "TSBK decoded: 0x%025x" % (symbols_to_integer(tsbk_decoded))
+	last_block_flag = tsbk_decoded[0] >> 1
+	if not last_block_flag:
+		print "found another TSBK"
+		# TODO: rework to handle up to a total of four TSBKs
+elif data_unit_id == 12:
+	print "found a Packet Data Unit"
+	# could be a multi-block control channel packet
+	# could be a confirmed or unconfirmed data packet
+	# TODO: decode
+elif data_unit_id == 0:
+	print "found a Header Data Unit"
+	# header used prior to superframe
+	# TODO: decode
+	# total of 396 symbols (including frame sync)
+elif data_unit_id == 3:
+	print "found a Terminator without subsequent Link Control"
+	# terminator used after superframe
+	# TODO: decode
+elif data_unit_id == 15:
+	print "found a Terminator with subsequent Link Control"
+	# terminator used after superframe
+	# TODO: decode
+elif data_unit_id == 5:
+	print "found a Logical Link Data Unit 1"
+	# contains voice frames (codewords) 1 through 9 of a superframe
+	# TODO: decode
+elif data_unit_id == 10:
+	print "found a Logical Link Data Unit 2"
+	# contains voice frames (codewords) 10 through 18 of a superframe
+	# TODO: decode
+else:
+	print "unknown Data Unit ID"
