@@ -176,11 +176,11 @@ print "frame sync: 0x%012x" % symbols_to_integer(symbols[0:24])
 nid_symbols = symbols[24:35] + symbols[36:57]
 
 # TODO: This is terrible.  Until we have a BCH decoder, just trust that the first 16 bits are correct
-address = symbols_to_integer(nid_symbols[:6])
+network_access_code = symbols_to_integer(nid_symbols[:6])
 data_unit_id = symbols_to_integer(nid_symbols[6:8])
 
 print "NID codeword: 0x%016x" % (symbols_to_integer(nid_symbols))
-print "address: 0x%03x, Data Unit ID: 0x%01x, first Status Symbol: 0x%01x" % (address, data_unit_id, symbols[35])
+print "Network Access Code: 0x%03x, Data Unit ID: 0x%01x, first Status Symbol: 0x%01x" % (network_access_code, data_unit_id, symbols[35])
 
 if data_unit_id == 7:
 	# this is a trunking control channel packet in the single block format aka a Trunking Signaling Block (TSBK)
