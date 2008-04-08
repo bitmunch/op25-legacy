@@ -211,17 +211,20 @@ elif data_unit_id == 0:
 elif data_unit_id == 3:
 	print "found a Terminator without subsequent Link Control"
 	# terminator used after superframe
-	# TODO: decode
+	# may follow LDU1 or LDU2
+	# consists only of frame sync, NID, and one (or two?) status symbols
+	# TODO: maybe one more status symbol
 elif data_unit_id == 15:
 	print "found a Terminator with subsequent Link Control"
 	# terminator used after superframe
+	# consists of frame sync, NID, 288 bit Link Control Word (Golay encoded), plus status symbols
 	# TODO: decode
 elif data_unit_id == 5:
-	print "found a Logical Link Data Unit 1"
+	print "found a Logical Link Data Unit 1 (LDU1)"
 	# contains voice frames (codewords) 1 through 9 of a superframe
 	# TODO: decode
 elif data_unit_id == 10:
-	print "found a Logical Link Data Unit 2"
+	print "found a Logical Link Data Unit 2 (LDU2)"
 	# contains voice frames (codewords) 10 through 18 of a superframe
 	# TODO: decode
 else:
