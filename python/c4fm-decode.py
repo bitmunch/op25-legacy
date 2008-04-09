@@ -39,6 +39,19 @@ def symbols_to_integer(symbols):
 		integer += symbol
 	return integer
 
+# return list of status symbols
+# also remove them from input list
+# input should already be stripped of FS and NID
+def extract_status_symbols(symbols):
+	status_symbols = []
+	# start at index 14 because the FS and NID have already been stripped
+	indices = range(14,len(symbols),36)
+	# start from the end so we don't pop out from under ourselves
+	indices.reverse()
+	for i in indices:
+		status_symbols.append(symbols.pop(i))
+	return status_symbols
+
 # de-interleave a sequence of 98 symbols (for data or control channel frame)
 def data_deinterleave(input):
 	output = []
@@ -183,14 +196,14 @@ print "NID codeword: 0x%016x" % (symbols_to_integer(nid_symbols))
 print "Network Access Code: 0x%03x, Data Unit ID: 0x%01x, first Status Symbol: 0x%01x" % (network_access_code, data_unit_id, symbols[35])
 
 if data_unit_id == 7:
-	# this is a trunking control channel packet in the single block format aka a Trunking Signaling Block (TSBK)
+	# this is a trunking control channel packet in the single block format
+	# contains one to four Trunking Signaling Blocks (TSBK)
 	print "found a TSBK"
-	# spec indicates status symbol at symbols[158] (if no more TSBKs), but I've only found nulls
-	#print "Status Symbols: 0x%01x, 0x%01x, 0x%01x, 0x%01x" % (symbols[71], symbols[107], symbols[143], symbols[158])
-	print "Status Symbols: 0x%01x, 0x%01x, 0x%01x" % (symbols[71], symbols[107], symbols[143])
-	tsbk_symbols = symbols[57:71] + symbols[72:107] + symbols[108:143] + symbols[144:158]
-	#print "TSBK symbols: 0x%049x" % (symbols_to_integer(tsbk_symbols))
-	#print "TSBK deinterleaved: 0x%049x" % (symbols_to_integer(data_deinterleave(tsbk_symbols)))
+	# we know there is at least one TSBK, so the frame is at least 158 symbols long
+	tsbk_symbols = symbols[57:158]
+	# spec diagram indicates status symbol at symbols[158] (if no more TSBKs), but I've only found nulls
+	status_symbols = extract_status_symbols(tsbk_symbols)
+	print "Status Symbols: 0x%01x, 0x%01x, 0x%01x" % tuple(status_symbols)
 	tsbk_decoded = trellis_1_2_decode(data_deinterleave(tsbk_symbols))
 	# TODO: verify with CRC
 	print "TSBK decoded: 0x%025x" % (symbols_to_integer(tsbk_decoded))
@@ -209,24 +222,26 @@ elif data_unit_id == 0:
 	# header used prior to superframe
 	# total of 396 symbols (including frame sync)
 	# 120 bits data, encoded to 648 bits
-	# TODO: more status symbols
-	print "Status Symbols: 0x%01x, 0x%01x, 0x%01x, 0x%01x" % (symbols[71], symbols[107], symbols[143], symbols[158])
-	# Message Indicator (MI) 72 bits
-	message_indicator = symbols[57:71] + symbols [72:94]
-	# Manufacturer's ID (MFID) 8 bits
-	manufacturers_id = symbols[94:102]
-	if manufacturers_id > 0:
-		print "Non-standard Manufacturer's ID"
-	# Algorithm ID (ALGID) 8 bits
-	algorithm_id = symbols[102:106]
-	# Key ID (KID) 16 bits
-	key_id = symbols[106] + symbols[108:115]
-	# Talk-group ID (TGID) 16 bits
-	talk_group_id = symbols[115:123]
-	# TODO: (36,20,17) Reed-Solomon decoding
-	#rs_codeword = all of above and then some
+	hdu_symbols = symbols[57:381]
+	status_symbols = extract_status_symbols(hdu_symbols)
+	print "Status Symbols: 0x%01x, 0x%01x, 0x%01x, 0x%01x, . . ." % tuple(status_symbols[:4])
+	golay_codewords = hdu_symbols[:324]
 	# TODO: (18,6,8) shortened Golay decoding
-	#golay_codeword = all of above and then some (I think. Diagram is unclear)
+	#rs_codeword = golay_18_6_8_decode(golay_codewords)
+	# TODO: (36,20,17) Reed-Solomon decoding
+	#header_data_unit = rs_36_20_17_decode(rs_codeword)
+	# Message Indicator (MI) 72 bits
+	#message_indicator = header_data_unit[:36]
+	# Manufacturer's ID (MFID) 8 bits
+	#manufacturers_id = header_data_unit[36:40]
+	#if manufacturers_id > 0:
+		#print "Non-standard Manufacturer's ID"
+	# Algorithm ID (ALGID) 8 bits
+	#algorithm_id = header_data_unit[40:44]
+	# Key ID (KID) 16 bits
+	#key_id = header_data_unit[44:52]
+	# Talk-group ID (TGID) 16 bits
+	#talk_group_id = header_data_unit[52:60]
 elif data_unit_id == 3:
 	print "found a Terminator without subsequent Link Control"
 	# terminator used after superframe
@@ -238,6 +253,8 @@ elif data_unit_id == 15:
 	# terminator used after superframe
 	# consists of frame sync, NID, 288 bit Link Control Word (Golay encoded), plus status symbols
 	# TODO: decode Link Control
+	# see LDU1/LC for contents (differently encoded here)
+	# 72 bits encoded with (24,12,13) Reed Solomon code and then (24,12,8) extended Golay code
 elif data_unit_id == 5:
 	print "found a Logical Link Data Unit 1 (LDU1)"
 	# contains voice frames 1 through 9 of a superframe
@@ -259,8 +276,30 @@ elif data_unit_id == 5:
 	#
 	# TODO:
 	# + Encryption Sync Word
-	# + Link Control: 72 bits data, 168 bits parity
+		# Message Indicator (MI) 72 bits
+		#message_indicator = 
+		# Algorithm ID (ALGID) 8 bits
+		#algorithm_id = 
+		# Key ID (KID) 16 bits
+		#key_id = 
+		# 96 bits encoded with (24,16,9) Reed Solomon code and then (10,6,3) shortened Hamming code
+		# total length encoded: 240 bits
+		# "interleaved with the voice information" how?
+		# TODO: decode
+	# + Link Control Word (LC): 72 bits data, 168 bits parity
+		# variable format specified by first field:
+		# Link Control Format (LCF) 8 bits
+		# rest of frame is 64 bits of fields specified by LCF
+		# likeliy to include TGID, Source ID, Destination ID, Emergency indicator, MFID
+		# 72 bits encoded with (24,12,13) Reed Solomon code and then (10,6,3) shortened Hamming code
+		# total length encoded: 240 bits
+		# how added to voice frames?
+		# TODO: decode
 	# + Low Speed Data: 32 bits data, 32 bits parity
+		# 32 bits encoded with (16,8,5) shortened cyclic code
+		# total length encoded: 64 bits
+		# how added to voice frames?
+		# TODO: decode
 elif data_unit_id == 10:
 	print "found a Logical Link Data Unit 2 (LDU2)"
 	# contains voice frames (codewords) 10 through 18 of a superframe
