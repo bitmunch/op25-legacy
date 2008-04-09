@@ -39,8 +39,8 @@ def symbols_to_integer(symbols):
 		integer += symbol
 	return integer
 
-# de-interleave a sequence of 98 symbols
-def deinterleave(input):
+# de-interleave a sequence of 98 symbols (for data or control channel frame)
+def data_deinterleave(input):
 	output = []
 	for i in range(0,23,2):
 		for j in (0, 26, 50, 74):
@@ -190,8 +190,8 @@ if data_unit_id == 7:
 	print "Status Symbols: 0x%01x, 0x%01x, 0x%01x" % (symbols[71], symbols[107], symbols[143])
 	tsbk_symbols = symbols[57:71] + symbols[72:107] + symbols[108:143] + symbols[144:158]
 	#print "TSBK symbols: 0x%049x" % (symbols_to_integer(tsbk_symbols))
-	#print "TSBK deinterleaved: 0x%049x" % (symbols_to_integer(deinterleave(tsbk_symbols)))
-	tsbk_decoded = trellis_1_2_decode(deinterleave(tsbk_symbols))
+	#print "TSBK deinterleaved: 0x%049x" % (symbols_to_integer(data_deinterleave(tsbk_symbols)))
+	tsbk_decoded = trellis_1_2_decode(data_deinterleave(tsbk_symbols))
 	# TODO: verify with CRC
 	print "TSBK decoded: 0x%025x" % (symbols_to_integer(tsbk_decoded))
 	last_block_flag = tsbk_decoded[0] >> 1
@@ -205,9 +205,28 @@ elif data_unit_id == 12:
 	# TODO: decode
 elif data_unit_id == 0:
 	print "found a Header Data Unit"
+	# Header Data Unit aka Header Word
 	# header used prior to superframe
-	# TODO: decode
 	# total of 396 symbols (including frame sync)
+	# 120 bits data, encoded to 648 bits
+	# TODO: more status symbols
+	print "Status Symbols: 0x%01x, 0x%01x, 0x%01x, 0x%01x" % (symbols[71], symbols[107], symbols[143], symbols[158])
+	# Message Indicator (MI) 72 bits
+	message_indicator = symbols[57:71] + symbols [72:94]
+	# Manufacturer's ID (MFID) 8 bits
+	manufacturers_id = symbols[94:102]
+	if manufacturers_id > 0:
+		print "Non-standard Manufacturer's ID"
+	# Algorithm ID (ALGID) 8 bits
+	algorithm_id = symbols[102:106]
+	# Key ID (KID) 16 bits
+	key_id = symbols[106] + symbols[108:115]
+	# Talk-group ID (TGID) 16 bits
+	talk_group_id = symbols[115:123]
+	# TODO: (36,20,17) Reed-Solomon decoding
+	#rs_codeword = all of above and then some
+	# TODO: (18,6,8) shortened Golay decoding
+	#golay_codeword = all of above and then some (I think. Diagram is unclear)
 elif data_unit_id == 3:
 	print "found a Terminator without subsequent Link Control"
 	# terminator used after superframe
@@ -218,11 +237,30 @@ elif data_unit_id == 15:
 	print "found a Terminator with subsequent Link Control"
 	# terminator used after superframe
 	# consists of frame sync, NID, 288 bit Link Control Word (Golay encoded), plus status symbols
-	# TODO: decode
+	# TODO: decode Link Control
 elif data_unit_id == 5:
 	print "found a Logical Link Data Unit 1 (LDU1)"
-	# contains voice frames (codewords) 1 through 9 of a superframe
-	# TODO: decode
+	# contains voice frames 1 through 9 of a superframe
+	#
+	# each IMBE frame encodes 20 ms of voice in 88 bits
+	# words u_0, u_1, . . . u_7 may be encrypted
+	# 56 coding bits added for total of 144 bits
+	# 48 most important bits protected by (23,12,7) Golay code
+	# (u_0, u_1, u_2, u_3 12 bits each)
+	# TODO: Golay decoding
+	# next 33 important bits protected by (15,11,3 Hamming code
+	# (u_4, u_5, u_6, 11 bits each)
+	# TODO: Hamming decoding
+	# 7 least important bits unprotected
+	# (u_7 7 bits)
+	# words u_1, u_2, . . . u_6 are further xored by PN based on u_0
+	# TODO: de-randomization
+	# TODO: de-interleaving
+	#
+	# TODO:
+	# + Encryption Sync Word
+	# + Link Control: 72 bits data, 168 bits parity
+	# + Low Speed Data: 32 bits data, 32 bits parity
 elif data_unit_id == 10:
 	print "found a Logical Link Data Unit 2 (LDU2)"
 	# contains voice frames (codewords) 10 through 18 of a superframe
