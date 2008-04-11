@@ -93,6 +93,39 @@ def trellis_1_2_decode(input):
 		#print output
 	return output
 
+# fake (63,16,23) BCH decoder, no error correction
+# TODO: make less fake
+def bch_63_16_23_decode(input):
+	return input[:8]
+
+# fake (18,6,8) shortened Golay decoder, no error correction
+# TODO: make less fake
+def golay_18_6_8_decode(input):
+	output = []
+	for i in range(0,len(input),9):
+		codeword = input[i:i+9]
+		output.extend(codeword[:3])
+	return output
+
+# fake (36,20,17) Reed-Solomon decoder, no error correction
+# TODO: make less fake
+def rs_36_20_17_decode(input):
+	return input[:60]
+
+# fake (24,12,8) extended Golay decoder, no error correction
+# TODO: make less fake
+def golay_24_12_8_decode(input):
+	output = []
+	for i in range(0,len(input),12):
+		codeword = input[i:i+12]
+		output.extend(codeword[:6])
+	return output
+
+# fake (24,12,13) Reed-Solomon decoder, no error correction
+# TODO: make less fake
+def rs_24_12_13_decode(input):
+	return input[:36]
+
 # collect input sample statistics for normalization
 total_value = 0.0
 total_deviation = 0.0
@@ -188,9 +221,9 @@ print "frame sync: 0x%012x" % symbols_to_integer(symbols[0:24])
 # extract Network Identifier from in between status symbols
 nid_symbols = symbols[24:35] + symbols[36:57]
 
-# TODO: This is terrible.  Until we have a BCH decoder, just trust that the first 16 bits are correct
-network_access_code = symbols_to_integer(nid_symbols[:6])
-data_unit_id = symbols_to_integer(nid_symbols[6:8])
+network_id = bch_63_16_23_decode(nid_symbols)
+network_access_code = symbols_to_integer(network_id[:6])
+data_unit_id = symbols_to_integer(network_id[6:])
 
 print "NID codeword: 0x%016x" % (symbols_to_integer(nid_symbols))
 print "Network Access Code: 0x%03x, Data Unit ID: 0x%01x, first Status Symbol: 0x%01x" % (network_access_code, data_unit_id, symbols[35])
@@ -202,12 +235,13 @@ if data_unit_id == 7:
 	# we know there is at least one TSBK, so the frame is at least 158 symbols long
 	tsbk_symbols = symbols[57:158]
 	# spec diagram indicates status symbol at symbols[158] (if no more TSBKs), but I've only found nulls
+	# TODO: maybe there is a status symbol after the nulls
 	status_symbols = extract_status_symbols(tsbk_symbols)
 	print "Status Symbols: 0x%01x, 0x%01x, 0x%01x" % tuple(status_symbols)
-	tsbk_decoded = trellis_1_2_decode(data_deinterleave(tsbk_symbols))
+	tsbk = trellis_1_2_decode(data_deinterleave(tsbk_symbols))
 	# TODO: verify with CRC
-	print "TSBK decoded: 0x%025x" % (symbols_to_integer(tsbk_decoded))
-	last_block_flag = tsbk_decoded[0] >> 1
+	print "TSBK: 0x%025x" % (symbols_to_integer(tsbk))
+	last_block_flag = tsbk[0] >> 1
 	if not last_block_flag:
 		print "found another TSBK"
 		# TODO: rework to handle up to a total of four TSBKs
@@ -222,39 +256,44 @@ elif data_unit_id == 0:
 	# header used prior to superframe
 	# total of 396 symbols (including frame sync)
 	# 120 bits data, encoded to 648 bits
-	hdu_symbols = symbols[57:381]
+	hdu_symbols = symbols[57:396]
 	status_symbols = extract_status_symbols(hdu_symbols)
-	print "Status Symbols: 0x%01x, 0x%01x, 0x%01x, 0x%01x, . . ." % tuple(status_symbols[:4])
-	golay_codewords = hdu_symbols[:324]
-	# TODO: (18,6,8) shortened Golay decoding
-	#rs_codeword = golay_18_6_8_decode(golay_codewords)
-	# TODO: (36,20,17) Reed-Solomon decoding
-	#header_data_unit = rs_36_20_17_decode(rs_codeword)
+	print "Status Symbols: ",
+	for ss in status_symbols:
+		print "0x%01x, " % ss
+	golay_codewords = hdu_symbols[:381]
+	rs_codeword = golay_18_6_8_decode(golay_codewords)
+	header_data_unit = rs_36_20_17_decode(rs_codeword)
 	# Message Indicator (MI) 72 bits
-	#message_indicator = header_data_unit[:36]
+	message_indicator = header_data_unit[:36]
 	# Manufacturer's ID (MFID) 8 bits
-	#manufacturers_id = header_data_unit[36:40]
-	#if manufacturers_id > 0:
-		#print "Non-standard Manufacturer's ID"
+	manufacturers_id = header_data_unit[36:40]
+	if manufacturers_id > 0:
+		print "Non-standard Manufacturer's ID"
 	# Algorithm ID (ALGID) 8 bits
-	#algorithm_id = header_data_unit[40:44]
+	algorithm_id = header_data_unit[40:44]
 	# Key ID (KID) 16 bits
-	#key_id = header_data_unit[44:52]
+	key_id = header_data_unit[44:52]
 	# Talk-group ID (TGID) 16 bits
-	#talk_group_id = header_data_unit[52:60]
+	talk_group_id = header_data_unit[52:60]
 elif data_unit_id == 3:
-	print "found a Terminator without subsequent Link Control"
+	print "found a Terminator Data Unit without subsequent Link Control"
 	# terminator used after superframe
 	# may follow LDU1 or LDU2
-	# consists only of frame sync, NID, and one (or two?) status symbols
-	# TODO: maybe one more status symbol
+	print "Status Symbol: 0x%01x" % symbols[71]
 elif data_unit_id == 15:
-	print "found a Terminator with subsequent Link Control"
+	print "found a Terminator Data Unit with subsequent Link Control"
 	# terminator used after superframe
-	# consists of frame sync, NID, 288 bit Link Control Word (Golay encoded), plus status symbols
-	# TODO: decode Link Control
-	# see LDU1/LC for contents (differently encoded here)
-	# 72 bits encoded with (24,12,13) Reed Solomon code and then (24,12,8) extended Golay code
+	# may follow LDU1 or LDU2
+	terminator_symbols = symbols[57:216]
+	status_symbols = extract_status_symbols(terminator_symbols)
+	print "Status Symbols: ",
+	for ss in status_symbols:
+		print "0x%01x, " % ss
+	golay_codewords = terminator_symbols[:144]
+	rs_codeword = golay_24_12_8_decode(golay_codewords)
+	link_control = rs_24_12_13_decode(rs_codeword)
+	print "Link Control: 0x%09x" % (symbols_to_integer(link_control))
 elif data_unit_id == 5:
 	print "found a Logical Link Data Unit 1 (LDU1)"
 	# contains voice frames 1 through 9 of a superframe
