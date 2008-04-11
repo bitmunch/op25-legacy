@@ -50,6 +50,10 @@ def extract_status_symbols(symbols):
 	indices.reverse()
 	for i in indices:
 		status_symbols.append(symbols.pop(i))
+	print "Status Symbols: ",
+	for ss in status_symbols:
+		print "0x%01x" % ss,
+	print
 	return status_symbols
 
 # de-interleave a sequence of 98 symbols (for data or control channel frame)
@@ -231,19 +235,18 @@ print "Network Access Code: 0x%03x, Data Unit ID: 0x%01x, first Status Symbol: 0
 if data_unit_id == 7:
 	# this is a trunking control channel packet in the single block format
 	# contains one to four Trunking Signaling Blocks (TSBK)
-	print "found a TSBK"
+	print "found a Trunking Signaling Block"
 	# we know there is at least one TSBK, so the frame is at least 158 symbols long
 	tsbk_symbols = symbols[57:158]
 	# spec diagram indicates status symbol at symbols[158] (if no more TSBKs), but I've only found nulls
 	# TODO: maybe there is a status symbol after the nulls
 	status_symbols = extract_status_symbols(tsbk_symbols)
-	print "Status Symbols: 0x%01x, 0x%01x, 0x%01x" % tuple(status_symbols)
 	tsbk = trellis_1_2_decode(data_deinterleave(tsbk_symbols))
 	# TODO: verify with CRC
 	print "TSBK: 0x%025x" % (symbols_to_integer(tsbk))
 	last_block_flag = tsbk[0] >> 1
 	if not last_block_flag:
-		print "found another TSBK"
+		print "found another Trunking Signaling Block"
 		# TODO: rework to handle up to a total of four TSBKs
 elif data_unit_id == 12:
 	print "found a Packet Data Unit"
@@ -258,9 +261,6 @@ elif data_unit_id == 0:
 	# 120 bits data, encoded to 648 bits
 	hdu_symbols = symbols[57:396]
 	status_symbols = extract_status_symbols(hdu_symbols)
-	print "Status Symbols: ",
-	for ss in status_symbols:
-		print "0x%01x, " % ss
 	golay_codewords = hdu_symbols[:381]
 	rs_codeword = golay_18_6_8_decode(golay_codewords)
 	header_data_unit = rs_36_20_17_decode(rs_codeword)
@@ -287,9 +287,6 @@ elif data_unit_id == 15:
 	# may follow LDU1 or LDU2
 	terminator_symbols = symbols[57:216]
 	status_symbols = extract_status_symbols(terminator_symbols)
-	print "Status Symbols: ",
-	for ss in status_symbols:
-		print "0x%01x, " % ss
 	golay_codewords = terminator_symbols[:144]
 	rs_codeword = golay_24_12_8_decode(golay_codewords)
 	link_control = rs_24_12_13_decode(rs_codeword)
@@ -312,8 +309,49 @@ elif data_unit_id == 5:
 	# words u_1, u_2, . . . u_6 are further xored by PN based on u_0
 	# TODO: de-randomization
 	# TODO: de-interleaving
-	#
-	# TODO:
+	ldu_symbols = symbols[57:864]
+	status_symbols = extract_status_symbols(ldu_symbols)
+	imbe1_symbols = ldu_symbols[:72]
+	imbe2_symbols = ldu_symbols[72:144]
+	imbe3_symbols = ldu_symbols[164:236]
+	imbe4_symbols = ldu_symbols[256:328]
+	imbe5_symbols = ldu_symbols[348:420]
+	imbe6_symbols = ldu_symbols[440:512]
+	imbe7_symbols = ldu_symbols[532:604]
+	imbe8_symbols = ldu_symbols[624:696]
+	imbe9_symbols = ldu_symbols[712:784]
+	lc_symbols = ldu_symbols[144:164] + ldu_symbols[236:256] + ldu_symbols[328:348] + ldu_symbols[420:440] + ldu_symbols[512:532] + ldu_symbols[604:624]
+	lsd_symbols = ldu_symbols[696:712]
+	# + Link Control Word (LC): 72 bits data, 168 bits parity
+		# variable format specified by first field:
+		# Link Control Format (LCF) 8 bits
+		# rest of frame is 64 bits of fields specified by LCF
+		# likeliy to include TGID, Source ID, Destination ID, Emergency indicator, MFID
+		# 72 bits encoded with (24,12,13) Reed Solomon code and then (10,6,3) shortened Hamming code
+		# total length encoded: 240 bits
+		# TODO: decode
+	# + Low Speed Data: 32 bits data, 32 bits parity
+		# 32 bits encoded with (16,8,5) shortened cyclic code
+		# total length encoded: 64 bits
+		# huh? Is the other half in LDU2?
+		# TODO: decode
+elif data_unit_id == 10:
+	print "found a Logical Link Data Unit 2 (LDU2)"
+	# contains voice frames (codewords) 10 through 18 of a superframe
+	ldu_symbols = symbols[57:864]
+	status_symbols = extract_status_symbols(ldu_symbols)
+	imbe10_symbols = ldu_symbols[:72]
+	imbe11_symbols = ldu_symbols[72:144]
+	imbe12_symbols = ldu_symbols[164:236]
+	imbe13_symbols = ldu_symbols[256:328]
+	imbe14_symbols = ldu_symbols[348:420]
+	imbe15_symbols = ldu_symbols[440:512]
+	imbe16_symbols = ldu_symbols[532:604]
+	imbe17_symbols = ldu_symbols[624:696]
+	imbe_symbols = ldu_symbols[712:784]
+	esd_symbols = ldu_symbols[144:164] + ldu_symbols[236:256] + ldu_symbols[328:348] + ldu_symbols[420:440] + ldu_symbols[512:532] + ldu_symbols[604:624]
+	lsd_symbols = ldu_symbols[696:712]
+	# TODO: decode
 	# + Encryption Sync Word
 		# Message Indicator (MI) 72 bits
 		#message_indicator = 
@@ -322,26 +360,5 @@ elif data_unit_id == 5:
 		# Key ID (KID) 16 bits
 		#key_id = 
 		# 96 bits encoded with (24,16,9) Reed Solomon code and then (10,6,3) shortened Hamming code
-		# total length encoded: 240 bits
-		# "interleaved with the voice information" how?
-		# TODO: decode
-	# + Link Control Word (LC): 72 bits data, 168 bits parity
-		# variable format specified by first field:
-		# Link Control Format (LCF) 8 bits
-		# rest of frame is 64 bits of fields specified by LCF
-		# likeliy to include TGID, Source ID, Destination ID, Emergency indicator, MFID
-		# 72 bits encoded with (24,12,13) Reed Solomon code and then (10,6,3) shortened Hamming code
-		# total length encoded: 240 bits
-		# how added to voice frames?
-		# TODO: decode
-	# + Low Speed Data: 32 bits data, 32 bits parity
-		# 32 bits encoded with (16,8,5) shortened cyclic code
-		# total length encoded: 64 bits
-		# how added to voice frames?
-		# TODO: decode
-elif data_unit_id == 10:
-	print "found a Logical Link Data Unit 2 (LDU2)"
-	# contains voice frames (codewords) 10 through 18 of a superframe
-	# TODO: decode
 else:
 	print "unknown Data Unit ID"
