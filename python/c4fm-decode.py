@@ -97,9 +97,10 @@ def trellis_1_2_decode(input):
 		#print output
 	return output
 
-# fake (63,16,23) BCH decoder, no error correction
+# fake (64,16,23) BCH decoder, no error correction
+# spec sometimes refers to this as (63,16,23) plus a parity bit
 # TODO: make less fake
-def bch_63_16_23_decode(input):
+def bch_64_16_23_decode(input):
 	return input[:8]
 
 # fake (18,6,8) shortened Golay decoder, no error correction
@@ -111,11 +112,6 @@ def golay_18_6_8_decode(input):
 		output.extend(codeword[:3])
 	return output
 
-# fake (36,20,17) Reed-Solomon decoder, no error correction
-# TODO: make less fake
-def rs_36_20_17_decode(input):
-	return input[:60]
-
 # fake (24,12,8) extended Golay decoder, no error correction
 # TODO: make less fake
 def golay_24_12_8_decode(input):
@@ -125,10 +121,58 @@ def golay_24_12_8_decode(input):
 		output.extend(codeword[:6])
 	return output
 
+# fake (10,6,3) shortened Hamming decoder, no error correction
+# TODO: make less fake
+def hamming_10_6_3_decode(input):
+	output = []
+	for i in range(0,len(input),5):
+		codeword = input[i:i+5]
+		output.extend(codeword[:3])
+	return output
+
 # fake (24,12,13) Reed-Solomon decoder, no error correction
 # TODO: make less fake
 def rs_24_12_13_decode(input):
 	return input[:36]
+
+# fake (24,16,9) Reed-Solomon decoder, no error correction
+# TODO: make less fake
+def rs_24_16_9_decode(input):
+	return input[:48]
+
+# fake (36,20,17) Reed-Solomon decoder, no error correction
+# TODO: make less fake
+def rs_36_20_17_decode(input):
+	return input[:60]
+
+# fake (16_8_5) shortened cyclic decoder, no error correction
+# TODO: make less fake
+def cyclic_16_8_5_decode(input):
+	output = []
+	for i in range(0,len(input),8):
+		codeword = input[i:i+8]
+		output.extend(codeword[:4])
+	return output
+
+# fake IMBE frame decoder
+# TODO: make less fake
+#
+# each IMBE frame encodes 20 ms of voice in 88 bits
+# words u_0, u_1, . . . u_7 may be encrypted
+# 56 coding bits added for total of 144 bits
+# 48 most important bits protected by (23,12,7) Golay code
+# (u_0, u_1, u_2, u_3 12 bits each)
+# TODO: Golay decoding
+# next 33 important bits protected by (15,11,3 Hamming code
+# (u_4, u_5, u_6, 11 bits each)
+# TODO: Hamming decoding
+# 7 least important bits unprotected
+# (u_7 7 bits)
+# words u_1, u_2, . . . u_6 are further xored by PN based on u_0
+# TODO: de-randomization
+# TODO: de-interleaving
+def imbe_decode(input):
+	print "Raw IMBE frame: 0x%0x" % (symbols_to_integer(input))
 
 # collect input sample statistics for normalization
 total_value = 0.0
@@ -225,7 +269,7 @@ print "frame sync: 0x%012x" % symbols_to_integer(symbols[0:24])
 # extract Network Identifier from in between status symbols
 nid_symbols = symbols[24:35] + symbols[36:57]
 
-network_id = bch_63_16_23_decode(nid_symbols)
+network_id = bch_64_16_23_decode(nid_symbols)
 network_access_code = symbols_to_integer(network_id[:6])
 data_unit_id = symbols_to_integer(network_id[6:])
 
@@ -290,75 +334,69 @@ elif data_unit_id == 15:
 	golay_codewords = terminator_symbols[:144]
 	rs_codeword = golay_24_12_8_decode(golay_codewords)
 	link_control = rs_24_12_13_decode(rs_codeword)
-	print "Link Control: 0x%09x" % (symbols_to_integer(link_control))
+	print "Link Control: 0x%018x" % (symbols_to_integer(link_control))
 elif data_unit_id == 5:
 	print "found a Logical Link Data Unit 1 (LDU1)"
 	# contains voice frames 1 through 9 of a superframe
-	#
-	# each IMBE frame encodes 20 ms of voice in 88 bits
-	# words u_0, u_1, . . . u_7 may be encrypted
-	# 56 coding bits added for total of 144 bits
-	# 48 most important bits protected by (23,12,7) Golay code
-	# (u_0, u_1, u_2, u_3 12 bits each)
-	# TODO: Golay decoding
-	# next 33 important bits protected by (15,11,3 Hamming code
-	# (u_4, u_5, u_6, 11 bits each)
-	# TODO: Hamming decoding
-	# 7 least important bits unprotected
-	# (u_7 7 bits)
-	# words u_1, u_2, . . . u_6 are further xored by PN based on u_0
-	# TODO: de-randomization
-	# TODO: de-interleaving
 	ldu_symbols = symbols[57:864]
 	status_symbols = extract_status_symbols(ldu_symbols)
-	imbe1_symbols = ldu_symbols[:72]
-	imbe2_symbols = ldu_symbols[72:144]
-	imbe3_symbols = ldu_symbols[164:236]
-	imbe4_symbols = ldu_symbols[256:328]
-	imbe5_symbols = ldu_symbols[348:420]
-	imbe6_symbols = ldu_symbols[440:512]
-	imbe7_symbols = ldu_symbols[532:604]
-	imbe8_symbols = ldu_symbols[624:696]
-	imbe9_symbols = ldu_symbols[712:784]
-	lc_symbols = ldu_symbols[144:164] + ldu_symbols[236:256] + ldu_symbols[328:348] + ldu_symbols[420:440] + ldu_symbols[512:532] + ldu_symbols[604:624]
-	lsd_symbols = ldu_symbols[696:712]
-	# + Link Control Word (LC): 72 bits data, 168 bits parity
-		# variable format specified by first field:
-		# Link Control Format (LCF) 8 bits
-		# rest of frame is 64 bits of fields specified by LCF
-		# likeliy to include TGID, Source ID, Destination ID, Emergency indicator, MFID
-		# 72 bits encoded with (24,12,13) Reed Solomon code and then (10,6,3) shortened Hamming code
-		# total length encoded: 240 bits
-		# TODO: decode
-	# + Low Speed Data: 32 bits data, 32 bits parity
-		# 32 bits encoded with (16,8,5) shortened cyclic code
-		# total length encoded: 64 bits
-		# huh? Is the other half in LDU2?
-		# TODO: decode
+	imbe_symbols = []
+	imbe_symbols.append(ldu_symbols[:72])
+	imbe_symbols.append(ldu_symbols[72:144])
+	imbe_symbols.append(ldu_symbols[164:236])
+	imbe_symbols.append(ldu_symbols[256:328])
+	imbe_symbols.append(ldu_symbols[348:420])
+	imbe_symbols.append(ldu_symbols[440:512])
+	imbe_symbols.append(ldu_symbols[532:604])
+	imbe_symbols.append(ldu_symbols[624:696])
+	imbe_symbols.append(ldu_symbols[712:784])
+	for frame in imbe_symbols:
+		imbe_decode(frame)
+	link_control_symbols = ldu_symbols[144:164] + ldu_symbols[236:256] + ldu_symbols[328:348] + ldu_symbols[420:440] + ldu_symbols[512:532] + ldu_symbols[604:624]
+	low_speed_data_symbols = ldu_symbols[696:712]
+	link_control_rs_codeword = hamming_10_6_3_decode(link_control_symbols)
+	link_control = rs_24_12_13_decode(link_control_rs_codeword)
+	print "Link Control: 0x%018x" % (symbols_to_integer(link_control))
+	link_control_format = link_control[:4]
+	print "Link Control Format: 0x%02x" % (symbols_to_integer(link_control_format))
+	# rest of link control frame is 64 bits of fields specified by LCF
+	# likeliy to include TGID, Source ID, Destination ID, Emergency indicator, MFID
+	low_speed_data = cyclic_16_8_5_decode(low_speed_data_symbols)
+	print "Low Speed Data: 0x%04x" % (symbols_to_integer(low_speed_data))
+	# spec says Low Speed Data = 32 bits data + 32 bits parity
+	# huh? Is the other half in LDU2?
 elif data_unit_id == 10:
-	print "found a Logical Link Data Unit 2 (LDU2)"
 	# contains voice frames (codewords) 10 through 18 of a superframe
+	print "found a Logical Link Data Unit 2 (LDU2)"
 	ldu_symbols = symbols[57:864]
 	status_symbols = extract_status_symbols(ldu_symbols)
-	imbe10_symbols = ldu_symbols[:72]
-	imbe11_symbols = ldu_symbols[72:144]
-	imbe12_symbols = ldu_symbols[164:236]
-	imbe13_symbols = ldu_symbols[256:328]
-	imbe14_symbols = ldu_symbols[348:420]
-	imbe15_symbols = ldu_symbols[440:512]
-	imbe16_symbols = ldu_symbols[532:604]
-	imbe17_symbols = ldu_symbols[624:696]
-	imbe_symbols = ldu_symbols[712:784]
-	esd_symbols = ldu_symbols[144:164] + ldu_symbols[236:256] + ldu_symbols[328:348] + ldu_symbols[420:440] + ldu_symbols[512:532] + ldu_symbols[604:624]
-	lsd_symbols = ldu_symbols[696:712]
-	# TODO: decode
-	# + Encryption Sync Word
-		# Message Indicator (MI) 72 bits
-		#message_indicator = 
-		# Algorithm ID (ALGID) 8 bits
-		#algorithm_id = 
-		# Key ID (KID) 16 bits
-		#key_id = 
-		# 96 bits encoded with (24,16,9) Reed Solomon code and then (10,6,3) shortened Hamming code
+	imbe_symbols = []
+	imbe_symbols.append(ldu_symbols[:72])
+	imbe_symbols.append(ldu_symbols[72:144])
+	imbe_symbols.append(ldu_symbols[164:236])
+	imbe_symbols.append(ldu_symbols[256:328])
+	imbe_symbols.append(ldu_symbols[348:420])
+	imbe_symbols.append(ldu_symbols[440:512])
+	imbe_symbols.append(ldu_symbols[532:604])
+	imbe_symbols.append(ldu_symbols[624:696])
+	imbe_symbols.append(ldu_symbols[712:784])
+	for frame in imbe_symbols:
+		imbe_decode(frame)
+	encryption_sync_symbols = ldu_symbols[144:164] + ldu_symbols[236:256] + ldu_symbols[328:348] + ldu_symbols[420:440] + ldu_symbols[512:532] + ldu_symbols[604:624]
+	low_speed_data_symbols = ldu_symbols[696:712]
+	encryption_sync_rs_codeword = hamming_10_6_3_decode(encryption_sync_symbols)
+	encryption_sync = rs_24_16_9_decode(encryption_sync_rs_codeword)
+	print "Encryption Sync Word: 0x%024x" % (symbols_to_integer(encryption_sync))
+	# Message Indicator (MI) 72 bits
+	message_indicator = encryption_sync[:36]
+	print "Message Indicator: 0x%018x" % (symbols_to_integer(message_indicator))
+	# Algorithm ID (ALGID) 8 bits
+	algorithm_id = encryption_sync[36:40]
+	print "Algorithm ID: 0x%02x" % (symbols_to_integer(algorithm_id))
+	# Key ID (KID) 16 bits
+	key_id = encryption_sync[40:48]
+	print "Key ID: 0x%04x" % (symbols_to_integer(key_id))
+	low_speed_data = cyclic_16_8_5_decode(low_speed_data_symbols)
+	print "Low Speed Data: 0x%04x" % (symbols_to_integer(low_speed_data))
 else:
 	print "unknown Data Unit ID"
