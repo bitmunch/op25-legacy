@@ -7,7 +7,7 @@ from optparse import OptionParser
 prototype P25 frame decoder
 
 input: short frequency demodulated signal capture including at least one frame (output of c4fm_demod.py)
-output: symbols of a single frame (plus some excess)
+output: decoded frames
 
 This horrifying mess is a prototype for stuff that will most likely end up as gnuradio signal processing blocks.
 """
@@ -20,10 +20,23 @@ parser.add_option("-s", "--samples-per-symbol", type="int", default=10, help="sa
 # frame synchronization header (in form most useful for correlation)
 frame_sync = [1, 1, 1, 1, 1, -1, 1, 1, -1, -1, 1, 1, -1, -1, -1, -1, 1, -1, 1, -1, -1, -1, -1, -1]
 minimum_span = options.samples_per_symbol // 2 # minimum number of adjacent correlations required to convince us
+# maximum number of symbols to look for in a frame  (Is this correct?)
+max_frame_length = 864
+symbol_rate = 4800
 data = open(options.input_file).read()
 input_samples = struct.unpack('f1'*(len(data)/4), data)
 sync_samples = [] # subset of input samples synchronized with respect to frame sync
 symbols = [] # recovered symbols (including frame sync)
+
+# collect input sample statistics for normalization
+total_value = 0.0
+total_deviation = 0.0
+count = 0
+for sample in input_samples:
+	total_value += sample
+	total_deviation += abs(sample)
+mean_value = total_value / len(input_samples)
+mean_deviation = total_deviation / len(input_samples)
 
 # return average (mean) of a list of values
 def average(list):
@@ -172,46 +185,42 @@ def cyclic_16_8_5_decode(input):
 # TODO: de-randomization
 # TODO: de-interleaving
 def imbe_decode(input):
-	print "Raw IMBE frame: 0x%0x" % (symbols_to_integer(input))
-
-# collect input sample statistics for normalization
-total_value = 0.0
-total_deviation = 0.0
-count = 0
-for sample in input_samples:
-	total_value += sample
-	total_deviation += abs(sample)
-mean_value = total_value / len(input_samples)
-mean_deviation = total_deviation / len(input_samples)
+	print "Raw IMBE frame: 0x%036x" % (symbols_to_integer(input))
 
 # correlate (multiply-accumulate) frame sync
-first = 0
-last = 0
-interesting = 0
-correlation_threshold = len(frame_sync) * mean_deviation
-for i in range(len(input_samples) - len(frame_sync) * options.samples_per_symbol):
-	correlation = 0
-	for j in range(len(frame_sync)):
-		correlation += frame_sync[j] * (input_samples[i + j * options.samples_per_symbol] - mean_value)
-	#print i, correlation
-	if interesting:
-		if correlation < correlation_threshold:
-			if i >= (first + minimum_span):
-				last = i
-				break
-			else:
-				first = 0
-				interesting = 0
-	elif correlation >= correlation_threshold:
-		first = i
-		interesting = 1
+def correlate(start):
+	first = 0
+	last = 0
+	interesting = 0
+	correlation_threshold = len(frame_sync) * mean_deviation
+	for i in range(start,len(input_samples) - len(frame_sync) * options.samples_per_symbol):
+		correlation = 0
+		for j in range(len(frame_sync)):
+			correlation += frame_sync[j] * (input_samples[i + j * options.samples_per_symbol] - mean_value)
+		#print i, correlation
+		if interesting:
+			if correlation < correlation_threshold:
+				if i >= (first + minimum_span):
+					last = i
+					break
+				else:
+					first = 0
+					interesting = 0
+		elif correlation >= correlation_threshold:
+			first = i
+			interesting = 1
+	if last:
+		# return center point of several adjacent correlations
+		return first + ((last - first) // 2)
+	else:
+		return 0
 
 # downsample to symbol rate (with integrate and dump)
-if last:
-	# use center point of several adjacent correlations
-	center = first + ((last - first) // 2)
-	# grab samples for symbol thereafter
-	for i in range(center, len(input_samples), options.samples_per_symbol):
+def downsample(start):
+	sync_samples = []
+	# grab samples for symbols starting with frame sync
+	#for i in range(start, len(input_samples), options.samples_per_symbol):
+	for i in range(start, start + (max_frame_length * options.samples_per_symbol), options.samples_per_symbol):
 		# "integrate and dump"
 		# Add up several (samples_per_symbol) adjacent samples to create a single
 		# (downsampled) sample as specified by the P25 CAI standard.
@@ -221,40 +230,44 @@ if last:
 		for sample in input_samples[start:end]: total += sample
 		sync_samples.append(total)
 		#print i, sync_samples[-1]
+	return sync_samples
 
-# determine symbol thresholds
-highs = []
-lows = []
-# Check out the frame sync samples since we are certain what symbols
-# each one ought to be. The frame sync only uses half (the highest and
-# lowest) of the four frequency deviations.
-for i in range(len(frame_sync)):
-	if frame_sync[i] == 1:
-		highs.append(sync_samples[i])
-	else:
-		lows.append(sync_samples[i])
-high = average(highs)
-low = average(lows)
-# Use these averages to establish thresholds between ranges of frequency deviations.
-step = (high - low) / 6
-low_threshold = low + step
-middle_threshold = low + (3 * step)
-high_threshold = low + (5 * step)
-
-# assign each sample to a symbol
-for sample in sync_samples:
-	if sample < low_threshold:
-		# dibit 0b11
-		symbols.append(3)
-	elif sample < middle_threshold:
-		# dibit 0b10
-		symbols.append(2)
-	elif sample < high_threshold:
-		# dibit 0b00
-		symbols.append(0)
-	else:
-		# dibit 0b01
-		symbols.append(1)
+def hard_decision(samples):
+	symbols = []
+	# determine symbol thresholds
+	highs = []
+	lows = []
+	# Check out the frame sync samples since we are certain what symbols
+	# each one ought to be. The frame sync only uses half (the highest and
+	# lowest) of the four frequency deviations.
+	for i in range(len(frame_sync)):
+		if frame_sync[i] == 1:
+			highs.append(samples[i])
+		else:
+			lows.append(samples[i])
+	high = average(highs)
+	low = average(lows)
+	# Use these averages to establish thresholds between ranges of frequency deviations.
+	step = (high - low) / 6
+	low_threshold = low + step
+	middle_threshold = low + (3 * step)
+	high_threshold = low + (5 * step)
+	
+	# assign each sample to a symbol (hard decision)
+	for sample in samples:
+		if sample < low_threshold:
+			# dibit 0b11
+			symbols.append(3)
+		elif sample < middle_threshold:
+			# dibit 0b10
+			symbols.append(2)
+		elif sample < high_threshold:
+			# dibit 0b00
+			symbols.append(0)
+		else:
+			# dibit 0b01
+			symbols.append(1)
+	return symbols
 
 # We have to do a little decoding in order to know how long the frame is.
 # Plus, we may want to use soft values for error correction decoding.  Then we
@@ -265,138 +278,176 @@ for sample in sync_samples:
 # network_identifier = symbols[24:57] (including status symbol at symbols[35])
 # unknown_blocks = symbols[57:?] (including status symbols after every 35 symbols)
 
-print "frame sync: 0x%012x" % symbols_to_integer(symbols[0:24])
-# extract Network Identifier from in between status symbols
-nid_symbols = symbols[24:35] + symbols[36:57]
+def decode_frame(symbols):
+	# Keep track of how many symbols we've decoded.
+	# For now, make a terrible guess that can be overridden if/when we know better.
+	consumed = max_frame_length
+	print "Frame Sync: 0x%012x" % symbols_to_integer(symbols[0:24])
+	# extract Network Identifier from in between status symbols
+	nid_symbols = symbols[24:35] + symbols[36:57]
+	
+	network_id = bch_64_16_23_decode(nid_symbols)
+	network_access_code = symbols_to_integer(network_id[:6])
+	data_unit_id = symbols_to_integer(network_id[6:])
+	
+	print "NID codeword: 0x%016x" % (symbols_to_integer(nid_symbols))
+	print "Network Access Code: 0x%03x, Data Unit ID: 0x%01x, first Status Symbol: 0x%01x" % (network_access_code, data_unit_id, symbols[35])
+	
+	if data_unit_id == 7:
+		# this is a trunking control channel packet in the single block format
+		# contains one to four Trunking Signaling Blocks (TSBK)
+		print "Found a Trunking Signaling Block"
+		# we know there is at least one TSBK, so the frame is at least 158 symbols long
+		tsbk_symbols = symbols[57:158]
+		# spec diagram indicates status symbol at symbols[158] (if no more TSBKs), but I've only found nulls
+		# TODO: maybe there is a status symbol after the nulls
+		status_symbols = extract_status_symbols(tsbk_symbols)
+		tsbk = trellis_1_2_decode(data_deinterleave(tsbk_symbols))
+		# TODO: verify with CRC
+		print "TSBK: 0x%025x" % (symbols_to_integer(tsbk))
+		last_block_flag = tsbk[0] >> 1
+		if not last_block_flag:
+			print "Found another Trunking Signaling Block"
+			# TODO: rework to handle up to a total of four TSBKs
+		consumed = 158
+	elif data_unit_id == 12:
+		print "Found a Packet Data Unit"
+		# could be a multi-block control channel packet
+		# could be a confirmed or unconfirmed data packet
+		# need to decode header to find out what the rest of the frame looks like
+		header_symbols = symbols[57:106]
+		status_symbols = extract_status_symbols(tsbk_symbols)
+		#crc_ccitt
+		# TODO: decode
+	elif data_unit_id == 0:
+		print "Found a Header Data Unit"
+		# Header Data Unit aka Header Word
+		# header used prior to superframe
+		# total of 396 symbols (including frame sync)
+		# 120 bits data, encoded to 648 bits
+		hdu_symbols = symbols[57:396]
+		status_symbols = extract_status_symbols(hdu_symbols)
+		golay_codewords = hdu_symbols[:381]
+		rs_codeword = golay_18_6_8_decode(golay_codewords)
+		header_data_unit = rs_36_20_17_decode(rs_codeword)
+		# Message Indicator (MI) 72 bits
+		message_indicator = header_data_unit[:36]
+		print "Message Indicator: 0x%018x" % (symbols_to_integer(message_indicator))
+		# Manufacturer's ID (MFID) 8 bits
+		manufacturers_id = header_data_unit[36:40]
+		print "Manufacturer's ID: 0x%02x" % (symbols_to_integer(manufacturers_id))
+		if symbols_to_integer(manufacturers_id) > 0:
+			print "Non-standard Manufacturer's ID"
+		# Algorithm ID (ALGID) 8 bits
+		algorithm_id = header_data_unit[40:44]
+		print "Algorithm ID: 0x%02x" % (symbols_to_integer(algorithm_id))
+		# Key ID (KID) 16 bits
+		key_id = header_data_unit[44:52]
+		print "Key ID: 0x%04x" % (symbols_to_integer(key_id))
+		# Talk-group ID (TGID) 16 bits
+		talk_group_id = header_data_unit[52:60]
+		print "Talk Group ID: 0x%04x" % (symbols_to_integer(talk_group_id))
+		consumed = 396
+	elif data_unit_id == 3:
+		print "Found a Terminator Data Unit without subsequent Link Control"
+		# terminator used after superframe
+		# may follow LDU1 or LDU2
+		print "Status Symbol: 0x%01x" % symbols[71]
+		consumed = 72
+	elif data_unit_id == 15:
+		print "Found a Terminator Data Unit with subsequent Link Control"
+		# terminator used after superframe
+		# may follow LDU1 or LDU2
+		terminator_symbols = symbols[57:216]
+		status_symbols = extract_status_symbols(terminator_symbols)
+		golay_codewords = terminator_symbols[:144]
+		rs_codeword = golay_24_12_8_decode(golay_codewords)
+		link_control = rs_24_12_13_decode(rs_codeword)
+		print "Link Control: 0x%018x" % (symbols_to_integer(link_control))
+		consumed = 216
+	elif data_unit_id == 5:
+		print "Found a Logical Link Data Unit 1 (LDU1)"
+		# contains voice frames 1 through 9 of a superframe
+		ldu_symbols = symbols[57:864]
+		status_symbols = extract_status_symbols(ldu_symbols)
+		imbe_symbols = []
+		imbe_symbols.append(ldu_symbols[:72])
+		imbe_symbols.append(ldu_symbols[72:144])
+		imbe_symbols.append(ldu_symbols[164:236])
+		imbe_symbols.append(ldu_symbols[256:328])
+		imbe_symbols.append(ldu_symbols[348:420])
+		imbe_symbols.append(ldu_symbols[440:512])
+		imbe_symbols.append(ldu_symbols[532:604])
+		imbe_symbols.append(ldu_symbols[624:696])
+		imbe_symbols.append(ldu_symbols[712:784])
+		for frame in imbe_symbols:
+			imbe_decode(frame)
+		link_control_symbols = ldu_symbols[144:164] + ldu_symbols[236:256] + ldu_symbols[328:348] + ldu_symbols[420:440] + ldu_symbols[512:532] + ldu_symbols[604:624]
+		low_speed_data_symbols = ldu_symbols[696:712]
+		link_control_rs_codeword = hamming_10_6_3_decode(link_control_symbols)
+		link_control = rs_24_12_13_decode(link_control_rs_codeword)
+		print "Link Control: 0x%018x" % (symbols_to_integer(link_control))
+		link_control_format = link_control[:4]
+		print "Link Control Format: 0x%02x" % (symbols_to_integer(link_control_format))
+		# rest of link control frame is 64 bits of fields specified by LCF
+		# likeliy to include TGID, Source ID, Destination ID, Emergency indicator, MFID
+		low_speed_data = cyclic_16_8_5_decode(low_speed_data_symbols)
+		print "Low Speed Data: 0x%04x" % (symbols_to_integer(low_speed_data))
+		# spec says Low Speed Data = 32 bits data + 32 bits parity
+		# huh? Is the other half in LDU2?
+		consumed = 864
+	elif data_unit_id == 10:
+		# contains voice frames (codewords) 10 through 18 of a superframe
+		print "Found a Logical Link Data Unit 2 (LDU2)"
+		ldu_symbols = symbols[57:864]
+		status_symbols = extract_status_symbols(ldu_symbols)
+		imbe_symbols = []
+		imbe_symbols.append(ldu_symbols[:72])
+		imbe_symbols.append(ldu_symbols[72:144])
+		imbe_symbols.append(ldu_symbols[164:236])
+		imbe_symbols.append(ldu_symbols[256:328])
+		imbe_symbols.append(ldu_symbols[348:420])
+		imbe_symbols.append(ldu_symbols[440:512])
+		imbe_symbols.append(ldu_symbols[532:604])
+		imbe_symbols.append(ldu_symbols[624:696])
+		imbe_symbols.append(ldu_symbols[712:784])
+		for frame in imbe_symbols:
+			imbe_decode(frame)
+		encryption_sync_symbols = ldu_symbols[144:164] + ldu_symbols[236:256] + ldu_symbols[328:348] + ldu_symbols[420:440] + ldu_symbols[512:532] + ldu_symbols[604:624]
+		low_speed_data_symbols = ldu_symbols[696:712]
+		encryption_sync_rs_codeword = hamming_10_6_3_decode(encryption_sync_symbols)
+		encryption_sync = rs_24_16_9_decode(encryption_sync_rs_codeword)
+		print "Encryption Sync Word: 0x%024x" % (symbols_to_integer(encryption_sync))
+		# Message Indicator (MI) 72 bits
+		message_indicator = encryption_sync[:36]
+		print "Message Indicator: 0x%018x" % (symbols_to_integer(message_indicator))
+		# Algorithm ID (ALGID) 8 bits
+		algorithm_id = encryption_sync[36:40]
+		print "Algorithm ID: 0x%02x" % (symbols_to_integer(algorithm_id))
+		# Key ID (KID) 16 bits
+		key_id = encryption_sync[40:48]
+		print "Key ID: 0x%04x" % (symbols_to_integer(key_id))
+		low_speed_data = cyclic_16_8_5_decode(low_speed_data_symbols)
+		print "Low Speed Data: 0x%04x" % (symbols_to_integer(low_speed_data))
+		consumed = 864
+	else:
+		print "unknown Data Unit ID"
+	return consumed
 
-network_id = bch_64_16_23_decode(nid_symbols)
-network_access_code = symbols_to_integer(network_id[:6])
-data_unit_id = symbols_to_integer(network_id[6:])
-
-print "NID codeword: 0x%016x" % (symbols_to_integer(nid_symbols))
-print "Network Access Code: 0x%03x, Data Unit ID: 0x%01x, first Status Symbol: 0x%01x" % (network_access_code, data_unit_id, symbols[35])
-
-if data_unit_id == 7:
-	# this is a trunking control channel packet in the single block format
-	# contains one to four Trunking Signaling Blocks (TSBK)
-	print "found a Trunking Signaling Block"
-	# we know there is at least one TSBK, so the frame is at least 158 symbols long
-	tsbk_symbols = symbols[57:158]
-	# spec diagram indicates status symbol at symbols[158] (if no more TSBKs), but I've only found nulls
-	# TODO: maybe there is a status symbol after the nulls
-	status_symbols = extract_status_symbols(tsbk_symbols)
-	tsbk = trellis_1_2_decode(data_deinterleave(tsbk_symbols))
-	# TODO: verify with CRC
-	print "TSBK: 0x%025x" % (symbols_to_integer(tsbk))
-	last_block_flag = tsbk[0] >> 1
-	if not last_block_flag:
-		print "found another Trunking Signaling Block"
-		# TODO: rework to handle up to a total of four TSBKs
-elif data_unit_id == 12:
-	print "found a Packet Data Unit"
-	# could be a multi-block control channel packet
-	# could be a confirmed or unconfirmed data packet
-	# TODO: decode
-elif data_unit_id == 0:
-	print "found a Header Data Unit"
-	# Header Data Unit aka Header Word
-	# header used prior to superframe
-	# total of 396 symbols (including frame sync)
-	# 120 bits data, encoded to 648 bits
-	hdu_symbols = symbols[57:396]
-	status_symbols = extract_status_symbols(hdu_symbols)
-	golay_codewords = hdu_symbols[:381]
-	rs_codeword = golay_18_6_8_decode(golay_codewords)
-	header_data_unit = rs_36_20_17_decode(rs_codeword)
-	# Message Indicator (MI) 72 bits
-	message_indicator = header_data_unit[:36]
-	# Manufacturer's ID (MFID) 8 bits
-	manufacturers_id = header_data_unit[36:40]
-	if manufacturers_id > 0:
-		print "Non-standard Manufacturer's ID"
-	# Algorithm ID (ALGID) 8 bits
-	algorithm_id = header_data_unit[40:44]
-	# Key ID (KID) 16 bits
-	key_id = header_data_unit[44:52]
-	# Talk-group ID (TGID) 16 bits
-	talk_group_id = header_data_unit[52:60]
-elif data_unit_id == 3:
-	print "found a Terminator Data Unit without subsequent Link Control"
-	# terminator used after superframe
-	# may follow LDU1 or LDU2
-	print "Status Symbol: 0x%01x" % symbols[71]
-elif data_unit_id == 15:
-	print "found a Terminator Data Unit with subsequent Link Control"
-	# terminator used after superframe
-	# may follow LDU1 or LDU2
-	terminator_symbols = symbols[57:216]
-	status_symbols = extract_status_symbols(terminator_symbols)
-	golay_codewords = terminator_symbols[:144]
-	rs_codeword = golay_24_12_8_decode(golay_codewords)
-	link_control = rs_24_12_13_decode(rs_codeword)
-	print "Link Control: 0x%018x" % (symbols_to_integer(link_control))
-elif data_unit_id == 5:
-	print "found a Logical Link Data Unit 1 (LDU1)"
-	# contains voice frames 1 through 9 of a superframe
-	ldu_symbols = symbols[57:864]
-	status_symbols = extract_status_symbols(ldu_symbols)
-	imbe_symbols = []
-	imbe_symbols.append(ldu_symbols[:72])
-	imbe_symbols.append(ldu_symbols[72:144])
-	imbe_symbols.append(ldu_symbols[164:236])
-	imbe_symbols.append(ldu_symbols[256:328])
-	imbe_symbols.append(ldu_symbols[348:420])
-	imbe_symbols.append(ldu_symbols[440:512])
-	imbe_symbols.append(ldu_symbols[532:604])
-	imbe_symbols.append(ldu_symbols[624:696])
-	imbe_symbols.append(ldu_symbols[712:784])
-	for frame in imbe_symbols:
-		imbe_decode(frame)
-	link_control_symbols = ldu_symbols[144:164] + ldu_symbols[236:256] + ldu_symbols[328:348] + ldu_symbols[420:440] + ldu_symbols[512:532] + ldu_symbols[604:624]
-	low_speed_data_symbols = ldu_symbols[696:712]
-	link_control_rs_codeword = hamming_10_6_3_decode(link_control_symbols)
-	link_control = rs_24_12_13_decode(link_control_rs_codeword)
-	print "Link Control: 0x%018x" % (symbols_to_integer(link_control))
-	link_control_format = link_control[:4]
-	print "Link Control Format: 0x%02x" % (symbols_to_integer(link_control_format))
-	# rest of link control frame is 64 bits of fields specified by LCF
-	# likeliy to include TGID, Source ID, Destination ID, Emergency indicator, MFID
-	low_speed_data = cyclic_16_8_5_decode(low_speed_data_symbols)
-	print "Low Speed Data: 0x%04x" % (symbols_to_integer(low_speed_data))
-	# spec says Low Speed Data = 32 bits data + 32 bits parity
-	# huh? Is the other half in LDU2?
-elif data_unit_id == 10:
-	# contains voice frames (codewords) 10 through 18 of a superframe
-	print "found a Logical Link Data Unit 2 (LDU2)"
-	ldu_symbols = symbols[57:864]
-	status_symbols = extract_status_symbols(ldu_symbols)
-	imbe_symbols = []
-	imbe_symbols.append(ldu_symbols[:72])
-	imbe_symbols.append(ldu_symbols[72:144])
-	imbe_symbols.append(ldu_symbols[164:236])
-	imbe_symbols.append(ldu_symbols[256:328])
-	imbe_symbols.append(ldu_symbols[348:420])
-	imbe_symbols.append(ldu_symbols[440:512])
-	imbe_symbols.append(ldu_symbols[532:604])
-	imbe_symbols.append(ldu_symbols[624:696])
-	imbe_symbols.append(ldu_symbols[712:784])
-	for frame in imbe_symbols:
-		imbe_decode(frame)
-	encryption_sync_symbols = ldu_symbols[144:164] + ldu_symbols[236:256] + ldu_symbols[328:348] + ldu_symbols[420:440] + ldu_symbols[512:532] + ldu_symbols[604:624]
-	low_speed_data_symbols = ldu_symbols[696:712]
-	encryption_sync_rs_codeword = hamming_10_6_3_decode(encryption_sync_symbols)
-	encryption_sync = rs_24_16_9_decode(encryption_sync_rs_codeword)
-	print "Encryption Sync Word: 0x%024x" % (symbols_to_integer(encryption_sync))
-	# Message Indicator (MI) 72 bits
-	message_indicator = encryption_sync[:36]
-	print "Message Indicator: 0x%018x" % (symbols_to_integer(message_indicator))
-	# Algorithm ID (ALGID) 8 bits
-	algorithm_id = encryption_sync[36:40]
-	print "Algorithm ID: 0x%02x" % (symbols_to_integer(algorithm_id))
-	# Key ID (KID) 16 bits
-	key_id = encryption_sync[40:48]
-	print "Key ID: 0x%04x" % (symbols_to_integer(key_id))
-	low_speed_data = cyclic_16_8_5_decode(low_speed_data_symbols)
-	print "Low Speed Data: 0x%04x" % (symbols_to_integer(low_speed_data))
-else:
-	print "unknown Data Unit ID"
+# main loop
+#
+# This is a first pass at carving this mess up into repeatable chunks.  Bear with me.
+correlation_index = 0
+for i in range(100):
+	frame_start = correlate(correlation_index)
+	if frame_start > 0:
+		time = float(frame_start) / (symbol_rate * options.samples_per_symbol)
+		print "Frame detected at %.3f seconds." % time
+		sync_samples = downsample(frame_start)
+		symbols = hard_decision(sync_samples)
+		consumed = decode_frame(symbols)
+		correlation_index = frame_start + (consumed * options.samples_per_symbol)
+		print
+	else:
+		print "Reached end of input without correlation."
+		break
