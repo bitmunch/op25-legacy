@@ -219,7 +219,6 @@ def correlate(start):
 def downsample(start):
 	sync_samples = []
 	# grab samples for symbols starting with frame sync
-	#for i in range(start, len(input_samples), options.samples_per_symbol):
 	for i in range(start, start + (max_frame_length * options.samples_per_symbol), options.samples_per_symbol):
 		# "integrate and dump"
 		# Add up several (samples_per_symbol) adjacent samples to create a single
@@ -446,7 +445,7 @@ for i in range(100):
 		sync_samples = downsample(frame_start)
 		symbols = hard_decision(sync_samples)
 		consumed = decode_frame(symbols)
-		correlation_index = frame_start + (consumed * options.samples_per_symbol)
+		correlation_index = frame_start + ((consumed - 1) * options.samples_per_symbol)
 		print
 	else:
 		print "Reached end of input without correlation."
