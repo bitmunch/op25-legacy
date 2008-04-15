@@ -315,9 +315,40 @@ def decode_frame(symbols):
 		# could be a confirmed or unconfirmed data packet
 		# need to decode header to find out what the rest of the frame looks like
 		header_symbols = symbols[57:106]
-		status_symbols = extract_status_symbols(tsbk_symbols)
-		#crc_ccitt
-		# TODO: decode
+		status_symbols = extract_status_symbols(header_symbols)
+		header = trellis_1_2_decode(data_deinterleave(header_symbols))
+		# A/N indicates whether or not confirmation is desired, 1 bit
+		an = header[0] % 2
+		# I/O indicates direction of message (1 = outbound, 0 = inbound), 1 bit
+		io = header[1] >> 1
+		# Format of PDU, 5 bits
+		format = symbols_to_integer(header[1:4]) & 0x1F
+		# Service Access Point (SAP) to which the message is directed, 6 bits
+		sap_id = symbols_to_integer(header[4:8]) & 0x3F
+		# Manufacturer's ID (MFID) 8 bits
+		manufacturers_id = symbols_to_integer(header_data_unit[8:12])
+		# Logical Link ID, 24 bits
+		logical_link_id = symbols_to_integer(header_data_unit[12:24])
+		# Full Message Flag (FMF) (1 for first try, 0 for retries), 1 bit
+		fmf = header[24] >> 1
+		# Blocks to Follow, 7 bits
+		blocks_to_follow = symbols_to_integer(header[24:28]) & 0x7F
+		# Pad Octet Count, 5 bits
+		pad_octet_count = symbols_to_integer(header[29:32]) & 0x1F
+		# total number of data octets = 16 * blocks_to_follow - 4 - pad_octet_count
+		data_octets = 16 * blocks_to_follow - 4 - pad_octet_count
+		# Synchronize (Syn), 1 bit
+		syn = header[32] >> 1
+		# Sequence Number (N(S)), 3 bits
+		sequence_number = symbols_to_integer(header[32:34]) & 0x7
+		# Fragment Sequence Number Field (FSNF), 4 bits
+		fragment_sequence_number = symbols_to_integer(header[34:36])
+		# Data Header Offset, 6 bits
+		data_header_offset = symbols_to_integer(header[36:40]) & 0x3F
+		# Header CRC, 16 bits
+		header_crc = symbols_to_integer(header[40:48])
+		# TODO: crc_ccitt error detection
+		# TODO: decode subsequent blocks
 	elif data_unit_id == 0:
 		print "Found a Header Data Unit"
 		# Header Data Unit aka Header Word
