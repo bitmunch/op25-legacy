@@ -44,12 +44,12 @@ def average(list):
 	for num in list: total += num
 	return total / len(list)
 
-# return integer represented by sequence of symbols (dibits)
-def symbols_to_integer(symbols):
+# return integer represented by sequence of dibits
+def dibits_to_integer(dibits):
 	integer = 0
-	for symbol in symbols:
+	for dibit in dibits:
 		integer = integer << 2
-		integer += symbol
+		integer += dibit
 	return integer
 
 # extract a block of symbols from in between status symbols
@@ -91,7 +91,7 @@ def trellis_1_2_decode(input):
 	state = 0
 	# cycle through 2 symbol codewords in input
 	for i in range(0,len(input),2):
-		codeword = symbols_to_integer(input[i:i+2])
+		codeword = dibits_to_integer(input[i:i+2])
 		similarity = [0, 0, 0, 0]
 		# compare codeword against each of four candidates for the current state
 		for candidate in range(4):
@@ -123,7 +123,7 @@ def trellis_3_4_decode(input):
 	state = 0
 	# cycle through 2 symbol codewords in input
 	for i in range(0,len(input),2):
-		codeword = symbols_to_integer(input[i:i+2])
+		codeword = dibits_to_integer(input[i:i+2])
 		similarity = [0, 0, 0, 0, 0, 0, 0, 0]
 		# compare codeword against each of eight candidates for the current state
 		for candidate in range(8):
@@ -213,7 +213,7 @@ def cyclic_16_8_5_decode(input):
 # TODO: de-randomization
 # TODO: de-interleaving
 def imbe_decode(input):
-	print "Raw IMBE frame: 0x%036x" % (symbols_to_integer(input))
+	print "Raw IMBE frame: 0x%036x" % (dibits_to_integer(input))
 
 # correlate (multiply-accumulate) frame sync
 def correlate(start):
@@ -309,17 +309,17 @@ def decode_frame(symbols):
 	consumed = 0
 	status_symbols = []
 
-	print "Frame Sync: 0x%012x" % symbols_to_integer(symbols[0:24])
+	print "Frame Sync: 0x%012x" % dibits_to_integer(symbols[0:24])
 	consumed += 24
 
 	nid_symbols, block_status_symbols, block_consumed = extract_block(symbols, 32, consumed)
 	status_symbols.extend(block_status_symbols)
 	consumed += block_consumed
 	network_id = bch_64_16_23_decode(nid_symbols)
-	network_access_code = symbols_to_integer(network_id[:6])
-	data_unit_id = symbols_to_integer(network_id[6:])
+	network_access_code = dibits_to_integer(network_id[:6])
+	data_unit_id = dibits_to_integer(network_id[6:])
 	
-	print "NID codeword: 0x%016x" % (symbols_to_integer(nid_symbols))
+	print "NID codeword: 0x%016x" % (dibits_to_integer(nid_symbols))
 	print "Network Access Code: 0x%03x, Data Unit ID: 0x%01x" % (network_access_code, data_unit_id)
 	
 	if data_unit_id == 7:
@@ -336,7 +336,7 @@ def decode_frame(symbols):
 			tsbk = trellis_1_2_decode(data_deinterleave(tsbk_symbols))
 			# TODO: verify with CRC
 			# TODO: see 102.AABC-B for further decoding
-			print "TSBK: 0x%025x" % (symbols_to_integer(tsbk))
+			print "TSBK: 0x%025x" % (dibits_to_integer(tsbk))
 			last_block_flag = tsbk[0] >> 1
 	elif data_unit_id == 12:
 		print "Found a Packet Data Unit"
@@ -350,34 +350,34 @@ def decode_frame(symbols):
 		# I/O indicates direction of message (1 = outbound, 0 = inbound), 1 bit
 		io = header[1] >> 1
 		# Format of PDU, 5 bits
-		format = symbols_to_integer(header[1:4]) & 0x1F
+		format = dibits_to_integer(header[1:4]) & 0x1F
 		# TODO: header crc_ccitt error detection
 		if format == 0x16:
 			print "PDU is a Confirmed Data Packet"
 			# block length in octets
 			block_size = 16
 			# Service Access Point (SAP) to which the message is directed, 6 bits
-			sap_id = symbols_to_integer(header[4:8]) & 0x3F
+			sap_id = dibits_to_integer(header[4:8]) & 0x3F
 			# Manufacturer's ID (MFID) 8 bits
-			manufacturers_id = symbols_to_integer(header_data_unit[8:12])
+			manufacturers_id = dibits_to_integer(header_data_unit[8:12])
 			# Logical Link ID, 24 bits
-			logical_link_id = symbols_to_integer(header_data_unit[12:24])
+			logical_link_id = dibits_to_integer(header_data_unit[12:24])
 			# Full Message Flag (FMF) (1 for first try, 0 for retries), 1 bit
 			fmf = header[24] >> 1
 			# Blocks to Follow, 7 bits
-			blocks_to_follow = symbols_to_integer(header[24:28]) & 0x7F
+			blocks_to_follow = dibits_to_integer(header[24:28]) & 0x7F
 			# Pad Octet Count, 5 bits
-			pad_octet_count = symbols_to_integer(header[29:32]) & 0x1F
+			pad_octet_count = dibits_to_integer(header[29:32]) & 0x1F
 			# Synchronize (Syn), 1 bit
 			syn = header[32] >> 1
 			# Sequence Number (N(S)), 3 bits
-			sequence_number = symbols_to_integer(header[32:34]) & 0x7
+			sequence_number = dibits_to_integer(header[32:34]) & 0x7
 			# Fragment Sequence Number Field (FSNF), 4 bits
-			fragment_sequence_number = symbols_to_integer(header[34:36])
+			fragment_sequence_number = dibits_to_integer(header[34:36])
 			# Data Header Offset, 6 bits
-			data_header_offset = symbols_to_integer(header[36:40]) & 0x3F
+			data_header_offset = dibits_to_integer(header[36:40]) & 0x3F
 			# Header CRC, 16 bits
-			header_crc = symbols_to_integer(header[40:48])
+			header_crc = dibits_to_integer(header[40:48])
 			# TODO: verify header CRC
 			user_data = []
 			for i in range(blocks_to_follow):
@@ -399,20 +399,20 @@ def decode_frame(symbols):
 			# block length in octets
 			block_size = 12
 			response_class = header[4]
-			response_type = symbols_to_integer(header[5:7]) & 0xE
-			response_status = symbols_to_integer(header[6:8]) & 0x3
+			response_type = dibits_to_integer(header[5:7]) & 0xE
+			response_status = dibits_to_integer(header[6:8]) & 0x3
 			# Manufacturer's ID (MFID) 8 bits
-			manufacturers_id = symbols_to_integer(header_data_unit[8:12])
+			manufacturers_id = dibits_to_integer(header_data_unit[8:12])
 			# Logical Link ID, 24 bits
-			logical_link_id = symbols_to_integer(header_data_unit[12:24])
+			logical_link_id = dibits_to_integer(header_data_unit[12:24])
 			# X, 1 bit
 			x = header[24] >> 1
 			# Blocks to Follow, 7 bits
-			blocks_to_follow = symbols_to_integer(header[24:28]) & 0x7F
+			blocks_to_follow = dibits_to_integer(header[24:28]) & 0x7F
 			# Source Logical Link ID, 24 bits
-			source_logical_link_id = symbols_to_integer(header_data_unit[28:40])
+			source_logical_link_id = dibits_to_integer(header_data_unit[28:40])
 			# Header CRC, 16 bits
-			header_crc = symbols_to_integer(header[40:48])
+			header_crc = dibits_to_integer(header[40:48])
 			# TODO: verify header CRC
 			response_data = []
 			for i in range(blocks_to_follow):
@@ -431,19 +431,19 @@ def decode_frame(symbols):
 			# block length in octets
 			block_size = 12
 			# Service Access Point (SAP) to which the message is directed, 6 bits
-			sap_id = symbols_to_integer(header[4:8]) & 0x3F
+			sap_id = dibits_to_integer(header[4:8]) & 0x3F
 			# Manufacturer's ID (MFID) 8 bits
-			manufacturers_id = symbols_to_integer(header_data_unit[8:12])
+			manufacturers_id = dibits_to_integer(header_data_unit[8:12])
 			# Logical Link ID, 24 bits
-			logical_link_id = symbols_to_integer(header_data_unit[12:24])
+			logical_link_id = dibits_to_integer(header_data_unit[12:24])
 			# Blocks to Follow, 7 bits
-			blocks_to_follow = symbols_to_integer(header[24:28]) & 0x7F
+			blocks_to_follow = dibits_to_integer(header[24:28]) & 0x7F
 			# Pad Octet Count, 5 bits
-			pad_octet_count = symbols_to_integer(header[29:32]) & 0x1F
+			pad_octet_count = dibits_to_integer(header[29:32]) & 0x1F
 			# Data Header Offset, 6 bits
-			data_header_offset = symbols_to_integer(header[36:40]) & 0x3F
+			data_header_offset = dibits_to_integer(header[36:40]) & 0x3F
 			# Header CRC, 16 bits
-			header_crc = symbols_to_integer(header[40:48])
+			header_crc = dibits_to_integer(header[40:48])
 			# TODO: verify header CRC
 			user_data = []
 			for i in range(blocks_to_follow):
@@ -476,21 +476,21 @@ def decode_frame(symbols):
 		header_data_unit = rs_36_20_17_decode(rs_codeword)
 		# Message Indicator (MI) 72 bits
 		message_indicator = header_data_unit[:36]
-		print "Message Indicator: 0x%018x" % (symbols_to_integer(message_indicator))
+		print "Message Indicator: 0x%018x" % (dibits_to_integer(message_indicator))
 		# Manufacturer's ID (MFID) 8 bits
 		manufacturers_id = header_data_unit[36:40]
-		print "Manufacturer's ID: 0x%02x" % (symbols_to_integer(manufacturers_id))
-		if symbols_to_integer(manufacturers_id) > 0:
+		print "Manufacturer's ID: 0x%02x" % (dibits_to_integer(manufacturers_id))
+		if dibits_to_integer(manufacturers_id) > 0:
 			print "Non-standard Manufacturer's ID"
 		# Algorithm ID (ALGID) 8 bits
 		algorithm_id = header_data_unit[40:44]
-		print "Algorithm ID: 0x%02x" % (symbols_to_integer(algorithm_id))
+		print "Algorithm ID: 0x%02x" % (dibits_to_integer(algorithm_id))
 		# Key ID (KID) 16 bits
 		key_id = header_data_unit[44:52]
-		print "Key ID: 0x%04x" % (symbols_to_integer(key_id))
+		print "Key ID: 0x%04x" % (dibits_to_integer(key_id))
 		# Talk-group ID (TGID) 16 bits
 		talk_group_id = header_data_unit[52:60]
-		print "Talk Group ID: 0x%04x" % (symbols_to_integer(talk_group_id))
+		print "Talk Group ID: 0x%04x" % (dibits_to_integer(talk_group_id))
 	elif data_unit_id == 3:
 		print "Found a Terminator Data Unit without subsequent Link Control"
 		# terminator used after superframe
@@ -506,7 +506,7 @@ def decode_frame(symbols):
 		golay_codewords = terminator_symbols[:144]
 		rs_codeword = golay_24_12_8_decode(golay_codewords)
 		link_control = rs_24_12_13_decode(rs_codeword)
-		print "Link Control: 0x%018x" % (symbols_to_integer(link_control))
+		print "Link Control: 0x%018x" % (dibits_to_integer(link_control))
 	elif data_unit_id == 5:
 		print "Found a Logical Link Data Unit 1 (LDU1)"
 		# contains voice frames 1 through 9 of a superframe
@@ -529,13 +529,13 @@ def decode_frame(symbols):
 		low_speed_data_symbols = ldu_symbols[696:712]
 		link_control_rs_codeword = hamming_10_6_3_decode(link_control_symbols)
 		link_control = rs_24_12_13_decode(link_control_rs_codeword)
-		print "Link Control: 0x%018x" % (symbols_to_integer(link_control))
+		print "Link Control: 0x%018x" % (dibits_to_integer(link_control))
 		link_control_format = link_control[:4]
-		print "Link Control Format: 0x%02x" % (symbols_to_integer(link_control_format))
+		print "Link Control Format: 0x%02x" % (dibits_to_integer(link_control_format))
 		# rest of link control frame is 64 bits of fields specified by LCF
 		# likeliy to include TGID, Source ID, Destination ID, Emergency indicator, MFID
 		low_speed_data = cyclic_16_8_5_decode(low_speed_data_symbols)
-		print "Low Speed Data: 0x%04x" % (symbols_to_integer(low_speed_data))
+		print "Low Speed Data: 0x%04x" % (dibits_to_integer(low_speed_data))
 		# spec says Low Speed Data = 32 bits data + 32 bits parity
 		# huh? Is the other half in LDU2?
 	elif data_unit_id == 10:
@@ -560,18 +560,18 @@ def decode_frame(symbols):
 		low_speed_data_symbols = ldu_symbols[696:712]
 		encryption_sync_rs_codeword = hamming_10_6_3_decode(encryption_sync_symbols)
 		encryption_sync = rs_24_16_9_decode(encryption_sync_rs_codeword)
-		print "Encryption Sync Word: 0x%024x" % (symbols_to_integer(encryption_sync))
+		print "Encryption Sync Word: 0x%024x" % (dibits_to_integer(encryption_sync))
 		# Message Indicator (MI) 72 bits
 		message_indicator = encryption_sync[:36]
-		print "Message Indicator: 0x%018x" % (symbols_to_integer(message_indicator))
+		print "Message Indicator: 0x%018x" % (dibits_to_integer(message_indicator))
 		# Algorithm ID (ALGID) 8 bits
 		algorithm_id = encryption_sync[36:40]
-		print "Algorithm ID: 0x%02x" % (symbols_to_integer(algorithm_id))
+		print "Algorithm ID: 0x%02x" % (dibits_to_integer(algorithm_id))
 		# Key ID (KID) 16 bits
 		key_id = encryption_sync[40:48]
-		print "Key ID: 0x%04x" % (symbols_to_integer(key_id))
+		print "Key ID: 0x%04x" % (dibits_to_integer(key_id))
 		low_speed_data = cyclic_16_8_5_decode(low_speed_data_symbols)
-		print "Low Speed Data: 0x%04x" % (symbols_to_integer(low_speed_data))
+		print "Low Speed Data: 0x%04x" % (dibits_to_integer(low_speed_data))
 	else:
 		print "unknown Data Unit ID"
 	# TODO: maybe extract status symbol after nulls
