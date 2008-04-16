@@ -89,6 +89,8 @@ def data_deinterleave(input):
 # 1/2 rate trellis decode a sequence of symbols
 # TODO: Use soft symbols instead of hard symbols.
 def trellis_1_2_decode(input):
+	if len(input) != 98:
+		raise NameError('wrong input length for trellis_1_2_decode')
 	output = []
 	# state transition table, including constellation to dibit pair mapping
 	next_words = (
@@ -108,15 +110,22 @@ def trellis_1_2_decode(input):
 				if ((~codeword ^ next_words[state][candidate]) & (1 << bit)) > 0:
 					similarity[candidate] += 1
 		# find the dibit that matches all four codeword bits
-		# TODO: exception handling: at least try the next best match
-		state = similarity.index(4)
+		if similarity.count(4) == 1:
+			state = similarity.index(4)
+		# otherwise find the dibit that matches three codeword bits
+		elif similarity.count(3) == 1:
+			state = similarity.index(3)
+			print "corrected single trellis error"
+		else:
+			raise NameError('ambiguous trellis decoding error')
 		output.append(state)
 	return output[:48]
 
 # 3/4 rate trellis decode a sequence of symbols
 # TODO: Use soft symbols instead of hard symbols.
 def trellis_3_4_decode(input):
-	# TODO: make way less fake
+	if len(input) != 98:
+		raise NameError('wrong input length for trellis_1_2_decode')
 	output = []
 	# state transition table, including constellation to dibit pair mapping
 	next_words = (
@@ -140,8 +149,14 @@ def trellis_3_4_decode(input):
 				if ((~codeword ^ next_words[state][candidate]) & (1 << bit)) > 0:
 					similarity[candidate] += 1
 		# find the dibit that matches all four codeword bits
-		# TODO: exception handling: at least try the next best match
-		state = similarity.index(4)
+		if similarity.count(4) == 1:
+			state = similarity.index(4)
+		# otherwise find the dibit that matches three codeword bits
+		elif similarity.count(3) == 1:
+			state = similarity.index(3)
+			print "corrected single trellis error"
+		else:
+			raise NameError('ambiguous trellis decoding error')
 		output.append(state)
 	return tribits_to_integer(output[:48])
 
