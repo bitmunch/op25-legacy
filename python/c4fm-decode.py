@@ -52,6 +52,14 @@ def dibits_to_integer(dibits):
 		integer += dibit
 	return integer
 
+# return integer represented by sequence of tribits
+def tribits_to_integer(tribits):
+	integer = 0
+	for tribit in tribits:
+		integer = integer << 3
+		integer += tribit
+	return integer
+
 # extract a block of symbols from in between status symbols
 # return extracted block, list of status symbols, and number of symbols consumed
 def extract_block(symbols, length, index):
@@ -103,7 +111,7 @@ def trellis_1_2_decode(input):
 		# TODO: exception handling: at least try the next best match
 		state = similarity.index(4)
 		output.append(state)
-	return output
+	return output[:48]
 
 # 3/4 rate trellis decode a sequence of symbols
 # TODO: Use soft symbols instead of hard symbols.
@@ -135,8 +143,7 @@ def trellis_3_4_decode(input):
 		# TODO: exception handling: at least try the next best match
 		state = similarity.index(4)
 		output.append(state)
-	# TODO: Broken! returns list of tribits, but list of dibits expected
-	return output
+	return tribits_to_integer(output[:48])
 
 # fake (64,16,23) BCH decoder, no error correction
 # spec sometimes refers to this as (63,16,23) plus a parity bit
@@ -336,7 +343,7 @@ def decode_frame(symbols):
 			tsbk = trellis_1_2_decode(data_deinterleave(tsbk_symbols))
 			# TODO: verify with CRC
 			# TODO: see 102.AABC-B for further decoding
-			print "TSBK: 0x%025x" % (dibits_to_integer(tsbk))
+			print "TSBK: 0x%024x" % (dibits_to_integer(tsbk))
 			last_block_flag = tsbk[0] >> 1
 	elif data_unit_id == 12:
 		print "Found a Packet Data Unit"
@@ -385,14 +392,15 @@ def decode_frame(symbols):
 				status_symbols.extend(block_status_symbols)
 				consumed += block_consumed
 				data_block = trellis_3_4_decode(data_deinterleave(data_block_symbols))
+				# data_block is 144 bits
 				# Data Block Serial Number, 7 bits
-				data_block_serial_number = data_block[:4] & 0xFE
+				data_block_serial_number = (data_block >> 128) & 0xFE00
 				# CRC-9, 9 bits
-				data_block_crc = data_block[3:8] & 0x1FF
+				data_block_crc = (data_block >> 128) & 0x01FF
 				#TODO: verify data block CRC
-				user_data.extend(data_block[8:72])
-			packet_crc = user_data[-16:]
-			user_data = user_data[:-16]
+				user_data.extend(data_block & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
+			packet_crc = user_data & 0xFFFFFFFF
+			user_data = user_data >> 32
 			#TODO: verify packet CRC
 		elif format == 0x3:
 			print "PDU is a Response Packet"
