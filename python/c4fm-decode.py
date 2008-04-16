@@ -602,6 +602,8 @@ def decode_frame(symbols):
 	for ss in status_symbols:
 		print "0x%01x" % ss,
 	print
+	print "Raw Frame: 0x%x" % (dibits_to_integer(symbols[:consumed]))
+	# TODO: print error corrected values
 	return consumed
 
 # main loop
