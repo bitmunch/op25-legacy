@@ -609,7 +609,8 @@ def decode_frame(symbols):
 	raw_frame =	dibits_to_integer(symbols[:consumed])
 	if not options.pad:
 		# make it start at the most significant bit of a hex digit
-		raw_frame = raw_frame << ((4 - (raw_frame % 4)) % 4)
+		if (consumed % 2) > 0:
+			raw_frame = raw_frame << 2
 	print "Raw Frame: 0x%x" % raw_frame
 	# TODO: print error corrected values
 	return consumed
