@@ -15,6 +15,7 @@ This horrifying mess is a prototype for stuff that will most likely end up as gn
 parser = OptionParser(option_class=eng_option)
 parser.add_option("-i", "--input-file", type="string", default="demod.dat", help="specify the input file")
 parser.add_option("-s", "--samples-per-symbol", type="int", default=10, help="samples per symbol of the input file")
+parser.add_option("-p", "--pad", action="store_true", dest="pad", help="pad frame to end of slot")
 (options, args) = parser.parse_args()
 
 # frame synchronization header (in form most useful for correlation)
@@ -482,11 +483,9 @@ def decode_frame(symbols):
 			print "PDU is an Alternate Multiple Block Trunking (MBT) Control Packet"
 			# see 102.AABC-B for more details
 			# TODO: decode
+			print "Warning: don't know how to decode"
 		else:
-			print "PDU has unknown format"
-			# how long is frame?
-			# block_size = ?
-			# error condition?
+			raise NameError('unknown PDU format')
 		# TODO: Enhanced Addressing Format (variation of Confirmed or Unconfirmed)
 	elif data_unit_id == 0:
 		print "Found a Header Data Unit"
@@ -596,13 +595,22 @@ def decode_frame(symbols):
 		low_speed_data = cyclic_16_8_5_decode(low_speed_data_symbols)
 		print "Low Speed Data: 0x%04x" % (dibits_to_integer(low_speed_data))
 	else:
-		print "unknown Data Unit ID"
+		raise NameError('unknown Data Unit ID')
 	# TODO: maybe extract status symbol after nulls
+	
+	if options.pad and consumed % 36 > 0:
+		pad_symbols, final_status_symbol, block_consumed = extract_block(symbols, ((36 - (consumed % 36)) % 36) - 1, consumed)
+		status_symbols.extend(final_status_symbol)
+		consumed += block_consumed
 	print "Status Symbols:",
 	for ss in status_symbols:
 		print "0x%01x" % ss,
 	print
-	print "Raw Frame: 0x%x" % (dibits_to_integer(symbols[:consumed]))
+	raw_frame =	dibits_to_integer(symbols[:consumed])
+	if not options.pad:
+		# make it start at the most significant bit of a hex digit
+		raw_frame = raw_frame << ((4 - (raw_frame % 4)) % 4)
+	print "Raw Frame: 0x%x" % raw_frame
 	# TODO: print error corrected values
 	return consumed
 
