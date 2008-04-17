@@ -354,8 +354,6 @@ def decode_frame(symbols):
 			tsbk_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
 			status_symbols.extend(block_status_symbols)
 			consumed += block_consumed
-			# spec diagram indicates status symbol at symbols[158] (single TSBK), but I've only found nulls
-			# TODO: maybe there is a status symbol after the nulls
 			tsbk = trellis_1_2_decode(data_deinterleave(tsbk_symbols))
 			# TODO: verify with CRC
 			# TODO: see 102.AABC-B for further decoding
@@ -596,8 +594,6 @@ def decode_frame(symbols):
 		print "Low Speed Data: 0x%04x" % (dibits_to_integer(low_speed_data))
 	else:
 		raise NameError('unknown Data Unit ID')
-	# TODO: maybe extract status symbol after nulls
-	
 	if options.pad and consumed % 36 > 0:
 		pad_symbols, final_status_symbol, block_consumed = extract_block(symbols, ((36 - (consumed % 36)) % 36) - 1, consumed)
 		status_symbols.extend(final_status_symbol)
