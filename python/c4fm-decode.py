@@ -471,9 +471,12 @@ def decode_frame(symbols):
 		elif format == 0x15:
 			if options.verbose:
 				print "PDU is an Unconfirmed Data Packet"
-				# could be a multi-block control channel packet (check SAP)
 				# Service Access Point (SAP) to which the message is directed, 6 bits
 				sap_id = (header >> 80) & 0x3F
+				if sap_id = 61:
+					print "PDU is a non-protected Multi-Block Tunking Control Packet (MBT)"
+				elif sap_id = 63:
+					print "PDU is a protected Multi-Block Tunking Control Packet (MBT)"
 				# Pad Octet Count, 5 bits
 				pad_octet_count = (header >> 32) & 0x1F
 				# Data Header Offset, 6 bits
@@ -496,9 +499,28 @@ def decode_frame(symbols):
 		elif format == 0x17:
 			if options.verbose:
 				print "PDU is an Alternate Multiple Block Trunking (MBT) Control Packet"
-			# see 102.AABC-B for more details
-			# TODO: decode
-			sys.stderr.write("Warning: don't know how to decode Alternate MBT Control Packet")
+				# Service Access Point (SAP) to which the message is directed, 6 bits
+				sap_id = (header >> 80) & 0x3F
+				if sap_id = 61:
+					print "MBT is non-protected"
+				elif sap_id = 63:
+					print "MBT is protected"
+				# Opcode, 6 bits
+				opcode = (header >> 32) & 0x3F
+				print "SAP ID: 0x%02x" % sap_id
+				print "Opcode: 0x%02x" % opcode
+			mbt_data = 0
+			for i in range(blocks_to_follow):
+				data_block_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
+				status_symbols.extend(block_status_symbols)
+				consumed += block_consumed
+				data_block = trellis_1_2_decode(data_deinterleave(data_block_symbols))
+				mbt_data = (data_block << 64) + data_block
+			packet_crc = mbt_data & 0xFFFFFFFF
+			mbt_data = mbt_data >> 32
+			#TODO: verify packet CRC
+			if options.verbose:
+				print "MBT Data: 0x%x" % mbt_data
 		else:
 			raise NameError('unknown PDU format')
 		# TODO: Enhanced Addressing Format (variation of Confirmed or Unconfirmed)
