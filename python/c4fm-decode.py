@@ -390,6 +390,13 @@ def decode_frame(symbols):
 			manufacturers_id = (header >> 72) & 0xFF
 			# Logical Link ID, 24 bits
 			logical_link_id = (header >> 48) & 0xFF
+			print "PDU Format: 0x%02x" % format
+			print "A/N: 0x%01x" % an
+			print "I/O: 0x%01x" % io
+			print "Manufacturer's ID: 0x%02x" % manufacturers_id
+			if manufacturers_id > 0:
+				print "Non-standard Manufacturer's ID"
+			print "Logical Link ID: 0x%06x" % logical_link_id
 		if format == 0x16:
 			if options.verbose:
 				print "PDU is a Confirmed Data Packet"
@@ -407,6 +414,13 @@ def decode_frame(symbols):
 				fragment_sequence_number = (header >> 24) & 0xF
 				# Data Header Offset, 6 bits
 				data_header_offset = (header >> 16) & 0x3F
+				print "SAP ID: 0x%02x" % sap_id
+				print "Full Message Flag: 0x%01x" % fmf
+				print "Pad Octet Count: 0x%02x" % pad_octet_count
+				print "Syn: 0x%01x" % syn
+				print "N(S): 0x%01x" % sequence_number
+				print "Fragment Sequence Number: 0x%01x" % fragment_squence_number
+				print "Data Header Offset: 0x%02x" % data_header_offset
 			user_data = 0
 			for i in range(blocks_to_follow):
 				data_block_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
@@ -424,6 +438,8 @@ def decode_frame(symbols):
 			packet_crc = user_data & 0xFFFFFFFF
 			user_data = user_data >> 32
 			#TODO: verify packet CRC
+			if options.verbose:
+				print "User Data: 0x%x" % user_data
 		elif format == 0x3:
 			if options.verbose:
 				print "PDU is a Response Packet"
@@ -434,6 +450,11 @@ def decode_frame(symbols):
 				x = (header >> 47) & 0x1
 				# Source Logical Link ID, 24 bits
 				source_logical_link_id = (header >> 16) & 0xFFFFFF
+				print "Response Class: 0x%01x" % response_class
+				print "Response Type: 0x%01x" % response_type
+				print "Response Status: 0x%01x" % response_status
+				print "X: 0x%01x" % x
+				print "Source Logical Link ID: 0x%06x" % source_logical_link_id
 			response_data = 0
 			for i in range(blocks_to_follow):
 				data_block_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
@@ -445,6 +466,8 @@ def decode_frame(symbols):
 			packet_crc = response_data & 0xFFFFFFFF
 			response_data = response_data >> 32
 			#TODO: verify packet CRC
+			if options.verbose:
+				print "Response Data: 0x%x" % user_data
 		elif format == 0x15:
 			if options.verbose:
 				print "PDU is an Unconfirmed Data Packet"
@@ -455,6 +478,9 @@ def decode_frame(symbols):
 				pad_octet_count = (header >> 32) & 0x1F
 				# Data Header Offset, 6 bits
 				data_header_offset = (header >> 16) & 0x3F
+				print "SAP ID: 0x%02x" % sap_id
+				print "Pad Octet Count: 0x%02x" % pad_octet_count
+				print "Data Header Offset: 0x%02x" % data_header_offset
 			user_data = 0
 			for i in range(blocks_to_follow):
 				data_block_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
@@ -465,6 +491,8 @@ def decode_frame(symbols):
 			packet_crc = user_data & 0xFFFFFFFF
 			user_data = user_data >> 32
 			#TODO: verify packet CRC
+			if options.verbose:
+				print "User Data: 0x%x" % user_data
 		elif format == 0x17:
 			if options.verbose:
 				print "PDU is an Alternate Multiple Block Trunking (MBT) Control Packet"
