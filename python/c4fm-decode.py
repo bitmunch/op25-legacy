@@ -121,13 +121,13 @@ def trellis_1_2_decode(input):
 		else:
 			raise NameError('ambiguous trellis decoding error')
 		output.append(state)
-	return output[:48]
+	return dibits_to_integer(output[:48])
 
 # 3/4 rate trellis decode a sequence of symbols
 # TODO: Use soft symbols instead of hard symbols.
 def trellis_3_4_decode(input):
 	if len(input) != 98:
-		raise NameError('wrong input length for trellis_1_2_decode')
+		raise NameError('wrong input length for trellis_3_4_decode')
 	output = []
 	# state transition table, including constellation to dibit pair mapping
 	next_words = (
@@ -166,7 +166,7 @@ def trellis_3_4_decode(input):
 # spec sometimes refers to this as (63,16,23) plus a parity bit
 # TODO: make less fake
 def bch_64_16_23_decode(input):
-	return input[:8]
+	return dibits_to_integer(input[:8])
 
 # fake (18,6,8) shortened Golay decoder, no error correction
 # TODO: make less fake
@@ -175,7 +175,7 @@ def golay_18_6_8_decode(input):
 	for i in range(0,len(input),9):
 		codeword = input[i:i+9]
 		output.extend(codeword[:3])
-	return output
+	return dibits_to_integer(output)
 
 # fake (24,12,8) extended Golay decoder, no error correction
 # TODO: make less fake
@@ -184,7 +184,7 @@ def golay_24_12_8_decode(input):
 	for i in range(0,len(input),12):
 		codeword = input[i:i+12]
 		output.extend(codeword[:6])
-	return output
+	return dibits_to_integer(output)
 
 # fake (10,6,3) shortened Hamming decoder, no error correction
 # TODO: make less fake
@@ -193,22 +193,7 @@ def hamming_10_6_3_decode(input):
 	for i in range(0,len(input),5):
 		codeword = input[i:i+5]
 		output.extend(codeword[:3])
-	return output
-
-# fake (24,12,13) Reed-Solomon decoder, no error correction
-# TODO: make less fake
-def rs_24_12_13_decode(input):
-	return input[:36]
-
-# fake (24,16,9) Reed-Solomon decoder, no error correction
-# TODO: make less fake
-def rs_24_16_9_decode(input):
-	return input[:48]
-
-# fake (36,20,17) Reed-Solomon decoder, no error correction
-# TODO: make less fake
-def rs_36_20_17_decode(input):
-	return input[:60]
+	return dibits_to_integer(output)
 
 # fake (16_8_5) shortened cyclic decoder, no error correction
 # TODO: make less fake
@@ -217,7 +202,25 @@ def cyclic_16_8_5_decode(input):
 	for i in range(0,len(input),8):
 		codeword = input[i:i+8]
 		output.extend(codeword[:4])
-	return output
+	return dibits_to_integer(output)
+
+# The Reed-Solomon decoders take integers as input because the input has
+# already been decoded by another error correction code.
+
+# fake (24,12,13) Reed-Solomon decoder, no error correction
+# TODO: make less fake
+def rs_24_12_13_decode(input):
+	return input >> 72
+
+# fake (24,16,9) Reed-Solomon decoder, no error correction
+# TODO: make less fake
+def rs_24_16_9_decode(input):
+	return input >> 48
+
+# fake (36,20,17) Reed-Solomon decoder, no error correction
+# TODO: make less fake
+def rs_36_20_17_decode(input):
+	return input >> 96
 
 # fake IMBE frame decoder
 # TODO: make less fake
@@ -238,6 +241,7 @@ def cyclic_16_8_5_decode(input):
 # TODO: de-interleaving
 def imbe_decode(input):
 	if options.verbose:
+		# FIXME:
 		print "Raw IMBE frame: 0x%036x" % (dibits_to_integer(input))
 
 # correlate (multiply-accumulate) frame sync
@@ -339,11 +343,11 @@ def decode_frame(symbols):
 	status_symbols.extend(block_status_symbols)
 	consumed += block_consumed
 	network_id = bch_64_16_23_decode(nid_symbols)
-	network_access_code = dibits_to_integer(network_id[:6])
-	data_unit_id = dibits_to_integer(network_id[6:])
+	data_unit_id = network_id & 0xF
 	if options.verbose:
+		network_access_code = network_id >> 4
 		print "Frame Sync: 0x%012x" % dibits_to_integer(symbols[0:24])
-		print "NID codeword: 0x%016x" % (dibits_to_integer(nid_symbols))
+		print "NID codeword: 0x%016x" % dibits_to_integer(nid_symbols)
 		print "Network Access Code: 0x%03x, Data Unit ID: 0x%01x" % (network_access_code, data_unit_id)
 	
 	if data_unit_id == 7:
@@ -352,17 +356,16 @@ def decode_frame(symbols):
 		# contains one to four Trunking Signaling Blocks (TSBK)
 		last_block_flag = 0
 		while last_block_flag < 1:
-			if options.verbose:
-				print "Found a Trunking Signaling Block"
 			tsbk_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
 			status_symbols.extend(block_status_symbols)
 			consumed += block_consumed
 			tsbk = trellis_1_2_decode(data_deinterleave(tsbk_symbols))
 			# TODO: verify with CRC
-			# TODO: see 102.AABC-B for further decoding
 			if options.verbose:
-				print "TSBK: 0x%024x" % (dibits_to_integer(tsbk))
-			last_block_flag = tsbk[0] >> 1
+				print "Found a Trunking Signaling Block"
+				print "TSBK: 0x%024x" % tsbk
+				# TODO: see 102.AABC-B for further decoding
+			last_block_flag = tsbk >> 95
 	elif data_unit_id == 12:
 		if options.verbose:
 			print "Found a Packet Data Unit"
@@ -372,39 +375,39 @@ def decode_frame(symbols):
 		consumed += block_consumed
 		header = trellis_1_2_decode(data_deinterleave(header_symbols))
 		# Format of PDU, 5 bits
-		format = dibits_to_integer(header[1:4]) & 0x1F
+		format = (header >> 88) & 0x1F
 		# Blocks to Follow, 7 bits
-		blocks_to_follow = dibits_to_integer(header[24:28]) & 0x7F
+		blocks_to_follow = (header >> 40) & 0x7F
 		# Header CRC, 16 bits
-		header_crc = dibits_to_integer(header[40:48])
+		header_crc = header & 0xFFFF
 		# TODO: verify header CRC
 		if options.verbose:
 			# A/N indicates whether or not confirmation is desired, 1 bit
-			an = header[0] % 2
+			an = (header >> 94) & 0x1
 			# I/O indicates direction of message (1 = outbound, 0 = inbound), 1 bit
-			io = header[1] >> 1
+			io = (header >> 93) & 0x1
 			# Manufacturer's ID (MFID) 8 bits
-			manufacturers_id = dibits_to_integer(header_data_unit[8:12])
+			manufacturers_id = (header >> 72) & 0xFF
 			# Logical Link ID, 24 bits
-			logical_link_id = dibits_to_integer(header_data_unit[12:24])
+			logical_link_id = (header >> 48) & 0xFF
 		if format == 0x16:
 			if options.verbose:
 				print "PDU is a Confirmed Data Packet"
 				# Service Access Point (SAP) to which the message is directed, 6 bits
-				sap_id = dibits_to_integer(header[4:8]) & 0x3F
+				sap_id = (header >> 80) & 0x3F
 				# Full Message Flag (FMF) (1 for first try, 0 for retries), 1 bit
-				fmf = header[24] >> 1
+				fmf = (header >> 47) & 0x1
 				# Pad Octet Count, 5 bits
-				pad_octet_count = dibits_to_integer(header[29:32]) & 0x1F
+				pad_octet_count = (header >> 32) & 0x1F
 				# Synchronize (Syn), 1 bit
-				syn = header[32] >> 1
+				syn = (header >> 31) & 0x1
 				# Sequence Number (N(S)), 3 bits
-				sequence_number = dibits_to_integer(header[32:34]) & 0x7
+				sequence_number = (header >> 28) & 0x7
 				# Fragment Sequence Number Field (FSNF), 4 bits
-				fragment_sequence_number = dibits_to_integer(header[34:36])
+				fragment_sequence_number = (header >> 24) & 0xF
 				# Data Header Offset, 6 bits
-				data_header_offset = dibits_to_integer(header[36:40]) & 0x3F
-			user_data = []
+				data_header_offset = (header >> 16) & 0x3F
+			user_data = 0
 			for i in range(blocks_to_follow):
 				data_block_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
 				status_symbols.extend(block_status_symbols)
@@ -412,55 +415,55 @@ def decode_frame(symbols):
 				data_block = trellis_3_4_decode(data_deinterleave(data_block_symbols))
 				# data_block is 144 bits
 				# CRC-9, 9 bits
-				data_block_crc = (data_block >> 128) & 0x01FF
+				data_block_crc = (data_block >> 128) & 0x1FF
 				#TODO: verify data block CRC
-				user_data.extend(data_block & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
+				user_data = (user_data << 128) + (data_block & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
 				if options.verbose:
 					# Data Block Serial Number, 7 bits
-					data_block_serial_number = (data_block >> 128) & 0xFE00
+					data_block_serial_number = (data_block >> 137)
 			packet_crc = user_data & 0xFFFFFFFF
 			user_data = user_data >> 32
 			#TODO: verify packet CRC
 		elif format == 0x3:
 			if options.verbose:
 				print "PDU is a Response Packet"
-				response_class = header[4]
-				response_type = dibits_to_integer(header[5:7]) & 0xE
-				response_status = dibits_to_integer(header[6:8]) & 0x3
+				response_class = (header >> 86) & 0x3
+				response_type = (header >> 83) & 0x7
+				response_status = (header >> 80) & 0x7
 				# X, 1 bit
-				x = header[24] >> 1
+				x = (header >> 47) & 0x1
 				# Source Logical Link ID, 24 bits
-				source_logical_link_id = dibits_to_integer(header_data_unit[28:40])
-			response_data = []
+				source_logical_link_id = (header >> 16) & 0xFFFFFF
+			response_data = 0
 			for i in range(blocks_to_follow):
 				data_block_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
 				status_symbols.extend(block_status_symbols)
 				consumed += block_consumed
 				data_block = trellis_1_2_decode(data_deinterleave(data_block_symbols))
-				response_data.extend(data_block[:32])
+				response_data = (response_data << 64) + data_block
 			# Not absolutely certain that this CRC location is correct.  Spec unclear if more than one data block.
-			packet_crc = response_data[-16:]
-			response_data = response_data[:-16]
+			packet_crc = response_data & 0xFFFFFFFF
+			response_data = response_data >> 32
 			#TODO: verify packet CRC
 		elif format == 0x15:
 			if options.verbose:
 				print "PDU is an Unconfirmed Data Packet"
 				# could be a multi-block control channel packet (check SAP)
 				# Service Access Point (SAP) to which the message is directed, 6 bits
-				sap_id = dibits_to_integer(header[4:8]) & 0x3F
+				sap_id = (header >> 80) & 0x3F
 				# Pad Octet Count, 5 bits
-				pad_octet_count = dibits_to_integer(header[29:32]) & 0x1F
+				pad_octet_count = (header >> 32) & 0x1F
 				# Data Header Offset, 6 bits
-				data_header_offset = dibits_to_integer(header[36:40]) & 0x3F
-			user_data = []
+				data_header_offset = (header >> 16) & 0x3F
+			user_data = 0
 			for i in range(blocks_to_follow):
 				data_block_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
 				status_symbols.extend(block_status_symbols)
 				consumed += block_consumed
 				data_block = trellis_1_2_decode(data_deinterleave(data_block_symbols))
-				user_data.extend(data_block[:32])
-			packet_crc = user_data[-16:]
-			user_data = user_data[:-16]
+				user_data = (data_block << 64) + data_block
+			packet_crc = user_data & 0xFFFFFFFF
+			user_data = user_data >> 32
 			#TODO: verify packet CRC
 		elif format == 0x17:
 			if options.verbose:
@@ -482,22 +485,22 @@ def decode_frame(symbols):
 			rs_codeword = golay_18_6_8_decode(hdu_symbols)
 			header_data_unit = rs_36_20_17_decode(rs_codeword)
 			# Message Indicator (MI) 72 bits
-			message_indicator = header_data_unit[:36]
-			print "Message Indicator: 0x%018x" % (dibits_to_integer(message_indicator))
+			message_indicator = header_data_unit >> 48
+			print "Message Indicator: 0x%018x" % message_indicator
 			# Manufacturer's ID (MFID) 8 bits
-			manufacturers_id = header_data_unit[36:40]
-			print "Manufacturer's ID: 0x%02x" % (dibits_to_integer(manufacturers_id))
-			if dibits_to_integer(manufacturers_id) > 0:
+			manufacturers_id = (header_data_unit >> 40) & 0xFF
+			print "Manufacturer's ID: 0x%02x" % manufacturers_id
+			if manufacturers_id > 0:
 				print "Non-standard Manufacturer's ID"
 			# Algorithm ID (ALGID) 8 bits
-			algorithm_id = header_data_unit[40:44]
-			print "Algorithm ID: 0x%02x" % (dibits_to_integer(algorithm_id))
+			algorithm_id = (header_data_unit >> 32) & 0xFF
+			print "Algorithm ID: 0x%02x" % algorithm_id
 			# Key ID (KID) 16 bits
-			key_id = header_data_unit[44:52]
-			print "Key ID: 0x%04x" % (dibits_to_integer(key_id))
+			key_id = (header_data_unit >> 16) & 0xFFFF
+			print "Key ID: 0x%04x" % key_id
 			# Talk-group ID (TGID) 16 bits
-			talk_group_id = header_data_unit[52:60]
-			print "Talk Group ID: 0x%04x" % (dibits_to_integer(talk_group_id))
+			talk_group_id = header_data_unit & 0xFFFF
+			print "Talk Group ID: 0x%04x" % talk_group_id
 	elif data_unit_id == 3:
 		# simple terminator, used after superframe
 		# may follow LDU1 or LDU2
@@ -510,12 +513,15 @@ def decode_frame(symbols):
 		terminator_symbols, block_status_symbols, block_consumed = extract_block(symbols, 144, consumed)
 		status_symbols.extend(block_status_symbols)
 		consumed += block_consumed
-		golay_codewords = terminator_symbols[:144]
-		rs_codeword = golay_24_12_8_decode(golay_codewords)
+		rs_codeword = golay_24_12_8_decode(terminator_symbols[:144])
 		link_control = rs_24_12_13_decode(rs_codeword)
 		if options.verbose:
 			print "Found a Terminator Data Unit with subsequent Link Control"
-			print "Link Control: 0x%018x" % (dibits_to_integer(link_control))
+			print "Link Control: 0x%018x" % link_control
+			link_control_format = link_control >> 64
+			print "Link Control Format: 0x%02x" % link_control_format
+			# rest of link control frame is 64 bits of fields specified by LCF
+			# likeliy to include TGID, Source ID, Destination ID, Emergency indicator, MFID
 	elif data_unit_id == 5:
 		# Logical Link Data Unit 1 (LDU1)
 		# contains voice frames 1 through 9 of a superframe
@@ -543,12 +549,12 @@ def decode_frame(symbols):
 		# huh? Is the other half in LDU2?
 		if options.verbose:
 			print "Found a Logical Link Data Unit 1 (LDU1)"
-			print "Link Control: 0x%018x" % (dibits_to_integer(link_control))
-			link_control_format = link_control[:4]
-			print "Link Control Format: 0x%02x" % (dibits_to_integer(link_control_format))
+			print "Link Control: 0x%018x" % link_control
+			link_control_format = link_control >> 64
+			print "Link Control Format: 0x%02x" % link_control_format
 			# rest of link control frame is 64 bits of fields specified by LCF
 			# likeliy to include TGID, Source ID, Destination ID, Emergency indicator, MFID
-			print "Low Speed Data: 0x%04x" % (dibits_to_integer(low_speed_data))
+			print "Low Speed Data: 0x%04x" % low_speed_data
 	elif data_unit_id == 10:
 		# Logical Link Data Unit 2 (LDU2)
 		# contains voice frames (codewords) 10 through 18 of a superframe
@@ -574,17 +580,17 @@ def decode_frame(symbols):
 		low_speed_data = cyclic_16_8_5_decode(low_speed_data_symbols)
 		if options.verbose:
 			print "Found a Logical Link Data Unit 2 (LDU2)"
-			print "Encryption Sync Word: 0x%024x" % (dibits_to_integer(encryption_sync))
+			print "Encryption Sync Word: 0x%024x" % encryption_sync
 			# Message Indicator (MI) 72 bits
-			message_indicator = encryption_sync[:36]
-			print "Message Indicator: 0x%018x" % (dibits_to_integer(message_indicator))
+			message_indicator = encryption_sync >> 24
+			print "Message Indicator: 0x%018x" % message_indicator
 			# Algorithm ID (ALGID) 8 bits
-			algorithm_id = encryption_sync[36:40]
-			print "Algorithm ID: 0x%02x" % (dibits_to_integer(algorithm_id))
+			algorithm_id = (encryption_sync >> 16) & 0xFF
+			print "Algorithm ID: 0x%02x" % algorithm_id
 			# Key ID (KID) 16 bits
-			key_id = encryption_sync[40:48]
-			print "Key ID: 0x%04x" % (dibits_to_integer(key_id))
-			print "Low Speed Data: 0x%04x" % (dibits_to_integer(low_speed_data))
+			key_id = encryption_sync & 0xFFFF
+			print "Key ID: 0x%04x" % key_id
+			print "Low Speed Data: 0x%04x" % low_speed_data
 	else:
 		raise NameError('unknown Data Unit ID')
 	if options.pad and consumed % 36 > 0:
