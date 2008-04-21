@@ -473,9 +473,9 @@ def decode_frame(symbols):
 				print "PDU is an Unconfirmed Data Packet"
 				# Service Access Point (SAP) to which the message is directed, 6 bits
 				sap_id = (header >> 80) & 0x3F
-				if sap_id = 61:
+				if sap_id == 61:
 					print "PDU is a non-protected Multi-Block Tunking Control Packet (MBT)"
-				elif sap_id = 63:
+				elif sap_id == 63:
 					print "PDU is a protected Multi-Block Tunking Control Packet (MBT)"
 				# Pad Octet Count, 5 bits
 				pad_octet_count = (header >> 32) & 0x1F
@@ -501,9 +501,9 @@ def decode_frame(symbols):
 				print "PDU is an Alternate Multiple Block Trunking (MBT) Control Packet"
 				# Service Access Point (SAP) to which the message is directed, 6 bits
 				sap_id = (header >> 80) & 0x3F
-				if sap_id = 61:
+				if sap_id == 61:
 					print "MBT is non-protected"
-				elif sap_id = 63:
+				elif sap_id == 63:
 					print "MBT is protected"
 				# Opcode, 6 bits
 				opcode = (header >> 32) & 0x3F
