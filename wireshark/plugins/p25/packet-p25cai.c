@@ -47,6 +47,11 @@ static int hf_p25cai_pdu = -1;
 static int hf_p25cai_ldu1 = -1;
 static int hf_p25cai_ldu2 = -1;
 static int hf_p25cai_termlc = -1;
+static int hf_p25cai_mi = -1;
+static int hf_p25cai_mfid = -1;
+static int hf_p25cai_algid = -1;
+static int hf_p25cai_kid = -1;
+static int hf_p25cai_tgid = -1;
 
 /* Field values */
 static const value_string data_unit_ids[] = {
@@ -63,6 +68,7 @@ static const value_string data_unit_ids[] = {
 /* Initialize the subtree pointers */
 static gint ett_p25cai = -1;
 static gint ett_nid = -1;
+static gint ett_du = -1;
 
 /* Code to actually dissect the packets */
 static int
@@ -71,7 +77,7 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 /* Set up structures needed to add the protocol subtree and manage it */
 	proto_item *ti, *nid_item, *du_item;
-	proto_tree *p25cai_tree, *nid_tree;
+	proto_tree *p25cai_tree, *nid_tree, *du_tree;
 	int offset;
 	guint8 duid;
 
@@ -121,6 +127,10 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		/* top level P25 CAI tree */
 		proto_tree_add_item(p25cai_tree, hf_p25cai_fs, tvb, offset, 6, FALSE);
 		offset += 6;
+
+		/* TODO: status symbol extraction */
+		/* FIXME: Much of the dissection below is broken without status symbol extraction. */
+
 		nid_item = proto_tree_add_item(p25cai_tree, hf_p25cai_nid, tvb, offset, 8, FALSE);
 
 		/* NID subtree */
@@ -129,17 +139,29 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		proto_tree_add_item(nid_tree, hf_p25cai_duid, tvb, offset, 2, FALSE);
 		offset += 8;
 
-		/* TODO: much more decoding below */
-
 		switch (duid) {
 		/* Header Data Unit */
 		case 0x0:
 			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_hdu, tvb, offset, -1, FALSE);
+			du_tree = proto_item_add_subtree(du_item, ett_du);
+			proto_tree_add_item(du_tree, hf_p25cai_mi, tvb, offset, 9, FALSE);
+			offset += 9;
+			proto_tree_add_item(du_tree, hf_p25cai_mfid, tvb, offset, 1, FALSE);
+			offset += 1;
+			proto_tree_add_item(du_tree, hf_p25cai_algid, tvb, offset, 1, FALSE);
+			offset += 1;
+			proto_tree_add_item(du_tree, hf_p25cai_kid, tvb, offset, 2, FALSE);
+			offset += 2;
+			proto_tree_add_item(du_tree, hf_p25cai_tgid, tvb, offset, 2, FALSE);
+			offset += 2;
 			break;
 		/* Terminator Data Unit without Link Control */
 		case 0x3:
 			/* nothing left to decode */
 			break;
+
+		/* TODO: much more dissection below */
+
 		/* Logical Link Data Unit 1 */
 		case 0x5:
 			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_ldu1, tvb, offset, -1, FALSE);
@@ -148,7 +170,7 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		case 0x7:
 			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_tsbk, tvb, offset, -1, FALSE);
 			break;
-		/* Logical Link Data Unit 1 */
+		/* Logical Link Data Unit 2 */
 		case 0xA:
 			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_ldu2, tvb, offset, -1, FALSE);
 			break;
@@ -230,12 +252,38 @@ proto_register_p25cai(void)
 			FT_NONE, BASE_NONE, NULL, 0x0,
 			NULL, HFILL }
 		},
+		{ &hf_p25cai_mi,
+			{ "Message Indicator", "p25cai.mi",
+			FT_BYTES, BASE_HEX, NULL, 0x0,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_mfid,
+			{ "Manufacturer's ID", "p25cai.mfid",
+			FT_UINT8, BASE_HEX, NULL, 0x0,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_algid,
+			{ "Algorithm ID", "p25cai.algid",
+			FT_UINT8, BASE_HEX, NULL, 0x0,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_kid,
+			{ "Key ID", "p25cai.kid",
+			FT_UINT16, BASE_HEX, NULL, 0x0,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_tgid,
+			{ "Talk-group ID", "p25cai.tgid",
+			FT_UINT16, BASE_HEX, NULL, 0x0,
+			NULL, HFILL }
+		}
 	};
 
 /* Setup protocol subtree arrays */
 	static gint *ett[] = {
 		&ett_p25cai,
-		&ett_nid
+		&ett_nid,
+		&ett_du
 	};
 
 /* Register the protocol name and description */
