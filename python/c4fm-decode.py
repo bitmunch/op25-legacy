@@ -17,6 +17,7 @@ parser.add_option("-i", "--input-file", type="string", default="demod.dat", help
 parser.add_option("-s", "--samples-per-symbol", type="int", default=10, help="samples per symbol of the input file")
 parser.add_option("-p", "--pad", action="store_true", dest="pad", default=False, help="pad frame to end of micro-slot")
 parser.add_option("-v", "--verbose", action="store_true", dest="verbose", default=False, help="verbose decoding")
+parser.add_option("-l", "--loopback-inject", action="store_true", dest="loopback", default=False, help="inject raw frames on loopback interface")
 (options, args) = parser.parse_args()
 
 # frame synchronization header (in form most useful for correlation)
@@ -523,7 +524,6 @@ def decode_frame(symbols):
 				print "MBT Data: 0x%x" % mbt_data
 		else:
 			raise NameError('unknown PDU format')
-		# TODO: Enhanced Addressing Format (variation of Confirmed or Unconfirmed)
 	elif data_unit_id == 0:
 		# Header Data Unit aka Header Word
 		# header used prior to superframe
@@ -658,6 +658,16 @@ def decode_frame(symbols):
 		if (consumed % 2) > 0:
 			raw_frame = raw_frame << 2
 	print "Raw Frame: 0x%x" % raw_frame
+	# inject raw frames on the loopback interface for wireshark to pick up
+	# requires scapy
+	if options.loopback:
+		import scapy
+		scapy_frame = ""
+		for i in range((len(hex(raw_frame))-5)*4,-1,-8):
+			# surely there is a simpler way
+			byte = (raw_frame >> i) & 0xFF;
+			scapy_frame += struct.pack('B1', byte)
+		scapy.sendp(scapy.Ether(type=0xFFFF)/scapy_frame, iface="lo")
 	# TODO: print error corrected values
 	return consumed
 
