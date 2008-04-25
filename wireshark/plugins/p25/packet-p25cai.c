@@ -34,6 +34,7 @@
 
 /* Forward declaration we need below */
 void proto_reg_handoff_p25cai(void);
+tvbuff_t* extract_status_symbols(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
 
 /* Initialize the protocol and registered fields */
 static int proto_p25cai = -1;
@@ -79,10 +80,9 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
 
 /* Set up structures needed to add the protocol subtree and manage it */
-	proto_item *ti, *nid_item, *ss_parent_item, *du_item;
-	proto_tree *p25cai_tree, *ss_tree, *nid_tree, *du_tree;
-	int i, j, offset, raw_length, extracted_length;
-	guchar *extracted_buffer;
+	proto_item *ti, *nid_item, *du_item;
+	proto_tree *p25cai_tree, *nid_tree, *du_tree;
+	int offset;
 	tvbuff_t *extracted_tvb;
 	guint8 duid;
 
@@ -91,8 +91,7 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
  */
 
 	/* Check that there's enough data */
-	raw_length = tvb_length(tvb);
-	if (raw_length < 14) /* P25 CAI smallest packet size */
+	if (tvb_length(tvb) < 14) /* P25 CAI smallest packet size */
 		return 0;
 
 	/* Check for correct Frame Sync value
@@ -134,28 +133,9 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		proto_tree_add_item(p25cai_tree, hf_p25cai_fs, tvb, offset, 6, FALSE);
 		offset += 6;
 
-		/* status symbols handling */
-		extracted_length = raw_length - (raw_length / 36);
-		extracted_buffer = (guchar*)ep_alloc0(extracted_length);
-		/* status symbol subtree */
-		ss_parent_item = proto_tree_add_item(p25cai_tree, hf_p25cai_ss_parent, tvb, 0, -1, FALSE);
-		ss_tree = proto_item_add_subtree(ss_parent_item, ett_ss);
-		/* Go through frame one dibit at a time. */
-		for (i = 0, j = 0; i < raw_length * 4; i++) {
-			if (i % 36 == 35) {
-				/* After every 35 dibits is a status symbol. */
-				proto_tree_add_item(ss_tree, hf_p25cai_ss, tvb, i/4, 1, FALSE);
-			} else {
-				/* Extract frame bits from between status symbols. */
-				/* I'm sure there is a more efficient way to do this. */
-				extracted_buffer[j/4] |= tvb_get_bits8(tvb, i * 2, 2) << (6 - (j % 4) * 2);
-				j++;
-			}
-		}
-		/* setup a new tvb buffer with the extracted frame */
-		extracted_tvb = tvb_new_real_data(extracted_buffer, extracted_length, extracted_length);
-		tvb_set_child_real_data_tvbuff(tvb, extracted_tvb);
-		add_new_data_source(pinfo, extracted_tvb, "Extracted Data");
+		/* Extract Status Symbols */
+		extracted_tvb = extract_status_symbols(tvb, pinfo, p25cai_tree);
+
 		/* process extracted_tvb from here on */
 
 		nid_item = proto_tree_add_item(p25cai_tree, hf_p25cai_nid, extracted_tvb, offset, 8, FALSE);
@@ -220,6 +200,47 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 /* Return the amount of data this dissector was able to dissect */
 	return tvb_length(tvb);
+}
+
+/* Extract status symbols, display them, and return frame without status symbols */
+tvbuff_t*
+extract_status_symbols(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
+{
+	proto_item *ss_parent_item;
+	proto_tree *ss_tree;
+	int i, j, raw_length, extracted_length;
+	guchar *extracted_buffer;
+	tvbuff_t *extracted_tvb;
+
+	raw_length = tvb_length(tvb);
+	extracted_length = raw_length - (raw_length / 36);
+
+	/* Create buffer to become new tvb. */
+	extracted_buffer = (guchar*)ep_alloc0(extracted_length);
+
+	/* Create status symbol subtree. */
+	ss_parent_item = proto_tree_add_item(tree, hf_p25cai_ss_parent, tvb, 0, -1, FALSE);
+	ss_tree = proto_item_add_subtree(ss_parent_item, ett_ss);
+
+	/* Go through frame one dibit at a time. */
+	for (i = 0, j = 0; i < raw_length * 4; i++) {
+		if (i % 36 == 35) {
+			/* After every 35 dibits is a status symbol. */
+			proto_tree_add_item(ss_tree, hf_p25cai_ss, tvb, i/4, 1, FALSE);
+		} else {
+			/* Extract frame bits from between status symbols. */
+			/* I'm sure there is a more efficient way to do this. */
+			extracted_buffer[j/4] |= tvb_get_bits8(tvb, i * 2, 2) << (6 - (j % 4) * 2);
+			j++;
+		}
+	}
+
+	/* Setup a new tvb buffer with the extracted data. */
+	extracted_tvb = tvb_new_real_data(extracted_buffer, extracted_length, extracted_length);
+	tvb_set_child_real_data_tvbuff(tvb, extracted_tvb);
+	add_new_data_source(pinfo, extracted_tvb, "Extracted Data");
+
+	return extracted_tvb;
 }
 
 
