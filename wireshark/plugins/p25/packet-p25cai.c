@@ -52,6 +52,8 @@ static int hf_p25cai_mfid = -1;
 static int hf_p25cai_algid = -1;
 static int hf_p25cai_kid = -1;
 static int hf_p25cai_tgid = -1;
+static int hf_p25cai_ss_parent = -1;
+static int hf_p25cai_ss = -1;
 
 /* Field values */
 static const value_string data_unit_ids[] = {
@@ -67,6 +69,7 @@ static const value_string data_unit_ids[] = {
 
 /* Initialize the subtree pointers */
 static gint ett_p25cai = -1;
+static gint ett_ss = -1;
 static gint ett_nid = -1;
 static gint ett_du = -1;
 
@@ -76,9 +79,11 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 {
 
 /* Set up structures needed to add the protocol subtree and manage it */
-	proto_item *ti, *nid_item, *du_item;
-	proto_tree *p25cai_tree, *nid_tree, *du_tree;
-	int offset;
+	proto_item *ti, *nid_item, *ss_parent_item, *du_item;
+	proto_tree *p25cai_tree, *ss_tree, *nid_tree, *du_tree;
+	int i, j, offset, raw_length, extracted_length;
+	guchar *extracted_buffer;
+	tvbuff_t *extracted_tvb;
 	guint8 duid;
 
 /*  If this doesn't look like a P25 CAI frame, give up and return 0 so that
@@ -86,7 +91,8 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
  */
 
 	/* Check that there's enough data */
-	if (tvb_length(tvb) < 14) /* P25 CAI smallest packet size */
+	raw_length = tvb_length(tvb);
+	if (raw_length < 14) /* P25 CAI smallest packet size */
 		return 0;
 
 	/* Check for correct Frame Sync value
@@ -128,31 +134,53 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		proto_tree_add_item(p25cai_tree, hf_p25cai_fs, tvb, offset, 6, FALSE);
 		offset += 6;
 
-		/* TODO: status symbol extraction */
-		/* FIXME: Much of the dissection below is broken without status symbol extraction. */
+		/* status symbols handling */
+		extracted_length = raw_length - (raw_length / 36);
+		extracted_buffer = (guchar*)ep_alloc0(extracted_length);
+		/* status symbol subtree */
+		ss_parent_item = proto_tree_add_item(p25cai_tree, hf_p25cai_ss_parent, tvb, 0, -1, FALSE);
+		ss_tree = proto_item_add_subtree(ss_parent_item, ett_ss);
+		/* Go through frame one dibit at a time. */
+		for (i = 0, j = 0; i < raw_length * 4; i++) {
+			if (i % 36 == 35) {
+				/* After every 35 dibits is a status symbol. */
+				proto_tree_add_item(ss_tree, hf_p25cai_ss, tvb, i/4, 1, FALSE);
+			} else {
+				/* Extract frame bits from between status symbols. */
+				/* I'm sure there is a more efficient way to do this. */
+				extracted_buffer[j/4] |= tvb_get_bits8(tvb, i * 2, 2) << (6 - (j % 4) * 2);
+				j++;
+			}
+		}
+		/* setup a new tvb buffer with the extracted frame */
+		extracted_tvb = tvb_new_real_data(extracted_buffer, extracted_length, extracted_length);
+		tvb_set_child_real_data_tvbuff(tvb, extracted_tvb);
+		add_new_data_source(pinfo, extracted_tvb, "Extracted Data");
+		/* process extracted_tvb from here on */
 
-		nid_item = proto_tree_add_item(p25cai_tree, hf_p25cai_nid, tvb, offset, 8, FALSE);
+		nid_item = proto_tree_add_item(p25cai_tree, hf_p25cai_nid, extracted_tvb, offset, 8, FALSE);
 
 		/* NID subtree */
 		nid_tree = proto_item_add_subtree(nid_item, ett_nid);
-		proto_tree_add_item(nid_tree, hf_p25cai_nac, tvb, offset, 2, FALSE);
-		proto_tree_add_item(nid_tree, hf_p25cai_duid, tvb, offset, 2, FALSE);
+		proto_tree_add_item(nid_tree, hf_p25cai_nac, extracted_tvb, offset, 2, FALSE);
+		proto_tree_add_item(nid_tree, hf_p25cai_duid, extracted_tvb, offset, 2, FALSE);
 		offset += 8;
 
 		switch (duid) {
 		/* Header Data Unit */
 		case 0x0:
-			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_hdu, tvb, offset, -1, FALSE);
+			/* TODO: ECC extraction */
+			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_hdu, extracted_tvb, offset, -1, FALSE);
 			du_tree = proto_item_add_subtree(du_item, ett_du);
-			proto_tree_add_item(du_tree, hf_p25cai_mi, tvb, offset, 9, FALSE);
+			proto_tree_add_item(du_tree, hf_p25cai_mi, extracted_tvb, offset, 9, FALSE);
 			offset += 9;
-			proto_tree_add_item(du_tree, hf_p25cai_mfid, tvb, offset, 1, FALSE);
+			proto_tree_add_item(du_tree, hf_p25cai_mfid, extracted_tvb, offset, 1, FALSE);
 			offset += 1;
-			proto_tree_add_item(du_tree, hf_p25cai_algid, tvb, offset, 1, FALSE);
+			proto_tree_add_item(du_tree, hf_p25cai_algid, extracted_tvb, offset, 1, FALSE);
 			offset += 1;
-			proto_tree_add_item(du_tree, hf_p25cai_kid, tvb, offset, 2, FALSE);
+			proto_tree_add_item(du_tree, hf_p25cai_kid, extracted_tvb, offset, 2, FALSE);
 			offset += 2;
-			proto_tree_add_item(du_tree, hf_p25cai_tgid, tvb, offset, 2, FALSE);
+			proto_tree_add_item(du_tree, hf_p25cai_tgid, extracted_tvb, offset, 2, FALSE);
 			offset += 2;
 			break;
 		/* Terminator Data Unit without Link Control */
@@ -164,23 +192,23 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 		/* Logical Link Data Unit 1 */
 		case 0x5:
-			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_ldu1, tvb, offset, -1, FALSE);
+			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_ldu1, extracted_tvb, offset, -1, FALSE);
 			break;
 		/* Trunking control channel packet in single block format */
 		case 0x7:
-			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_tsbk, tvb, offset, -1, FALSE);
+			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_tsbk, extracted_tvb, offset, -1, FALSE);
 			break;
 		/* Logical Link Data Unit 2 */
 		case 0xA:
-			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_ldu2, tvb, offset, -1, FALSE);
+			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_ldu2, extracted_tvb, offset, -1, FALSE);
 			break;
 		/* Packet Data Unit */
 		case 0xC:
-			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_pdu, tvb, offset, -1, FALSE);
+			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_pdu, extracted_tvb, offset, -1, FALSE);
 			break;
 		/* Terminator Data Unit with Link Control */
 		case 0xF:
-			proto_tree_add_item(p25cai_tree, hf_p25cai_termlc, tvb, offset, -1, FALSE);
+			proto_tree_add_item(p25cai_tree, hf_p25cai_termlc, extracted_tvb, offset, -1, FALSE);
 			break;
 		/* Unknown Data Unit */
 		default:
@@ -276,12 +304,23 @@ proto_register_p25cai(void)
 			{ "Talk-group ID", "p25cai.tgid",
 			FT_UINT16, BASE_HEX, NULL, 0x0,
 			NULL, HFILL }
+		},
+		{ &hf_p25cai_ss_parent,
+			{ "Status Symbols", "p25cai.ss_parent",
+			FT_NONE, BASE_NONE, NULL, 0x0,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_ss,
+			{ "Status Symbol", "p25cai.ss",
+			FT_UINT8, BASE_HEX, NULL, 0x3,
+			NULL, HFILL }
 		}
 	};
 
 /* Setup protocol subtree arrays */
 	static gint *ett[] = {
 		&ett_p25cai,
+		&ett_ss,
 		&ett_nid,
 		&ett_du
 	};
