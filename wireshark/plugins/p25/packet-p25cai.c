@@ -32,9 +32,12 @@
 
 #define FRAME_SYNC_MAGIC 0x5575F5FF77FF
 
-/* Forward declaration we need below */
+/* function prototypes */
 void proto_reg_handoff_p25cai(void);
 tvbuff_t* extract_status_symbols(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
+tvbuff_t* build_hdu_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
+guint8 golay_18_6_8_decode(guint32 codeword);
+void rs_36_20_17_decode(guint8 *codeword, guint8 *decoded);
 
 /* Initialize the protocol and registered fields */
 static int proto_p25cai = -1;
@@ -83,7 +86,7 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	proto_item *ti, *nid_item, *du_item;
 	proto_tree *p25cai_tree, *nid_tree, *du_tree;
 	int offset;
-	tvbuff_t *extracted_tvb;
+	tvbuff_t *extracted_tvb, *du_tvb;
 	guint8 duid;
 
 /*  If this doesn't look like a P25 CAI frame, give up and return 0 so that
@@ -149,18 +152,19 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		switch (duid) {
 		/* Header Data Unit */
 		case 0x0:
-			/* TODO: ECC extraction */
-			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_hdu, extracted_tvb, offset, -1, FALSE);
+			du_tvb = build_hdu_tvb(extracted_tvb, pinfo, offset);
+			offset = 0;
+			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_hdu, du_tvb, offset, -1, FALSE);
 			du_tree = proto_item_add_subtree(du_item, ett_du);
-			proto_tree_add_item(du_tree, hf_p25cai_mi, extracted_tvb, offset, 9, FALSE);
+			proto_tree_add_item(du_tree, hf_p25cai_mi, du_tvb, offset, 9, FALSE);
 			offset += 9;
-			proto_tree_add_item(du_tree, hf_p25cai_mfid, extracted_tvb, offset, 1, FALSE);
+			proto_tree_add_item(du_tree, hf_p25cai_mfid, du_tvb, offset, 1, FALSE);
 			offset += 1;
-			proto_tree_add_item(du_tree, hf_p25cai_algid, extracted_tvb, offset, 1, FALSE);
+			proto_tree_add_item(du_tree, hf_p25cai_algid, du_tvb, offset, 1, FALSE);
 			offset += 1;
-			proto_tree_add_item(du_tree, hf_p25cai_kid, extracted_tvb, offset, 2, FALSE);
+			proto_tree_add_item(du_tree, hf_p25cai_kid, du_tvb, offset, 2, FALSE);
 			offset += 2;
-			proto_tree_add_item(du_tree, hf_p25cai_tgid, extracted_tvb, offset, 2, FALSE);
+			proto_tree_add_item(du_tree, hf_p25cai_tgid, du_tvb, offset, 2, FALSE);
 			offset += 2;
 			break;
 		/* Terminator Data Unit without Link Control */
@@ -209,14 +213,14 @@ extract_status_symbols(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	proto_item *ss_parent_item;
 	proto_tree *ss_tree;
 	int i, j, raw_length, extracted_length;
-	guchar *extracted_buffer;
+	guint8 *extracted_buffer;
 	tvbuff_t *extracted_tvb;
 
 	raw_length = tvb_length(tvb);
 	extracted_length = raw_length - (raw_length / 36);
 
 	/* Create buffer to become new tvb. */
-	extracted_buffer = (guchar*)ep_alloc0(extracted_length);
+	extracted_buffer = (guint8*)ep_alloc0(extracted_length);
 
 	/* Create status symbol subtree. */
 	ss_parent_item = proto_tree_add_item(tree, hf_p25cai_ss_parent, tvb, 0, -1, FALSE);
@@ -238,9 +242,78 @@ extract_status_symbols(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	/* Setup a new tvb buffer with the extracted data. */
 	extracted_tvb = tvb_new_real_data(extracted_buffer, extracted_length, extracted_length);
 	tvb_set_child_real_data_tvbuff(tvb, extracted_tvb);
-	add_new_data_source(pinfo, extracted_tvb, "Extracted Data");
+	add_new_data_source(pinfo, extracted_tvb, "P25 CAI");
 
 	return extracted_tvb;
+}
+
+/* Build Header Data Unit tvb. */
+tvbuff_t*
+build_hdu_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset)
+{
+	guint8 *hdu_buffer, *rs_codeword;
+	guint8 rs_code_byte, high_byte, low_byte;
+	guint32 golay_codeword;
+	int i, j;
+	tvbuff_t *hdu_tvb;
+
+	DISSECTOR_ASSERT(tvb_length_remaining(tvb, offset) >= 81);
+
+	rs_codeword = (guint8*)ep_alloc0(27);
+	hdu_buffer = (guint8*)ep_alloc0(15);
+
+	/* Each 18 bits is a golay codeword. */
+	for (i = offset * 8, j = 0; j < 216; i += 18, j += 6) {
+
+		/* Take 18 bits from the tvb, adjusting for byte boundaries. */
+		golay_codeword = (tvb_get_ntohl(tvb, i / 8) >> (14 - i % 8)) & 0x3FFFF;
+		rs_code_byte = golay_18_6_8_decode(golay_codeword) << 2;
+
+		/* Stuff high bits into one byte of the new buffer. */
+		high_byte = rs_code_byte >> (j % 8);
+		rs_codeword[j / 8] |= high_byte;
+
+		/* Stuff low bits into the next unless beyond end of buffer. */
+		if (j < 210)
+			low_byte = rs_code_byte << (8 - j % 8);
+			rs_codeword[j / 8 + 1] |= low_byte;
+	}
+
+	rs_36_20_17_decode(rs_codeword, hdu_buffer);
+
+	/* Setup a new tvb buffer with the decoded data. */
+	hdu_tvb = tvb_new_real_data(hdu_buffer, 15, 15);
+	tvb_set_child_real_data_tvbuff(tvb, hdu_tvb);
+	add_new_data_source(pinfo, hdu_tvb, "data units");
+
+	return hdu_tvb;
+}
+
+
+/* Error correction decoders
+ *
+ * TODO:  For now these are fake.  They pull out the original bits without
+ * actually doing any error correction or detection.
+ */
+
+/* fake (18,6,8) shortened Golay decoder, no error correction */
+/* TODO: make less fake */
+guint8
+golay_18_6_8_decode(guint32 codeword)
+{
+	return (codeword >> 12) & 0x3F;
+}
+
+/* fake (36,20,17) Reed-Solomon decoder, no error correction */
+/* TODO: make less fake */
+void
+rs_36_20_17_decode(guint8 *codeword, guint8 *decoded)
+{
+	int i;
+
+	/* Just grab the first 15 bytes (20 sets of six bits) */
+	for (i = 0; i < 15; i++)
+		decoded[i] = codeword[i];
 }
 
 
