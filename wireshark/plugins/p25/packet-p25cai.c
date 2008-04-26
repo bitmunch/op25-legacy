@@ -36,7 +36,10 @@
 void proto_reg_handoff_p25cai(void);
 tvbuff_t* extract_status_symbols(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
 tvbuff_t* build_hdu_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
+tvbuff_t* build_termlc_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
 guint8 golay_18_6_8_decode(guint32 codeword);
+guint16 golay_24_12_8_decode(guint32 codeword);
+void rs_24_12_13_decode(guint8 *codeword, guint8 *decoded);
 void rs_36_20_17_decode(guint8 *codeword, guint8 *decoded);
 
 /* Initialize the protocol and registered fields */
@@ -50,7 +53,6 @@ static int hf_p25cai_tsbk = -1;
 static int hf_p25cai_pdu = -1;
 static int hf_p25cai_ldu1 = -1;
 static int hf_p25cai_ldu2 = -1;
-static int hf_p25cai_termlc = -1;
 static int hf_p25cai_mi = -1;
 static int hf_p25cai_mfid = -1;
 static int hf_p25cai_algid = -1;
@@ -58,6 +60,8 @@ static int hf_p25cai_kid = -1;
 static int hf_p25cai_tgid = -1;
 static int hf_p25cai_ss_parent = -1;
 static int hf_p25cai_ss = -1;
+static int hf_p25cai_lc = -1;
+static int hf_p25cai_lcf = -1;
 
 /* Field values */
 static const value_string data_unit_ids[] = {
@@ -192,7 +196,13 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			break;
 		/* Terminator Data Unit with Link Control */
 		case 0xF:
-			proto_tree_add_item(p25cai_tree, hf_p25cai_termlc, extracted_tvb, offset, -1, FALSE);
+			du_tvb = build_termlc_tvb(extracted_tvb, pinfo, offset);
+			offset = 0;
+			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_lc, du_tvb, offset, -1, FALSE);
+			du_tree = proto_item_add_subtree(du_item, ett_du);
+			proto_tree_add_item(du_tree, hf_p25cai_lcf, du_tvb, offset, 1, FALSE);
+			offset += 1;
+			/* TODO: Decode Link Control according to Link Control Format. */
 			break;
 		/* Unknown Data Unit */
 		default:
@@ -262,7 +272,7 @@ build_hdu_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset)
 	rs_codeword = (guint8*)ep_alloc0(27);
 	hdu_buffer = (guint8*)ep_alloc0(15);
 
-	/* Each 18 bits is a golay codeword. */
+	/* Each 18 bits is a Golay codeword. */
 	for (i = offset * 8, j = 0; j < 216; i += 18, j += 6) {
 
 		/* Take 18 bits from the tvb, adjusting for byte boundaries. */
@@ -274,9 +284,10 @@ build_hdu_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset)
 		rs_codeword[j / 8] |= high_byte;
 
 		/* Stuff low bits into the next unless beyond end of buffer. */
-		if (j < 210)
+		if (j < 210) {
 			low_byte = rs_code_byte << (8 - j % 8);
 			rs_codeword[j / 8 + 1] |= low_byte;
+		}
 	}
 
 	rs_36_20_17_decode(rs_codeword, hdu_buffer);
@@ -289,6 +300,48 @@ build_hdu_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset)
 	return hdu_tvb;
 }
 
+/* Build Terminator Data Unit with Link Control tvb. */
+/* TODO: This one is completely untested. */
+tvbuff_t*
+build_termlc_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset)
+{
+	guint8 *termlc_buffer, *rs_codeword;
+	guint16 rs_code_chunk;
+	guint8 high_byte, low_byte;
+	guint32 golay_codeword;
+	int i, j;
+	tvbuff_t *termlc_tvb;
+
+	DISSECTOR_ASSERT(tvb_length_remaining(tvb, offset) >= 36);
+
+	rs_codeword = (guint8*)ep_alloc0(18);
+	termlc_buffer = (guint8*)ep_alloc0(9);
+
+	/* Each 24 bits is a Golay codeword. */
+	for (i = offset * 8, j = 0; j < 144; i += 24, j += 12) {
+
+		/* Take 24 bits from the tvb, adjusting for byte boundaries. */
+		golay_codeword = (tvb_get_ntohl(tvb, i / 8) >> (8 - i % 8)) & 0xFFFFFF;
+		rs_code_chunk = golay_24_12_8_decode(golay_codeword) << 4;
+
+		/* Stuff high bits into one byte of the new buffer. */
+		high_byte = rs_code_chunk >> (j % 8);
+		rs_codeword[j / 8] |= high_byte;
+
+		/* Stuff low bits into the next. */
+		low_byte = rs_code_chunk << (8 - j % 8);
+		rs_codeword[j / 8 + 1] |= low_byte;
+	}
+
+	rs_24_12_13_decode(rs_codeword, termlc_buffer);
+
+	/* Setup a new tvb buffer with the decoded data. */
+	termlc_tvb = tvb_new_real_data(termlc_buffer, 15, 15);
+	tvb_set_child_real_data_tvbuff(tvb, termlc_tvb);
+	add_new_data_source(pinfo, termlc_tvb, "data units");
+
+	return termlc_tvb;
+}
 
 /* Error correction decoders
  *
@@ -304,6 +357,26 @@ golay_18_6_8_decode(guint32 codeword)
 	return (codeword >> 12) & 0x3F;
 }
 
+/* fake (24,12,8) extended Golay decoder, no error correction */
+/* TODO: make less fake */
+guint16
+golay_24_12_8_decode(guint32 codeword)
+{
+	return (codeword >> 12) & 0xFFF;
+}
+
+/* fake (24,12,13) Reed-Solomon decoder, no error correction */
+/* TODO: make less fake */
+void
+rs_24_12_13_decode(guint8 *codeword, guint8 *decoded)
+{
+	int i;
+
+	/* Just grab the first 9 bytes (12 sets of six bits) */
+	for (i = 0; i < 9; i++)
+		decoded[i] = codeword[i];
+}
+
 /* fake (36,20,17) Reed-Solomon decoder, no error correction */
 /* TODO: make less fake */
 void
@@ -315,7 +388,6 @@ rs_36_20_17_decode(guint8 *codeword, guint8 *decoded)
 	for (i = 0; i < 15; i++)
 		decoded[i] = codeword[i];
 }
-
 
 /* Register the protocol with Wireshark */
 void
@@ -369,11 +441,6 @@ proto_register_p25cai(void)
 			FT_NONE, BASE_NONE, NULL, 0x0,
 			NULL, HFILL }
 		},
-		{ &hf_p25cai_termlc,
-			{ "Terminator Data Unit with Link Control", "p25cai.termlc",
-			FT_NONE, BASE_NONE, NULL, 0x0,
-			NULL, HFILL }
-		},
 		{ &hf_p25cai_mi,
 			{ "Message Indicator", "p25cai.mi",
 			FT_BYTES, BASE_HEX, NULL, 0x0,
@@ -407,6 +474,16 @@ proto_register_p25cai(void)
 		{ &hf_p25cai_ss,
 			{ "Status Symbol", "p25cai.ss",
 			FT_UINT8, BASE_HEX, NULL, 0x3,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_lc,
+			{ "Link Control", "p25cai.lc",
+			FT_NONE, BASE_NONE, NULL, 0x0,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_lcf,
+			{ "Link Control Format", "p25cai.lcf",
+			FT_UINT8, BASE_HEX, NULL, 0x0,
 			NULL, HFILL }
 		}
 	};
