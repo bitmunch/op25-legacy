@@ -171,6 +171,171 @@ static const value_string emergency_indicators[] = {
 	{ 0, NULL }
 };
 
+static const value_string isp_opcodes[] = {
+	/* voice service isp */
+	/* TODO: dissect AABC page 43 */
+	{ 0x00, "Group Voice Service Request" }, /* GRP_V_REQ */
+	{ 0x04, "Unit To Unit Voice Service Request" }, /* UU_V_REQ */
+	{ 0x05, "Unit To Unit Answer Response" }, /* UU_ANS_RSP */
+	{ 0x08, "Telephone Interconnect Request - Explicit Dialing" }, /* TELE_INT_DIAL_REQ */
+	{ 0x09, "Telephone Interconnect Request - Implicit Dialing" }, /* TELE_INT_PSTN_REQ */
+	{ 0x0A, "Telephone Interconnect Answer Response" }, /* TELE_INT_ANS_RSP */
+
+	/* data service isp */
+	/* TODO: dissect AABC page 69 */
+	{ 0x10, "Individual Data Service Request (obsolete)" }, /* IND_DATA_REQ */
+	{ 0x11, "Group Data Service Request (obsolete)" }, /* GRP_DATA_REQ */
+	{ 0x12, "SNDCP Data Channel Request" }, /* SN-DAT_CHN_REQ */
+	{ 0x13, "SNDCP Data Page Response" }, /* SN-DAT_PAGE_RES */
+	{ 0x14, "SNDCP Reconnect Request" }, /* SN-REC_REQ */
+
+	/* control and status isp */
+	/* TODO: dissect AABC page 86 */
+	{ 0x20, "Acknowledge Response - Unit" }, /* ACK_RSP_U */
+	{ 0x2E, "Authentication Query" }, /* AUTH_Q */
+	{ 0x2F, "Authentication Response" }, /* AUTH_RSP */
+	{ 0x1F, "Call Alert Request" }, /* CALL_ALRT_REQ */
+	{ 0x23, "Cancel Service Request" }, /* CAN_SRV_REQ */
+	{ 0x27, "Emergency Alarm Request" }, /* EMRG_ALRM_REQ */
+	{ 0x24, "Extended Function Response" }, /* EXT_FNCT_RSP */
+	{ 0x29, "Group Affiliation Query Response" }, /* GRP_AFF_Q_RSP */
+	{ 0x28, "Group Affiliation Request" }, /* GRP_AFF_REQ */
+	{ 0x32, "Identifier Update Request" }, /* IDEN_UP_REQ */
+	{ 0x1C, "Message Update Request" }, /* MSG_UPDT_REQ */
+	{ 0x30, "Protection Parameter Request" }, /* P_PARM_REQ */
+	{ 0x1A, "Status Query Request" }, /* STS_Q_REQ */
+	{ 0x19, "Status Query Response" }, /* STS_Q_RSP */
+	{ 0x18, "Status Update Request" }, /* STS_UPDT_REQ */
+	{ 0x2C, "Unit Registration Request" }, /* U_REG_REQ */
+	{ 0x2B, "De-Registration Request" }, /* U_DE_REG_REQ */
+	{ 0x2D, "Location Registration Request" }, /* LOC_REG_REQ */
+	{ 0x1D, "Radio Unit Monitor Request" }, /* RAD_MON_REQ */
+	{ 0x36, "Roaming Address Request" }, /* ROAM_ADDR_REQ */
+	{ 0x37, "Roaming Address Response" }, /* ROAM_ADDR_RSP */
+
+	{ 0, NULL }
+};
+
+static const value_string osp_opcodes[] = {
+	/* voice service osp */
+	/* TODO: dissect AABC page 53 */
+	{ 0x00, "Group Voice Channel Grant" }, /* GRP_V_CH_GRANT */
+	{ 0x02, "Group Voice Channel Grant Update" }, /* GRP_V_CH_GRANT_UPDT */
+	{ 0x03, "Group Voice Channel Grant Update - Explicit" }, /* GRP_V_CH_GRANT_UPDT_EXP */
+	{ 0x04, "Unit To Unit Voice Channel Grant" }, /* UU_V_CH_GRANT */
+	{ 0x05, "Unit To Unit Answer Request" }, /* UU_ANS_REQ */
+	{ 0x06, "Unit To Unit Voice Channel Grant Update" }, /* UU_V_CH_GRANT_UPDT */
+	{ 0x08, "Telephone Interconnect Voice Channel Grant" }, /* TELE_INT_CH_GRANT */
+	{ 0x09, "Telephone Interconnect Voice Channel Grant Update" }, /* TELE_INT_CH_GRANT_UPDT */
+	{ 0x0A, "Telephone Interconnect Answer Request" }, /* TELE_INT_ANS_REQ */
+
+	/* data service osp */
+	/* TODO: dissect AABC page 76 */
+	{ 0x10, "Individual Data Channel Grant (obsolete)" }, /* IND_DATA_CH_GRANT */
+	{ 0x11, "Group Data Channel Grant (obsolete)" }, /* GRP_DATA_CH_GRANT */
+	{ 0x12, "Group Data Channel Announcement (obsolete)" }, /* GRP_DATA_CH_ANN */
+	{ 0x13, "Group Data Channel Announcement Explicit (obsolete)" }, /* GRP_DATA_CH_ANN_EXP */
+	{ 0x14, "SNDCP Data Channel Grant" }, /* SN-DATA_CHN_GNT */
+	{ 0x15, "SNDCP Data Page Request" }, /* SN-DATA_PAGE_REQ */
+	{ 0x16, "SNDCP Data Channel Announcement - Explicit" }, /* SN-DAT_CHN_ANN_EXP */
+
+	/* control and status osp */
+	/* TODO: dissect AABC page 121 */
+	{ 0x20, "Acknowledge Response - FNE" }, /* ACK_RSP_FNE */
+	{ 0x3C, "Adjacent Status Broadcast" }, /* ADJ_STS_BCST */
+	{ 0x2E, "Authentication Command" }, /* AUTH_CMD */
+	{ 0x1F, "Call Alert" }, /* CALL_ALRT */
+	{ 0x27, "Deny Response" }, /* DENY_RSP */
+	{ 0x24, "Extended Function Command" }, /* EXT_FNCT_CMD */
+	{ 0x2A, "Group Affiliation Query" }, /* GRP_AFF_Q */
+	{ 0x28, "Group Affiliation Response" }, /* GRP_AFF_RSP */
+	{ 0x3D, "Identifier Update" }, /* IDEN_UP */
+	{ 0x1C, "Message Update" }, /* MSG_UPDT */
+	{ 0x3B, "Network Status Broadcast" }, /* NET_STS_BCST */
+	{ 0x3E, "Protection Parameter Broadcast" }, /* P_PARM_BCST */
+	{ 0x3F, "Protection Parameter Update" }, /* P_PARM_UPDT */
+	{ 0x21, "Queued Response" }, /* QUE_RSP */
+	{ 0x3A, "RFSS Status Broadcast" }, /* RFSS_STS_BCST */
+	{ 0x39, "Secondary Control Channel Broadcast" }, /* SCCB */
+	{ 0x1A, "Status Query" }, /* STS_Q */
+	{ 0x18, "Status Update" }, /* STS_UPDT */
+	{ 0x38, "System Service Broadcast" }, /* SYS_SRV_BCST */
+	{ 0x2D, "Unit Registration Command" }, /* U_REG_CMD */
+	{ 0x2C, "Unit Registration Response" }, /* U_REG_RSP */
+	{ 0x2F, "De-Registration Acknowledge" }, /* U_DE_REG_ACK */
+	{ 0x2B, "Location Registration Response" }, /* LOC_REG_RSP */
+	{ 0x1D, "Radio Unit Monitor Command" }, /* RAD_MON_CMD */
+	{ 0x36, "Roaming Address Command" }, /* ROAM_ADDR_CMD */
+	{ 0x37, "Roaming Address Update" }, /* ROAM_ADDR_UPDT */
+	{ 0x35, "Time and Date Announcement" }, /* TIME_DATE_ANN */
+	{ 0x34, "Identifier Update for VHF/UHF Bands" }, /* IDEN_UP_VU */
+	{ 0x29, "Secondary Control Channel Broadcast - Explicit" }, /* SCCB_EXP */
+
+	{ 0, NULL }
+};
+
+static const range_string cancel_reason_codes[] = {
+	{ 0x00, 0x00, "No Reason Code" },
+	{ 0x01, 0x0F, "Reserved" },
+	{ 0x10, 0x10, "Terminate Queued Condition" },
+	{ 0x11, 0x1F, "Reserved" },
+	{ 0x20, 0x20, "Terminate Resource Assignment" },
+	{ 0x21, 0x7F, "Reserved" },
+	{ 0x80, 0xFF, "User or System Definable" },
+	{ 0, 0, NULL }
+};
+
+static const range_string deny_response_reason_codes[] = {
+	{ 0x00, 0x0F, "Reserved" },
+	{ 0x10, 0x10, "The requestion unit is not valid" },
+	{ 0x11, 0x11, "The requestion unit is not authorized for this service" },
+	{ 0x12, 0x1F, "Reserved" },
+	{ 0x20, 0x20, "The target unit is not valid" },
+	{ 0x21, 0x21, "The target unit is not authorized for this service" },
+	{ 0x22, 0x2E, "Reserved" },
+	{ 0x2F, 0x2F, "Target unit has refused this call" },
+	{ 0x30, 0x30, "The target group is not valid" },
+	{ 0x31, 0x31, "The target group is not authorized for this service" },
+	{ 0x32, 0x3F, "Reserved" },
+	{ 0x40, 0x40, "Invalid dialing" },
+	{ 0x41, 0x41, "Telephone number is not authorized" },
+	{ 0x42, 0x42, "PSTN address is not valid" },
+	{ 0x43, 0x4F, "Reserved" },
+	{ 0x50, 0x50, "Call time-out has occurred" },
+	{ 0x51, 0x51, "Landline has terminated this call" },
+	{ 0x52, 0x52, "Subscriber unit has terminated this call" },
+	{ 0x53, 0x5E, "Reserved" },
+	{ 0x5F, 0x5F, "Call has been pre-empted" },
+	{ 0x60, 0x60, "Site access denial" },
+	{ 0x61, 0xEF, "User or system definable" },
+	{ 0xF0, 0xF0, "The call options are not valid for thie service" },
+	{ 0xF1, 0xF1, "Protection service option is not valid" },
+	{ 0xF2, 0xF2, "Duplex service option is not valid" },
+	{ 0xF3, 0xF3, "Circuit or packet mode service option is not valid" },
+	{ 0xF4, 0xFE, "User or system definable" },
+	{ 0xFF, 0xFF, "The system does not support this service" },
+	{ 0, 0, NULL }
+};
+
+static const range_string queued_response_reason_codes[] = {
+	{ 0x00, 0x0F, "Reserved" },
+	{ 0x10, 0x10, "The requesting unit is active in another service" },
+	{ 0x11, 0x1F, "Reserved" },
+	{ 0x10, 0x10, "The target unit is active in another service" },
+	{ 0x21, 0x2E, "Reserved" },
+	{ 0x2F, 0x2F, "The target unit has queued the call" },
+	{ 0x30, 0x30, "The target group is currently active" },
+	{ 0x31, 0x3F, "Reserved" },
+	{ 0x40, 0x40, "Channel resources are not currently active" },
+	{ 0x41, 0x41, "Telephone resources are not currently active" },
+	{ 0x42, 0x42, "Data resources are not currently active" },
+	{ 0x43, 0x4F, "Reserved" },
+	{ 0x50, 0x50, "Superseding service currently active" },
+	{ 0x51, 0x7F, "Reserved" },
+	{ 0x80, 0xFF, "User or System Definable" },
+	{ 0, 0, NULL }
+};
+
 /* Initialize the subtree pointers */
 static gint ett_p25cai = -1;
 static gint ett_ss = -1;
