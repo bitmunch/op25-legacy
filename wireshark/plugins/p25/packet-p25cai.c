@@ -36,11 +36,16 @@
 void proto_reg_handoff_p25cai(void);
 tvbuff_t* extract_status_symbols(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
 tvbuff_t* build_hdu_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
+tvbuff_t* build_tsdu_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
 tvbuff_t* build_termlc_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
+void data_deinterleave(tvbuff_t *tvb, guint8 *deinterleaved, int bit_offset);
+void trellis_1_2_decode(guint8 *encoded, guint8 *decoded, int offset);
 guint8 golay_18_6_8_decode(guint32 codeword);
 guint16 golay_24_12_8_decode(guint32 codeword);
 void rs_24_12_13_decode(guint8 *codeword, guint8 *decoded);
 void rs_36_20_17_decode(guint8 *codeword, guint8 *decoded);
+int find_min(guint8 list[], int len);
+int count_bits(unsigned int n);
 
 /* Initialize the protocol and registered fields */
 static int proto_p25cai = -1;
@@ -62,13 +67,18 @@ static int hf_p25cai_ss_parent = -1;
 static int hf_p25cai_ss = -1;
 static int hf_p25cai_lc = -1;
 static int hf_p25cai_lcf = -1;
+static int hf_p25cai_lbf = -1;
+static int hf_p25cai_ptbf = -1;
+static int hf_p25cai_opcode = -1;
+static int hf_p25cai_args = -1;
+static int hf_p25cai_crc = -1;
 
 /* Field values */
 static const value_string data_unit_ids[] = {
 	{ 0x0, "Header Data Unit" },
 	{ 0x3, "Terminator without Link Control" },
 	{ 0x5, "Logical Link Data Unit 1" },
-	{ 0x7, "Single Block Format Trunking Control Channel Packet" },
+	{ 0x7, "Trunking Signaling Data Unit" },
 	{ 0xA, "Logical Link Data Unit 2" },
 	{ 0xC, "Packet Data Unit" },
 	{ 0xF, "Terminator with Link Control" },
@@ -91,7 +101,7 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	proto_tree *p25cai_tree, *nid_tree, *du_tree;
 	int offset;
 	tvbuff_t *extracted_tvb, *du_tvb;
-	guint8 duid;
+	guint8 duid, last_block;
 
 /*  If this doesn't look like a P25 CAI frame, give up and return 0 so that
  *  perhaps another dissector can take over.
@@ -182,9 +192,27 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		case 0x5:
 			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_ldu1, extracted_tvb, offset, -1, FALSE);
 			break;
-		/* Trunking control channel packet in single block format */
+		/* Trunking Signaling Data Unit */
 		case 0x7:
-			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_tsbk, extracted_tvb, offset, -1, FALSE);
+			du_tvb = build_tsdu_tvb(extracted_tvb, pinfo, offset);
+			offset = 0;
+			last_block = 0;
+			while (last_block == 0) {
+				last_block = tvb_get_guint8(du_tvb, offset) >> 7;
+				du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_tsbk, du_tvb, offset, 12, FALSE);
+				du_tree = proto_item_add_subtree(du_item, ett_du);
+				proto_tree_add_item(du_tree, hf_p25cai_lbf, du_tvb, offset, 1, FALSE);
+				proto_tree_add_item(du_tree, hf_p25cai_ptbf, du_tvb, offset, 1, FALSE);
+				proto_tree_add_item(du_tree, hf_p25cai_opcode, du_tvb, offset, 1, FALSE);
+				offset += 1;
+				proto_tree_add_item(du_tree, hf_p25cai_mfid, du_tvb, offset, 1, FALSE);
+				offset += 1;
+				proto_tree_add_item(du_tree, hf_p25cai_args, du_tvb, offset, 8, FALSE);
+				offset += 8;
+				/* TODO: more items */
+				proto_tree_add_item(du_tree, hf_p25cai_crc, du_tvb, offset, 2, FALSE);
+				offset += 2;
+			}
 			break;
 		/* Logical Link Data Unit 2 */
 		case 0xA:
@@ -300,6 +328,42 @@ build_hdu_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset)
 	return hdu_tvb;
 }
 
+/* Build Trunking Signaling Block tvb. */
+tvbuff_t*
+build_tsdu_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset)
+{
+	guint8 *tsdu_buffer, *trellis_buffer;
+	guint8 last_block;
+	int tsdu_offset, tvb_bit_offset;
+	tvbuff_t *tsdu_tvb;
+
+	/* From here on, our tvb offset may not fall on bit boundaries, so we track
+	 * it by bits instead of bytes.
+	 */
+	tvb_bit_offset = offset * 8;
+	tsdu_offset = 0;
+	last_block = 0;
+
+	tsdu_buffer = (guint8*)ep_alloc0(36); /* 12 times maximum number of TSBKs (3) */
+
+	while (last_block == 0) {
+		DISSECTOR_ASSERT(tvb_length_remaining(tvb, tvb_bit_offset / 8) >= 25);
+		trellis_buffer = (guint8*)ep_alloc0(25);
+		data_deinterleave(tvb, trellis_buffer, tvb_bit_offset);
+		trellis_1_2_decode(trellis_buffer, tsdu_buffer, tsdu_offset);
+		tvb_bit_offset += 196;
+		last_block = tsdu_buffer[tsdu_offset] >> 7;
+		tsdu_offset += 12;
+	}
+
+	/* Setup a new tvb buffer with the decoded data. */
+	tsdu_tvb = tvb_new_real_data(tsdu_buffer, tsdu_offset, tsdu_offset);
+	tvb_set_child_real_data_tvbuff(tvb, tsdu_tvb);
+	add_new_data_source(pinfo, tsdu_tvb, "data units");
+
+	return tsdu_tvb;
+}
+
 /* Build Terminator Data Unit with Link Control tvb. */
 /* TODO: This one is completely untested. */
 tvbuff_t*
@@ -341,6 +405,73 @@ build_termlc_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset)
 	add_new_data_source(pinfo, termlc_tvb, "data units");
 
 	return termlc_tvb;
+}
+
+/* Deinterleave data block.  Assumes output buffer is already zeroed. */
+void
+data_deinterleave(tvbuff_t *tvb, guint8 *deinterleaved, int bit_offset)
+{
+	int d, i, j, t;
+	int steps[] = {0, 52, 100, 148};
+
+	/* step through input nibbles to copy to output */
+	for (i = bit_offset, d = 0; i < 45 + bit_offset; i += 4) {
+		for (j = 0; j < 4; j++, d += 4) {
+			/* t = tvb bit index
+			 * d = deinterleaved bit index
+			 */
+			t = i + steps[j];
+			deinterleaved[d / 8] |= ((tvb_get_guint8(tvb, t / 8) << (t % 8)) & 0xF0) >> (d % 8);
+		}
+	}
+	t = bit_offset + 48;
+	deinterleaved[24] |= ((tvb_get_guint8(tvb, t / 8) << (t % 8)) & 0xF0);
+}
+
+/* 1/2 rate trellis decoder.  Assumes output buffer is already zeroed. */
+void
+trellis_1_2_decode(guint8 *encoded, guint8 *decoded, int offset)
+{
+	int i, j, k;
+	int state = 0;
+	guint8 codeword;
+
+	/* Hamming distance */
+	guint8 hd[4];
+
+	/* state transition table, including constellation to dibit pair mapping */
+	guint8 next_words[4][4] = {
+		{0x2, 0xC, 0x1, 0xF},
+		{0xE, 0x0, 0xD, 0x3},
+		{0x9, 0x7, 0xA, 0x4},
+		{0x5, 0xB, 0x6, 0x8}
+	};
+
+	/* step through 4 bit codewords in input */
+	for (i = 0; i < 196; i += 4) {
+		codeword = (encoded[i / 8] >> (4 - (i % 8))) & 0xF;
+		for (k = 0; k < 4; k++)
+			hd[k] = 0;
+		/* try each codeword in a row of the state transition table */
+		for (j = 0; j < 4; j++) {
+			/* find Hamming distance for candidate */
+			hd[j] = count_bits(codeword ^ next_words[state][j]);
+		}
+		/* find the dibit that matches the most codeword bits (minimum Hamming distance) */
+		state = find_min(hd, 4);
+		/* error if minimum can't be found */
+		DISSECTOR_ASSERT(state != -1);
+		/* It also might be nice to report a condition where the minimum is
+		 * non-zero, i.e. an error has been corrected.  It probably shouldn't
+		 * be a permanent failure, though.
+		 *
+		 * DISSECTOR_ASSERT(hd[state] == 0);
+		 */
+
+		/* append dibit onto output buffer */
+		if (i < 192)
+			decoded[(i / 16) + offset] |= state << (6 - (i / 2) % 8);
+	}
 }
 
 /* Error correction decoders
@@ -485,6 +616,31 @@ proto_register_p25cai(void)
 			{ "Link Control Format", "p25cai.lcf",
 			FT_UINT8, BASE_HEX, NULL, 0x0,
 			NULL, HFILL }
+		},
+		{ &hf_p25cai_lbf,
+			{ "Last Block Flag", "p25cai.lbf",
+			FT_BOOLEAN, BASE_NONE, NULL, 0x80,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_ptbf,
+			{ "Protected Trunking Block Flag", "p25cai.ptbf",
+			FT_BOOLEAN, BASE_NONE, NULL, 0x40,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_opcode,
+			{ "Opcode", "p25cai.opcode",
+			FT_UINT8, BASE_HEX, NULL, 0x3F,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_args,
+			{ "Arguments", "p25cai.args",
+			FT_UINT64, BASE_HEX, NULL, 0x0,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_crc,
+			{ "CRC", "p25cai.crc",
+			FT_UINT16, BASE_HEX, NULL, 0x0,
+			NULL, HFILL }
 		}
 	};
 
@@ -533,4 +689,42 @@ proto_reg_handoff_p25cai(void)
 
 		inited = TRUE;
 	}
+}
+
+
+/* Utility functions */
+
+/* count the number of 1 bits in an int */
+int
+count_bits(unsigned int n)
+{
+    int i = 0;
+    for (i = 0; n != 0; i++)
+        n &= n - 1;
+    return i;
+}
+
+/* return the index of the lowest value in a list */
+int
+find_min(guint8 list[], int len)
+{
+	int min = list[0];	
+	int index = 0;	
+	int unique = 1;	
+	int i;
+
+	for (i = 1; i < len; i++) {
+		if (list[i] < min) {
+			min = list[i];
+			index = i;
+			unique = 1;
+		} else if (list[i] == min) {
+			unique = 0;
+		}
+	}
+	/* return -1 if a minimum can't be found */
+	if (!unique)
+		return -1;
+
+	return index;
 }
