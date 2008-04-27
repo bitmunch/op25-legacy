@@ -85,6 +85,92 @@ static const value_string data_unit_ids[] = {
 	{ 0, NULL }
 };
 
+static const value_string network_access_codes[] = {
+	{ 0x293, "Default NAC" },
+	{ 0xF7E, "Receiver to open on any NAC" },
+	{ 0xF7F, "Repeater to receive and retransmit any NAC" },
+	{ 0, NULL }
+};
+
+static const value_string manufacturer_ids[] = {
+	{ 0x00, "Standard MFID (pre-2001)" },
+	{ 0x01, "Standard MFID (post-2001)" },
+	{ 0, NULL }
+};
+
+static const value_string link_control_formats[] = {
+	{ 0x00, "Group Call Format" },
+	{ 0x03, "Individual Call Format" },
+	{ 0x80, "Encrypted Group Call Format" },
+	{ 0x83, "Encrypted Individual Call Format" },
+	/* TODO: see AABF for more */
+	{ 0, NULL }
+};
+
+static const range_string logical_link_ids[] = {
+	{ 0x000000, 0x000000, "No One" },
+	{ 0x000001, 0x98967F, "General Use" },
+	{ 0x989680, 0xFFFFFE, "Talk Group or Special Purpose Use" },
+	{ 0xFFFFFF, 0xFFFFFF, "Everyone" },
+	{ 0, 0, NULL }
+};
+
+static const value_string talk_group_ids[] = {
+	{ 0x0000, "No One" },
+	{ 0x0001, "Default Talk Group" },
+	{ 0xFFFF, "Everyone" },
+	{ 0, NULL }
+};
+
+static const value_string key_ids[] = {
+	{ 0x0000, "Default Key ID" },
+	{ 0, NULL }
+};
+
+static const value_string algorithm_ids[] = {
+	{ 0x00, "ACCORDION 1.3" },
+	{ 0x01, "BATON (Auto Even)" },
+	{ 0x02, "FIREFLY Type 1" },
+	{ 0x03, "MAYFLY Type 1" },
+	{ 0x04, "SAVILLE" },
+	{ 0x41, "BATON (Auto Odd)" },
+	{ 0x80, "Unencrypted message" },
+	{ 0x81, "DES" },
+	{ 0x83, "Triple DES" },
+	{ 0x84, "AES" },
+	{ 0, NULL }
+};
+
+static const value_string service_access_points[] = {
+	{ 0x00, "Unencrypted User Data" },
+	{ 0x01, "Encrypted User Data" },
+	{ 0x02, "Circuit Data" },
+	{ 0x03, "Circuit Data Control" },
+	{ 0x04, "Packet Data" },
+	{ 0x05, "Address Resolution Protocol" },
+	{ 0x06, "SNDCP Packet Data Control" },
+	{ 0x1F, "Extended Address" },
+	{ 0x20, "Registration and Authorization" },
+	{ 0x21, "Channel Reassignment" },
+	{ 0x22, "System Configuration" },
+	{ 0x23, "MR Loop-Back" },
+	{ 0x24, "MR Statistics" },
+	{ 0x25, "MR Out-of-Service" },
+	{ 0x26, "MR Paging" },
+	{ 0x27, "MR Configuration" },
+	{ 0x28, "Unencrypted Key Management Message" },
+	{ 0x29, "Encrypted Key Management Message" },
+	{ 0x3D, "Trunking Control" },
+	{ 0x3F, "Protected Trunking Control" },
+	{ 0, NULL }
+};
+
+static const value_string emergency_indicators[] = {
+	{ 0x0, "Routine, non-emergency condition" },
+	{ 0x1, "Emergency condition" },
+	{ 0, NULL }
+};
+
 /* Initialize the subtree pointers */
 static gint ett_p25cai = -1;
 static gint ett_ss = -1;
@@ -539,7 +625,7 @@ proto_register_p25cai(void)
 		},
 		{ &hf_p25cai_nac,
 			{ "Network Access Code", "p25cai.nac",
-			FT_UINT16, BASE_HEX, NULL, 0xFFF0,
+			FT_UINT16, BASE_HEX, VALS(network_access_codes), 0xFFF0,
 			NULL, HFILL }
 		},
 		{ &hf_p25cai_duid,
@@ -579,22 +665,22 @@ proto_register_p25cai(void)
 		},
 		{ &hf_p25cai_mfid,
 			{ "Manufacturer's ID", "p25cai.mfid",
-			FT_UINT8, BASE_HEX, NULL, 0x0,
+			FT_UINT8, BASE_HEX, VALS(manufacturer_ids), 0x0,
 			NULL, HFILL }
 		},
 		{ &hf_p25cai_algid,
 			{ "Algorithm ID", "p25cai.algid",
-			FT_UINT8, BASE_HEX, NULL, 0x0,
+			FT_UINT8, BASE_HEX, VALS(algorithm_ids), 0x0,
 			NULL, HFILL }
 		},
 		{ &hf_p25cai_kid,
 			{ "Key ID", "p25cai.kid",
-			FT_UINT16, BASE_HEX, NULL, 0x0,
+			FT_UINT16, BASE_HEX, VALS(key_ids), 0x0,
 			NULL, HFILL }
 		},
 		{ &hf_p25cai_tgid,
-			{ "Talk-group ID", "p25cai.tgid",
-			FT_UINT16, BASE_HEX, NULL, 0x0,
+			{ "Talk Group ID", "p25cai.tgid",
+			FT_UINT16, BASE_HEX, VALS(talk_group_ids), 0x0,
 			NULL, HFILL }
 		},
 		{ &hf_p25cai_ss_parent,
@@ -614,7 +700,7 @@ proto_register_p25cai(void)
 		},
 		{ &hf_p25cai_lcf,
 			{ "Link Control Format", "p25cai.lcf",
-			FT_UINT8, BASE_HEX, NULL, 0x0,
+			FT_UINT8, BASE_HEX, VALS(link_control_formats), 0x0,
 			NULL, HFILL }
 		},
 		{ &hf_p25cai_lbf,
