@@ -34,15 +34,23 @@
 
 /* function prototypes */
 void proto_reg_handoff_p25cai(void);
+void dissect_voice(tvbuff_t *tvb, proto_tree *tree, int offset);
+void dissect_lsd(tvbuff_t *tvb, proto_tree *tree, int offset);
+void dissect_lc(tvbuff_t *tvb, proto_tree *tree);
+void dissect_es(tvbuff_t *tvb, proto_tree *tree);
 tvbuff_t* extract_status_symbols(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
 tvbuff_t* build_hdu_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
 tvbuff_t* build_tsdu_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
-tvbuff_t* build_termlc_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
+tvbuff_t* build_term_lc_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
+tvbuff_t* build_ldu_lc_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
+tvbuff_t* build_ldu_es_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
 void data_deinterleave(tvbuff_t *tvb, guint8 *deinterleaved, int bit_offset);
 void trellis_1_2_decode(guint8 *encoded, guint8 *decoded, int offset);
 guint8 golay_18_6_8_decode(guint32 codeword);
 guint16 golay_24_12_8_decode(guint32 codeword);
+guint8 hamming_10_6_3_decode(guint32 codeword);
 void rs_24_12_13_decode(guint8 *codeword, guint8 *decoded);
+void rs_24_16_9_decode(guint8 *codeword, guint8 *decoded);
 void rs_36_20_17_decode(guint8 *codeword, guint8 *decoded);
 int find_min(guint8 list[], int len);
 int count_bits(unsigned int n);
@@ -69,9 +77,13 @@ static int hf_p25cai_lc = -1;
 static int hf_p25cai_lcf = -1;
 static int hf_p25cai_lbf = -1;
 static int hf_p25cai_ptbf = -1;
-static int hf_p25cai_opcode = -1;
+static int hf_p25cai_isp_opcode = -1;
+static int hf_p25cai_osp_opcode = -1;
 static int hf_p25cai_args = -1;
 static int hf_p25cai_crc = -1;
+static int hf_p25cai_imbe = -1;
+static int hf_p25cai_lsd = -1;
+static int hf_p25cai_es = -1;
 
 /* Field values */
 static const value_string data_unit_ids[] = {
@@ -341,6 +353,8 @@ static gint ett_p25cai = -1;
 static gint ett_ss = -1;
 static gint ett_nid = -1;
 static gint ett_du = -1;
+static gint ett_lc = -1;
+static gint ett_es = -1;
 
 /* Code to actually dissect the packets */
 static int
@@ -442,6 +456,10 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		/* Logical Link Data Unit 1 */
 		case 0x5:
 			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_ldu1, extracted_tvb, offset, -1, FALSE);
+			du_tree = proto_item_add_subtree(du_item, ett_du);
+			dissect_voice(extracted_tvb, du_tree, offset);
+			dissect_lc(build_ldu_lc_tvb(extracted_tvb, pinfo, offset), du_tree);
+			dissect_lsd(extracted_tvb, du_tree, offset);
 			break;
 		/* Trunking Signaling Data Unit */
 		case 0x7:
@@ -454,20 +472,26 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 				du_tree = proto_item_add_subtree(du_item, ett_du);
 				proto_tree_add_item(du_tree, hf_p25cai_lbf, du_tvb, offset, 1, FALSE);
 				proto_tree_add_item(du_tree, hf_p25cai_ptbf, du_tvb, offset, 1, FALSE);
-				proto_tree_add_item(du_tree, hf_p25cai_opcode, du_tvb, offset, 1, FALSE);
+				/* FIXME: how to know it is OSP vs. ISP? */
+				proto_tree_add_item(du_tree, hf_p25cai_osp_opcode, du_tvb, offset, 1, FALSE);
 				offset += 1;
 				proto_tree_add_item(du_tree, hf_p25cai_mfid, du_tvb, offset, 1, FALSE);
 				offset += 1;
 				proto_tree_add_item(du_tree, hf_p25cai_args, du_tvb, offset, 8, FALSE);
 				offset += 8;
-				/* TODO: more items */
+				/* TODO: dissect args subtree */
 				proto_tree_add_item(du_tree, hf_p25cai_crc, du_tvb, offset, 2, FALSE);
+				/* TODO: verify CRC */
 				offset += 2;
 			}
 			break;
 		/* Logical Link Data Unit 2 */
 		case 0xA:
 			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_ldu2, extracted_tvb, offset, -1, FALSE);
+			du_tree = proto_item_add_subtree(du_item, ett_du);
+			dissect_voice(extracted_tvb, du_tree, offset);
+			dissect_es(build_ldu_es_tvb(extracted_tvb, pinfo, offset), du_tree);
+			dissect_lsd(extracted_tvb, du_tree, offset);
 			break;
 		/* Packet Data Unit */
 		case 0xC:
@@ -475,13 +499,7 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			break;
 		/* Terminator Data Unit with Link Control */
 		case 0xF:
-			du_tvb = build_termlc_tvb(extracted_tvb, pinfo, offset);
-			offset = 0;
-			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_lc, du_tvb, offset, -1, FALSE);
-			du_tree = proto_item_add_subtree(du_item, ett_du);
-			proto_tree_add_item(du_tree, hf_p25cai_lcf, du_tvb, offset, 1, FALSE);
-			offset += 1;
-			/* TODO: Decode Link Control according to Link Control Format. */
+			dissect_lc(build_term_lc_tvb(extracted_tvb, pinfo, offset), tree);
 			break;
 		/* Unknown Data Unit */
 		default:
@@ -493,6 +511,83 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 
 /* Return the amount of data this dissector was able to dissect */
 	return tvb_length(tvb);
+}
+
+/* Dissect voice frames */
+void
+dissect_voice(tvbuff_t *tvb, proto_tree *tree, int offset)
+{
+	DISSECTOR_ASSERT(tvb_length_remaining(tvb, offset) >= 196);
+
+
+	/* TODO: make these less raw */
+	proto_tree_add_item(tree, hf_p25cai_imbe, tvb, offset, 18, FALSE);
+	offset += 18;
+	proto_tree_add_item(tree, hf_p25cai_imbe, tvb, offset, 18, FALSE);
+	offset += 23;
+	proto_tree_add_item(tree, hf_p25cai_imbe, tvb, offset, 18, FALSE);
+	offset += 23;
+	proto_tree_add_item(tree, hf_p25cai_imbe, tvb, offset, 18, FALSE);
+	offset += 23;
+	proto_tree_add_item(tree, hf_p25cai_imbe, tvb, offset, 18, FALSE);
+	offset += 23;
+	proto_tree_add_item(tree, hf_p25cai_imbe, tvb, offset, 18, FALSE);
+	offset += 23;
+	proto_tree_add_item(tree, hf_p25cai_imbe, tvb, offset, 18, FALSE);
+	offset += 23;
+	proto_tree_add_item(tree, hf_p25cai_imbe, tvb, offset, 18, FALSE);
+	offset += 22;
+	proto_tree_add_item(tree, hf_p25cai_imbe, tvb, offset, 18, FALSE);
+	offset += 18;
+}
+
+/* Dissect Low Speed Data from an LDU */
+void
+dissect_lsd(tvbuff_t *tvb, proto_tree *tree, int offset)
+{
+	/* we were passed the offset to the beginning of the LDU */
+	offset += 174;
+
+	DISSECTOR_ASSERT(tvb_length_remaining(tvb, offset) >= 4);
+
+	/* TODO: error correction decoding */
+	proto_tree_add_item(tree, hf_p25cai_lsd, tvb, offset, 4, FALSE);
+}
+
+/* Dissect Link Control */
+void
+dissect_lc(tvbuff_t *tvb, proto_tree *tree)
+{
+	proto_tree *lc_tree;
+	proto_item *lc_item;
+	int offset = 0;
+
+	DISSECTOR_ASSERT(tvb_length_remaining(tvb, offset) >= 9);
+
+	lc_item = proto_tree_add_item(tree, hf_p25cai_lc, tvb, offset, 9, FALSE);
+	lc_tree = proto_item_add_subtree(lc_item, ett_lc);
+	proto_tree_add_item(lc_tree, hf_p25cai_lcf, tvb, offset, 1, FALSE);
+	offset += 1;
+	/* TODO: Decode Link Control according to Link Control Format. */
+}
+
+/* Dissect Encryption Sync from an LDU2 */
+void
+dissect_es(tvbuff_t *tvb, proto_tree *tree)
+{
+	proto_tree *es_tree;
+	proto_item *es_item;
+	int offset = 0;
+
+	DISSECTOR_ASSERT(tvb_length_remaining(tvb, offset) >= 12);
+
+	es_item = proto_tree_add_item(tree, hf_p25cai_es, tvb, offset, 12, FALSE);
+	es_tree = proto_item_add_subtree(es_item, ett_es);
+	proto_tree_add_item(es_tree, hf_p25cai_mi, tvb, offset, 9, FALSE);
+	offset += 9;
+	proto_tree_add_item(es_tree, hf_p25cai_algid, tvb, offset, 1, FALSE);
+	offset += 1;
+	proto_tree_add_item(es_tree, hf_p25cai_kid, tvb, offset, 2, FALSE);
 }
 
 /* Extract status symbols, display them, and return frame without status symbols */
@@ -579,6 +674,106 @@ build_hdu_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset)
 	return hdu_tvb;
 }
 
+/* Build Link Control tvb from LDU1 */
+tvbuff_t*
+build_ldu_lc_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset)
+{
+	guint8 *lc_buffer, *rs_codeword;
+	guint8 rs_code_byte, high_byte, low_byte;
+	guint32 hamming_codeword;
+	int i, j, r, t;
+	tvbuff_t *lc_tvb;
+
+	/* we were passed the offset to the beginning of the LDU */
+	offset += 36;
+
+	DISSECTOR_ASSERT(tvb_length_remaining(tvb, offset) >= 147);
+
+	rs_codeword = (guint8*)ep_alloc0(18);
+	lc_buffer = (guint8*)ep_alloc0(9);
+
+	/* step through tvb bits to find 10 bit hamming codewords */
+	for (i = offset * 8, r = 0; r < 144; i += 184) {
+		for (j = 0; j < 40; j += 10, r += 6) {
+			/* t = tvb bit index
+			 * r = reed-solomon codeword bit index
+			 */
+			t = i + j;
+			hamming_codeword = (tvb_get_ntohl(tvb, t / 8) >> (22 - t % 8)) & 0x3FF;
+			rs_code_byte = hamming_10_6_3_decode(hamming_codeword) << 2;
+
+			/* Stuff high bits into one byte of the new buffer. */
+			high_byte = rs_code_byte >> (r % 8);
+			rs_codeword[r / 8] |= high_byte;
+
+			/* Stuff low bits into the next unless beyond end of buffer. */
+			if (r < 144) {
+				low_byte = rs_code_byte << (8 - r % 8);
+				rs_codeword[r / 8 + 1] |= low_byte;
+			}
+		}
+	}
+
+	rs_24_12_13_decode(rs_codeword, lc_buffer);
+
+	/* Setup a new tvb buffer with the decoded data. */
+	lc_tvb = tvb_new_real_data(lc_buffer, 9, 9);
+	tvb_set_child_real_data_tvbuff(tvb, lc_tvb);
+	add_new_data_source(pinfo, lc_tvb, "Link Control");
+
+	return lc_tvb;
+}
+
+/* Build Encryption Sync tvb LDU2 */
+tvbuff_t*
+build_ldu_es_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset)
+{
+	guint8 *es_buffer, *rs_codeword;
+	guint8 rs_code_byte, high_byte, low_byte;
+	guint32 hamming_codeword;
+	int i, j, r, t;
+	tvbuff_t *es_tvb;
+
+	/* we were passed the offset to the beginning of the LDU */
+	offset += 36;
+
+	DISSECTOR_ASSERT(tvb_length_remaining(tvb, offset) >= 147);
+
+	rs_codeword = (guint8*)ep_alloc0(18);
+	es_buffer = (guint8*)ep_alloc0(12);
+
+	/* step through tvb bits to find 10 bit hamming codewords */
+	for (i = offset * 8, r = 0; r < 144; i += 184) {
+		for (j = 0; j < 40; j += 10, r += 6) {
+			/* t = tvb bit index
+			 * r = reed-solomon codeword bit index
+			 */
+			t = i + j;
+			hamming_codeword = (tvb_get_ntohl(tvb, t / 8) >> (22 - t % 8)) & 0x3FF;
+			rs_code_byte = hamming_10_6_3_decode(hamming_codeword) << 2;
+
+			/* Stuff high bits into one byte of the new buffer. */
+			high_byte = rs_code_byte >> (r % 8);
+			rs_codeword[r / 8] |= high_byte;
+
+			/* Stuff low bits into the next unless beyond end of buffer. */
+			if (r < 144) {
+				low_byte = rs_code_byte << (8 - r % 8);
+				rs_codeword[r / 8 + 1] |= low_byte;
+			}
+		}
+	}
+
+	rs_24_16_9_decode(rs_codeword, es_buffer);
+
+	/* Setup a new tvb buffer with the decoded data. */
+	es_tvb = tvb_new_real_data(es_buffer, 12, 12);
+	tvb_set_child_real_data_tvbuff(tvb, es_tvb);
+	add_new_data_source(pinfo, es_tvb, "Encryption Sync");
+
+	return es_tvb;
+}
+
 /* Build Trunking Signaling Block tvb. */
 tvbuff_t*
 build_tsdu_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset)
@@ -615,22 +810,22 @@ build_tsdu_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset)
 	return tsdu_tvb;
 }
 
-/* Build Terminator Data Unit with Link Control tvb. */
+/* Build Link Control tvb from Terminator */
 /* TODO: This one is completely untested. */
 tvbuff_t*
-build_termlc_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset)
+build_term_lc_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset)
 {
-	guint8 *termlc_buffer, *rs_codeword;
+	guint8 *lc_buffer, *rs_codeword;
 	guint16 rs_code_chunk;
 	guint8 high_byte, low_byte;
 	guint32 golay_codeword;
 	int i, j;
-	tvbuff_t *termlc_tvb;
+	tvbuff_t *lc_tvb;
 
 	DISSECTOR_ASSERT(tvb_length_remaining(tvb, offset) >= 36);
 
 	rs_codeword = (guint8*)ep_alloc0(18);
-	termlc_buffer = (guint8*)ep_alloc0(9);
+	lc_buffer = (guint8*)ep_alloc0(9);
 
 	/* Each 24 bits is a Golay codeword. */
 	for (i = offset * 8, j = 0; j < 144; i += 24, j += 12) {
@@ -648,14 +843,14 @@ build_termlc_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset)
 		rs_codeword[j / 8 + 1] |= low_byte;
 	}
 
-	rs_24_12_13_decode(rs_codeword, termlc_buffer);
+	rs_24_12_13_decode(rs_codeword, lc_buffer);
 
 	/* Setup a new tvb buffer with the decoded data. */
-	termlc_tvb = tvb_new_real_data(termlc_buffer, 15, 15);
-	tvb_set_child_real_data_tvbuff(tvb, termlc_tvb);
-	add_new_data_source(pinfo, termlc_tvb, "data units");
+	lc_tvb = tvb_new_real_data(lc_buffer, 15, 15);
+	tvb_set_child_real_data_tvbuff(tvb, lc_tvb);
+	add_new_data_source(pinfo, lc_tvb, "data units");
 
-	return termlc_tvb;
+	return lc_tvb;
 }
 
 /* Deinterleave data block.  Assumes output buffer is already zeroed. */
@@ -747,6 +942,14 @@ golay_24_12_8_decode(guint32 codeword)
 	return (codeword >> 12) & 0xFFF;
 }
 
+/* fake (10,6,3) shortened Hamming decoder, no error correction */
+/* TODO: make less fake */
+guint8
+hamming_10_6_3_decode(guint32 codeword)
+{
+	return (codeword >> 4) & 0x3F;
+}
+
 /* fake (24,12,13) Reed-Solomon decoder, no error correction */
 /* TODO: make less fake */
 void
@@ -756,6 +959,18 @@ rs_24_12_13_decode(guint8 *codeword, guint8 *decoded)
 
 	/* Just grab the first 9 bytes (12 sets of six bits) */
 	for (i = 0; i < 9; i++)
+		decoded[i] = codeword[i];
+}
+
+/* fake (24,16,9) Reed-Solomon decoder, no error correction */
+/* TODO: make less fake */
+void
+rs_24_16_9_decode(guint8 *codeword, guint8 *decoded)
+{
+	int i;
+
+	/* Just grab the first 12 bytes (16 sets of six bits) */
+	for (i = 0; i < 12; i++)
 		decoded[i] = codeword[i];
 }
 
@@ -878,9 +1093,14 @@ proto_register_p25cai(void)
 			FT_BOOLEAN, BASE_NONE, NULL, 0x40,
 			NULL, HFILL }
 		},
-		{ &hf_p25cai_opcode,
-			{ "Opcode", "p25cai.opcode",
-			FT_UINT8, BASE_HEX, NULL, 0x3F,
+		{ &hf_p25cai_isp_opcode,
+			{ "Opcode", "p25cai.isp.opcode",
+			FT_UINT8, BASE_HEX, VALS(isp_opcodes), 0x3F,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_osp_opcode,
+			{ "Opcode", "p25cai.osp.opcode",
+			FT_UINT8, BASE_HEX, VALS(osp_opcodes), 0x3F,
 			NULL, HFILL }
 		},
 		{ &hf_p25cai_args,
@@ -892,6 +1112,21 @@ proto_register_p25cai(void)
 			{ "CRC", "p25cai.crc",
 			FT_UINT16, BASE_HEX, NULL, 0x0,
 			NULL, HFILL }
+		},
+		{ &hf_p25cai_imbe,
+			{ "Raw IMBE Frame", "p25cai.imbe",
+			FT_BYTES, BASE_HEX, NULL, 0x0,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_lsd,
+			{ "Low Speed Data", "p25cai.lsd",
+			FT_UINT32, BASE_HEX, NULL, 0x0,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_es,
+			{ "Encryption Sync", "p25cai.es",
+			FT_NONE, BASE_NONE, NULL, 0x0,
+			NULL, HFILL }
 		}
 	};
 
@@ -900,7 +1135,9 @@ proto_register_p25cai(void)
 		&ett_p25cai,
 		&ett_ss,
 		&ett_nid,
-		&ett_du
+		&ett_du,
+		&ett_lc,
+		&ett_es
 	};
 
 /* Register the protocol name and description */
