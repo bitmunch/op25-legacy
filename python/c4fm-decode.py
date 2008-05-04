@@ -642,7 +642,7 @@ def decode_frame(symbols):
 			print "Key ID: 0x%04x" % key_id
 			print "Low Speed Data: 0x%04x" % low_speed_data
 	else:
-		raise NameError('unknown Data Unit ID')
+		raise NameError('unknown Data Unit ID = ' + str(data_unit_id))
 	if options.pad and consumed % 36 > 0:
 		pad_symbols, final_status_symbol, block_consumed = extract_block(symbols, ((36 - (consumed % 36)) % 36) - 1, consumed)
 		status_symbols.extend(final_status_symbol)
