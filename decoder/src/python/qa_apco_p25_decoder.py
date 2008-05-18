@@ -31,9 +31,9 @@ class qa_apco_p25_decoder (gr_unittest.TestCase):
         self.fg = None
 
     def test_constuct_apco_p25_decoder_f(self):
-        framing_sequence = ()
+        framing_sequence = (1, 1, 1, 1, 1, 3, 1, 1, 3, 3, 1, 1, 3, 3, 3, 3, 1, 3, 1, 3, 3, 3, 3, 3)
         src = gr.vector_source_f(framing_sequence)
-        p25 = gr.apco_25_decoder_f()
+        p25 = gr.apco_p25_decoder_f()
         self.fg.connect(src, p25)
         self.fg.run()
         # no meaningful external test at present
