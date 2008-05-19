@@ -19,8 +19,8 @@ class usrp_source_c(gr.hier_block):
         self._src = usrp.source_c()
         if subdev_spec is None:
             subdev_spec = usrp.pick_rx_subdevice(self._src)
-            self._subdev = usrp.selected_subdev(self._src, subdev_spec)
-            print "Using RX d'board %s" % (self._subdev.side_and_name(),)
+        self._subdev = usrp.selected_subdev(self._src, subdev_spec)
+        print "Using RX d'board %s" % (self._subdev.side_and_name(),)
         self._src.set_mux(usrp.determine_rx_mux_value(self._src, subdev_spec))
         self._src.set_decim_rate(self._decim)
         if gain is None:
