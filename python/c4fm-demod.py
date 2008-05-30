@@ -34,7 +34,11 @@ class app_flow_graph(gr.flow_graph):
 		qdemod = gr.quadrature_demod_cf(1.0)
 		sink = gr.file_sink(gr.sizeof_float, options.output_file)
 
-		self.connect(src,ddc,resampler,qdemod,sink)
+		if options.invert:
+			inverter = gr.multiply_const_ff(-1.0)
+			self.connect(src,ddc,resampler,qdemod,inverter,sink)
+		else:
+			self.connect(src,ddc,resampler,qdemod,sink)
 
 def main():
 	parser = OptionParser(option_class=eng_option)
@@ -43,6 +47,8 @@ def main():
 	parser.add_option("-r", "--sample-rate", type="eng_float", default=500e3, help="sample rate of input file", metavar="Hz")
 	parser.add_option("-f", "--frequency", type="eng_float", default=0, help="frequency of signal to demodulate", metavar="Hz")
 	parser.add_option("-s", "--samples-per-symbol", type="int", default=10, help="samples per symbol in output file")
+	parser.add_option("-a", "--invert", action="store_true", dest="invert", default=False, help="invert output")
+
 	(options, args) = parser.parse_args()
 
 	fg = app_flow_graph(options)
