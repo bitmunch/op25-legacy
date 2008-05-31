@@ -29,4 +29,4 @@ TESTS = 				\
 
 
 noinst_PYTHON = 			\
-	qa_apco_p25_decoder.py			
+	qa_op25.py			

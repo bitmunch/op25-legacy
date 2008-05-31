@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright 2008 Stevie Glass
+# Copyright 2008 Steve Glass
 # 
 # This file is part of OP25
 # 
@@ -21,8 +21,15 @@
 # 
 
 from gnuradio import gr, gr_unittest
+#from gnuradio import op25
+import op25
 
-class qa_apco_p25_decoder (gr_unittest.TestCase):
+# import os
+#
+# print 'Blocked waiting for GDB attach (pid = %d)' % (os.getpid(),)
+# raw_input("Press Enter to continue...")
+
+class qa_op25(gr_unittest.TestCase):
 
     def setUp(self):
         self.fg = gr.flow_graph ()
@@ -30,13 +37,20 @@ class qa_apco_p25_decoder (gr_unittest.TestCase):
     def tearDown(self):
         self.fg = None
 
-    def test_constuct_apco_p25_decoder_f(self):
-        framing_sequence = (1, 1, 1, 1, 1, 3, 1, 1, 3, 3, 1, 1, 3, 3, 3, 3, 1, 3, 1, 3, 3, 3, 3, 3)
-        src = gr.vector_source_f(framing_sequence)
-        p25 = gr.apco_p25_decoder_f()
+#     def test_op25_decoder_f_ctor(self):
+#         msgq = gr.msg_queue()
+#         self.fg.connect(src, p25)
+#         p25 = op25.decoder_f(msgq)
+#         # assert not null
+
+    def test_correlator(self):
+        framing_sequence = (3, 3, 3, 3, 3, -3, 3, 3, -3, -3, 3, 3, -3, -3, -3, -3, 3, -3, 3, -3, -3, -3, -3, -3)
+        src = gr.vector_source_f(framing_sequence, False)
+        msgq = gr.msg_queue()
+        p25 = op25.decoder_f(msgq)
         self.fg.connect(src, p25)
         self.fg.run()
-        # no meaningful external test at present
+        # check the msgq output (needs separate thread and terminate the flow graph)
         
 if __name__ == '__main__':
     gr_unittest.main ()

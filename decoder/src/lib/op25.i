@@ -7,7 +7,7 @@
 
 %{
 #include "gnuradio_swig_bug_workaround.h"
-#include "gr_apco_p25_decoder_f.h"
+#include "op25_decoder_f.h"
 #include <stdexcept>
 %}
 
@@ -16,20 +16,20 @@
  * Second arg is the name of the class minus the prefix.
  *
  * This does some behind-the-scenes magic so we can access
- * apco_p25_decoder_f from python as gr.apco_p25_decoder_f
+ * op25_decoder_f from python as op25.decoder_f
  */
-GR_SWIG_BLOCK_MAGIC(gr, apco_p25_decoder_f);
+GR_SWIG_BLOCK_MAGIC(op25,decoder_f);
 
 /*
- * Publically accesible constuctor function for apco_p25_decoder_f.
+ * Publicly-accesible constuctor function for op25_decoder_f.
  */
-gr_apco_p25_decoder_f_sptr gr_make_apco_p25_decoder_f();
+op25_decoder_f_sptr op25_make_decoder_f(gr_msg_queue_sptr msgq);
 
 /*
- * The actual gr_apco_p25_decoder block.
+ * The actual op25_decoder block.
  */
-class gr_apco_p25_decoder_f : public gr_sync_block
+class op25_decoder_f : public gr_sync_block
 {
 private:
-   gr_apco_p25_decoder_f();
+   op25_decoder_f(gr_msg_queue_sptr msgq);
 };

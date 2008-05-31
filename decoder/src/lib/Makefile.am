@@ -21,7 +21,7 @@
 
 include $(top_srcdir)/Makefile.common
 
-# Install this stuff so that it ends up as the gr.apco_p25_decoder
+# Install this stuff so that it ends up as the op25.decoder_f
 # module. This usually ends up at:
 # ${prefix}/lib/python${python_version}/site-packages/gnuradio
 
@@ -33,57 +33,61 @@ AM_CPPFLAGS = $(STD_DEFINES_AND_INCLUDES) $(PYTHON_CPPFLAGS) $(WITH_INCLUDES)
 SWIGPYTHONARGS = $(SWIGPYTHONFLAGS) $(SWIGGRFLAGS) $(WITH_SWIG_INCLUDES) \
 	$(WITH_INCLUDES)
 
-ALL_IFILES = 				\
-	$(LOCAL_IFILES)			\
+ALL_IFILES = \
+	$(LOCAL_IFILES) \
 	$(NON_LOCAL_IFILES)		
 
-NON_LOCAL_IFILES =			\
+NON_LOCAL_IFILES = \
 	$(GNURADIO_CORE_INCLUDEDIR)/swig/gnuradio.i
 
-
-LOCAL_IFILES = 				\
+LOCAL_IFILES = \
 	$(top_srcdir)/src/lib/op25.i				
 
 # These files are built by SWIG.  The first is the C++ glue.
 # The second is the python wrapper that loads the _op25 shared library
 # and knows how to call our extensions.
 
-BUILT_SOURCES = 			\
-	op25.cc			\
+BUILT_SOURCES = \
+	op25.cc \
 	op25.py				
 
 # This gets op25.py installed in the right place
-ourpython_PYTHON =			\
+ourpython_PYTHON = \
 	op25.py
 
 ourlib_LTLIBRARIES = _op25.la
 
 # These are the source files that go into the shared library
-_op25_la_SOURCES = 			\
+_op25_la_SOURCES = \
+	abstract_data_unit.cc \
+	data_unit.cc \
+	header.cc \
+	ldu1.cc \
+	ldu2.cc \
+	packet.cc \
+	terminator.cc \
 	op25.cc \
-	gr_apco_p25_decoder_f.cc		
+	op25_decoder_f.cc
 
 # magic flags
 _op25_la_LDFLAGS = $(NO_UNDEFINED) -module -avoid-version
 
 # link the library against some comon swig runtime code and the 
 # c++ standard library
-_op25_la_LIBADD = 			\
-	$(PYTHON_LDFLAGS)		\
-	-lstdc++			
+_op25_la_LIBADD = \
+	$(PYTHON_LDFLAGS) \
+	-lstdc++
 
 op25.cc op25.py: $(LOCAL_IFILES) $(ALL_IFILES)
-	$(SWIG) $(SWIGPYTHONARGS) -module gr -o op25.cc $(LOCAL_IFILES)
+	$(SWIG) $(SWIGPYTHONARGS) -module op25 -o op25.cc $(LOCAL_IFILES)
 
 # These headers get installed in ${prefix}/include/gnuradio
-grinclude_HEADERS =			\
-	gr_apco_p25_decoder_f.h		
-
+grinclude_HEADERS = \
+	op25_decoder_f.h		
 
 # These swig headers get installed in ${prefix}/include/gnuradio/swig
-swiginclude_HEADERS = 			\
+swiginclude_HEADERS = \
 	$(LOCAL_IFILES)
-
 
 MOSTLYCLEANFILES = $(BUILT_SOURCES) *.pyc
 
