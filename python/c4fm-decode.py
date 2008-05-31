@@ -18,11 +18,14 @@ parser.add_option("-s", "--samples-per-symbol", type="int", default=10, help="sa
 parser.add_option("-p", "--pad", action="store_true", dest="pad", default=False, help="pad frame to end of micro-slot")
 parser.add_option("-v", "--verbose", action="store_true", dest="verbose", default=False, help="verbose decoding")
 parser.add_option("-l", "--loopback-inject", action="store_true", dest="loopback", default=False, help="inject raw frames on loopback interface")
+parser.add_option("-c", "--correlation-threshold", type="float", default=1.0, help="set lower than 1.0 for greater correlation sensitivity")
 (options, args) = parser.parse_args()
 
 # frame synchronization header (in form most useful for correlation)
 frame_sync = [1, 1, 1, 1, 1, -1, 1, 1, -1, -1, 1, 1, -1, -1, -1, -1, 1, -1, 1, -1, -1, -1, -1, -1]
 minimum_span = options.samples_per_symbol // 2 # minimum number of adjacent correlations required to convince us
+# The constant 0.2 below was experimentally determined but may not be ideal
+correlation_threshold = len(frame_sync) * options.correlation_threshold * 0.2
 # maximum number of symbols to look for in a frame  (Is this correct?)
 max_frame_length = 864
 symbol_rate = 4800
@@ -30,16 +33,6 @@ data = open(options.input_file).read()
 input_samples = struct.unpack('f1'*(len(data)/4), data)
 sync_samples = [] # subset of input samples synchronized with respect to frame sync
 symbols = [] # recovered symbols (including frame sync)
-
-# collect input sample statistics for normalization
-total_value = 0.0
-total_deviation = 0.0
-count = 0
-for sample in input_samples:
-	total_value += sample
-	total_deviation += abs(sample)
-mean_value = total_value / len(input_samples)
-mean_deviation = total_deviation / len(input_samples)
 
 # return average (mean) of a list of values
 def average(list):
@@ -250,11 +243,10 @@ def correlate(start):
 	first = 0
 	last = 0
 	interesting = 0
-	correlation_threshold = len(frame_sync) * mean_deviation
 	for i in range(start,len(input_samples) - len(frame_sync) * options.samples_per_symbol):
 		correlation = 0
 		for j in range(len(frame_sync)):
-			correlation += frame_sync[j] * (input_samples[i + j * options.samples_per_symbol] - mean_value)
+			correlation += frame_sync[j] * input_samples[i + j * options.samples_per_symbol]
 		#print i, correlation
 		if interesting:
 			if correlation < correlation_threshold:
@@ -304,6 +296,7 @@ def hard_decision(samples):
 			lows.append(samples[i])
 	high = average(highs)
 	low = average(lows)
+	#print "scale", high - low
 	# Use these averages to establish thresholds between ranges of frequency deviations.
 	step = (high - low) / 6
 	low_threshold = low + step
