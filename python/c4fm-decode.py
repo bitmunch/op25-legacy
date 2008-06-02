@@ -28,6 +28,8 @@ minimum_span = options.samples_per_symbol // 2 # minimum number of adjacent corr
 correlation_threshold = len(frame_sync) * options.correlation_threshold * 0.2
 # maximum number of symbols to look for in a frame  (Is this correct?)
 max_frame_length = 864
+# minimum number of symbols in a frame
+min_frame_length = 56
 symbol_rate = 4800
 data = open(options.input_file).read()
 input_samples = struct.unpack('f1'*(len(data)/4), data)
@@ -85,9 +87,8 @@ def data_deinterleave(input):
 # 1/2 rate trellis decode a sequence of symbols
 # TODO: Use soft symbols instead of hard symbols.
 def trellis_1_2_decode(input):
-	if len(input) != 98:
-		raise NameError('wrong input length for trellis_1_2_decode')
 	output = []
+	error_count = 0;
 	# state transition table, including constellation to dibit pair mapping
 	next_words = (
 		(0x2, 0xC, 0x1, 0xF),
@@ -111,18 +112,26 @@ def trellis_1_2_decode(input):
 		# otherwise find the dibit that matches three codeword bits
 		elif similarity.count(3) == 1:
 			state = similarity.index(3)
-			sys.stderr.write("corrected single trellis error")
+			# We may have corrected the error, so count only a partial error.
+			error_count += 0.01
 		else:
-			raise NameError('ambiguous trellis decoding error')
+			# We probably can't correct this error, but we can take our best guess.
+			for j in range(3,-1,-1):
+				if similarity.count(j) > 0:
+					state = similarity.index(j)
+					error_count += 1
+					break
 		output.append(state)
-	return dibits_to_integer(output[:48])
+	# Even if we have a terrible string of errors, we return our best guess and report the error count.
+	if error_count > 0:
+		sys.stderr.write("Trellis decoding error count: %.2f\n" % error_count)
+	return dibits_to_integer(output[:48]), error_count
 
 # 3/4 rate trellis decode a sequence of symbols
 # TODO: Use soft symbols instead of hard symbols.
 def trellis_3_4_decode(input):
-	if len(input) != 98:
-		raise NameError('wrong input length for trellis_3_4_decode')
 	output = []
+	error_count = 0;
 	# state transition table, including constellation to dibit pair mapping
 	next_words = (
 		(0x2, 0xD, 0xE, 0x1, 0x7, 0x8, 0xB, 0x4),
@@ -150,11 +159,20 @@ def trellis_3_4_decode(input):
 		# otherwise find the dibit that matches three codeword bits
 		elif similarity.count(3) == 1:
 			state = similarity.index(3)
-			sys.stderr.write("corrected single trellis error")
+			# We may have corrected the error, so count only a partial error.
+			error_count += 0.01
 		else:
-			raise NameError('ambiguous trellis decoding error')
+			# We probably can't correct this error, but we can take our best guess.
+			for j in range(3,-1,-1):
+				if similarity.count(j) > 0:
+					state = similarity.index(j)
+					error_count += 1
+					break
 		output.append(state)
-	return tribits_to_integer(output[:48])
+	# Even if we have a terrible string of errors, we return our best guess and report the error count.
+	if error_count > 0:
+		sys.stderr.write("Trellis decoding error count: %.2f\n" % error_count)
+	return tribits_to_integer(output[:48]), error_count
 
 # fake (64,16,23) BCH decoder, no error correction
 # spec sometimes refers to this as (63,16,23) plus a parity bit
@@ -331,6 +349,8 @@ def hard_decision(samples):
 def decode_frame(symbols):
 	# Keep track of how many symbols we've decoded, starting at 24 (frame sync).
 	consumed = 24
+	# error tracking
+	decode_error = 0
 	status_symbols = []
 
 	nid_symbols, block_status_symbols, block_consumed = extract_block(symbols, 32, consumed)
@@ -353,7 +373,8 @@ def decode_frame(symbols):
 			tsbk_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
 			status_symbols.extend(block_status_symbols)
 			consumed += block_consumed
-			tsbk = trellis_1_2_decode(data_deinterleave(tsbk_symbols))
+			tsbk, error_count = trellis_1_2_decode(data_deinterleave(tsbk_symbols))
+			decode_error += error_count
 			# TODO: verify with CRC
 			if options.verbose:
 				print "Found a Trunking Signaling Block"
@@ -367,7 +388,8 @@ def decode_frame(symbols):
 		header_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
 		status_symbols.extend(block_status_symbols)
 		consumed += block_consumed
-		header = trellis_1_2_decode(data_deinterleave(header_symbols))
+		header, error_count = trellis_1_2_decode(data_deinterleave(header_symbols))
+		decode_error += error_count
 		# Format of PDU, 5 bits
 		format = (header >> 88) & 0x1F
 		# Blocks to Follow, 7 bits
@@ -454,7 +476,8 @@ def decode_frame(symbols):
 				data_block_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
 				status_symbols.extend(block_status_symbols)
 				consumed += block_consumed
-				data_block = trellis_1_2_decode(data_deinterleave(data_block_symbols))
+				data_block, error_count = trellis_1_2_decode(data_deinterleave(data_block_symbols))
+				decode_error += error_count
 				response_data = (response_data << 64) + data_block
 			# Not absolutely certain that this CRC location is correct.  Spec unclear if more than one data block.
 			packet_crc = response_data & 0xFFFFFFFF
@@ -483,7 +506,8 @@ def decode_frame(symbols):
 				data_block_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
 				status_symbols.extend(block_status_symbols)
 				consumed += block_consumed
-				data_block = trellis_1_2_decode(data_deinterleave(data_block_symbols))
+				data_block, error_count = trellis_1_2_decode(data_deinterleave(data_block_symbols))
+				decode_error += error_count
 				user_data = (data_block << 64) + data_block
 			packet_crc = user_data & 0xFFFFFFFF
 			user_data = user_data >> 32
@@ -508,7 +532,8 @@ def decode_frame(symbols):
 				data_block_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
 				status_symbols.extend(block_status_symbols)
 				consumed += block_consumed
-				data_block = trellis_1_2_decode(data_deinterleave(data_block_symbols))
+				data_block, error_count = trellis_1_2_decode(data_deinterleave(data_block_symbols))
+				decode_error += error_count
 				mbt_data = (data_block << 64) + data_block
 			packet_crc = mbt_data & 0xFFFFFFFF
 			mbt_data = mbt_data >> 32
@@ -516,7 +541,8 @@ def decode_frame(symbols):
 			if options.verbose:
 				print "MBT Data: 0x%x" % mbt_data
 		else:
-			raise NameError('unknown PDU format')
+			sys.stderr.write("Unknown PDU format: %2x\n" % format)
+			decode_error += 1
 	elif data_unit_id == 0:
 		# Header Data Unit aka Header Word
 		# header used prior to superframe
@@ -635,7 +661,8 @@ def decode_frame(symbols):
 			print "Key ID: 0x%04x" % key_id
 			print "Low Speed Data: 0x%04x" % low_speed_data
 	else:
-		raise NameError('unknown Data Unit ID = ' + str(data_unit_id))
+		sys.stderr.write("Unknown Data Unit ID: %1x\n" % data_unit_id)
+		decode_error += 1
 	if options.pad and consumed % 36 > 0:
 		pad_symbols, final_status_symbol, block_consumed = extract_block(symbols, ((36 - (consumed % 36)) % 36) - 1, consumed)
 		status_symbols.extend(final_status_symbol)
@@ -662,6 +689,10 @@ def decode_frame(symbols):
 			scapy_frame += struct.pack('B1', byte)
 		scapy.sendp(scapy.Ether(type=0xFFFF)/scapy_frame, iface="lo")
 	# TODO: print error corrected values
+	if decode_error >= 1:
+		# Since we had an error, don't assume that the correct number of symbols was consumed.
+		consumed = min_frame_length
+		sys.stderr.write("Decoding error detected.\n")
 	return consumed
 
 # main loop
