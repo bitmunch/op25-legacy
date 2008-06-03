@@ -35,7 +35,10 @@ min_frame_length = 56
 bytes_per_sample = 4 # input is 32 bit floats
 chunk_size = max_frame_length * options.samples_per_symbol
 symbol_rate = 4800
-file = open(options.input_file)
+if options.input_file == '-':
+	file = sys.stdin
+else:
+	file = open(options.input_file)
 input_samples = []
 
 # return average (mean) of a list of values

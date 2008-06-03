@@ -22,7 +22,11 @@ class app_flow_graph(gr.flow_graph):
 		intrp = int(lcm // options.sample_rate)
 		decim = int(lcm // output_sample_rate)
 
-		src = gr.file_source(gr.sizeof_gr_complex, options.input_file)
+		if options.input_file == '-':
+			src = gr.file_descriptor_source(gr.sizeof_gr_complex, 0)
+		else:
+			src = gr.file_source(gr.sizeof_gr_complex, options.input_file)
+
 		ddc_coeffs = \
 			gr.firdes.low_pass (1.0,
 				options.sample_rate,
@@ -32,7 +36,11 @@ class app_flow_graph(gr.flow_graph):
 		ddc =  gr.freq_xlating_fir_filter_ccf (1,ddc_coeffs,-options.frequency,options.sample_rate)
 		resampler = blks.rational_resampler_ccc(self, intrp, decim)
 		qdemod = gr.quadrature_demod_cf(1.0)
-		sink = gr.file_sink(gr.sizeof_float, options.output_file)
+
+		if options.output_file == '-':
+			sink = gr.file_descriptor_sink(gr.sizeof_float, 1)
+		else:
+			sink = gr.file_sink(gr.sizeof_float, options.output_file)
 
 		if options.invert:
 			inverter = gr.multiply_const_ff(-1.0)

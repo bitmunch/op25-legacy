@@ -70,7 +70,11 @@ class app_flow_graph(gr.flow_graph):
         else:
             filename = str(options.frequency//1e6) + "m"
             filename += "-complex-" + str(sample_rate/1000) + "kss.dat"
-        OUT = gr.file_sink(gr.sizeof_gr_complex, filename)
+        if filename == '-':
+            OUT = gr.file_descriptor_sink(gr.sizeof_gr_complex, 1)
+        else:
+            OUT = gr.file_sink(gr.sizeof_gr_complex, filename)
+
         self.connect(last, OUT)
         last = OUT
 
