@@ -501,7 +501,7 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 				du_tree = proto_item_add_subtree(du_item, ett_du);
 				proto_tree_add_item(du_tree, hf_p25cai_lbf, du_tvb, offset, 1, FALSE);
 				proto_tree_add_item(du_tree, hf_p25cai_ptbf, du_tvb, offset, 1, FALSE);
-				if (mfid > 2) {
+				if (mfid > 1) {
 					proto_tree_add_item(du_tree, hf_p25cai_unknown_opcode, du_tvb, offset, 1, FALSE);
 				} else {
 					/* FIXME: how to know it is OSP vs. ISP? */
