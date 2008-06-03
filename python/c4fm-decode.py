@@ -88,7 +88,7 @@ def data_deinterleave(input):
 # TODO: Use soft symbols instead of hard symbols.
 def trellis_1_2_decode(input):
 	output = []
-	error_count = 0;
+	error_count = 0
 	# state transition table, including constellation to dibit pair mapping
 	next_words = (
 		(0x2, 0xC, 0x1, 0xF),
@@ -131,7 +131,7 @@ def trellis_1_2_decode(input):
 # TODO: Use soft symbols instead of hard symbols.
 def trellis_3_4_decode(input):
 	output = []
-	error_count = 0;
+	error_count = 0
 	# state transition table, including constellation to dibit pair mapping
 	next_words = (
 		(0x2, 0xD, 0xE, 0x1, 0x7, 0x8, 0xB, 0x4),
@@ -685,7 +685,7 @@ def decode_frame(symbols):
 		scapy_frame = ""
 		for i in range((len(hex(raw_frame))-5)*4,-1,-8):
 			# surely there is a simpler way
-			byte = (raw_frame >> i) & 0xFF;
+			byte = (raw_frame >> i) & 0xFF
 			scapy_frame += struct.pack('B1', byte)
 		scapy.sendp(scapy.Ether(type=0xFFFF)/scapy_frame, iface="lo")
 	# TODO: print error corrected values
