@@ -79,6 +79,7 @@ static int hf_p25cai_lbf = -1;
 static int hf_p25cai_ptbf = -1;
 static int hf_p25cai_isp_opcode = -1;
 static int hf_p25cai_osp_opcode = -1;
+static int hf_p25cai_unknown_opcode = -1;
 static int hf_p25cai_args = -1;
 static int hf_p25cai_crc = -1;
 static int hf_p25cai_imbe = -1;
@@ -107,6 +108,33 @@ static const value_string network_access_codes[] = {
 static const value_string manufacturer_ids[] = {
 	{ 0x00, "Standard MFID (pre-2001)" },
 	{ 0x01, "Standard MFID (post-2001)" },
+	{ 0x10, "Relm / BK Radio" },
+	{ 0x20, "Cycomm" },
+	{ 0x28, "Efratom Time and Frequency Products, Inc" },
+	{ 0x30, "Com-Net Ericsson" },
+	{ 0x38, "Datron" },
+	{ 0x40, "Icom" },
+	{ 0x48, "Garmin" },
+	{ 0x50, "GTE" },
+	{ 0x55, "IFR Systems" },
+	{ 0x60, "GEC-Marconi" },
+	{ 0x68, "Kenwood Communications" },
+	{ 0x70, "Glenayre Electronics" },
+	{ 0x74, "Japan Radio Co." },
+	{ 0x78, "Kokusai" },
+	{ 0x7C, "Maxon" },
+	{ 0x80, "Midland" },
+	{ 0x86, "Daniels Electronics Ltd." },
+	{ 0x90, "Motorola" },
+	{ 0xA0, "Thales" },
+	{ 0xA4, "M/A-COM" },
+	{ 0xB0, "Raytheon" },
+	{ 0xC0, "SEA" },
+	{ 0xC8, "Securicor" },
+	{ 0xD0, "ADI" },
+	{ 0xD8, "Tait Electronics" },
+	{ 0xE0, "Teletec" },
+	{ 0xF0, "Transcrypt International" },
 	{ 0, NULL }
 };
 
@@ -366,7 +394,7 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 	proto_tree *p25cai_tree, *nid_tree, *du_tree;
 	int offset;
 	tvbuff_t *extracted_tvb, *du_tvb;
-	guint8 duid, last_block;
+	guint8 duid, last_block, mfid;
 
 /*  If this doesn't look like a P25 CAI frame, give up and return 0 so that
  *  perhaps another dissector can take over.
@@ -468,12 +496,17 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			last_block = 0;
 			while (last_block == 0) {
 				last_block = tvb_get_guint8(du_tvb, offset) >> 7;
+				mfid = tvb_get_guint8(du_tvb, offset + 1);
 				du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_tsbk, du_tvb, offset, 12, FALSE);
 				du_tree = proto_item_add_subtree(du_item, ett_du);
 				proto_tree_add_item(du_tree, hf_p25cai_lbf, du_tvb, offset, 1, FALSE);
 				proto_tree_add_item(du_tree, hf_p25cai_ptbf, du_tvb, offset, 1, FALSE);
-				/* FIXME: how to know it is OSP vs. ISP? */
-				proto_tree_add_item(du_tree, hf_p25cai_osp_opcode, du_tvb, offset, 1, FALSE);
+				if (mfid > 2) {
+					proto_tree_add_item(du_tree, hf_p25cai_unknown_opcode, du_tvb, offset, 1, FALSE);
+				} else {
+					/* FIXME: how to know it is OSP vs. ISP? */
+					proto_tree_add_item(du_tree, hf_p25cai_osp_opcode, du_tvb, offset, 1, FALSE);
+				}
 				offset += 1;
 				proto_tree_add_item(du_tree, hf_p25cai_mfid, du_tvb, offset, 1, FALSE);
 				offset += 1;
@@ -1101,6 +1134,11 @@ proto_register_p25cai(void)
 		{ &hf_p25cai_osp_opcode,
 			{ "Opcode", "p25cai.osp.opcode",
 			FT_UINT8, BASE_HEX, VALS(osp_opcodes), 0x3F,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_unknown_opcode,
+			{ "Unknown Opcode (non-standard MFID)", "p25cai.unknown.opcode",
+			FT_UINT8, BASE_HEX, NULL, 0x3F,
 			NULL, HFILL }
 		},
 		{ &hf_p25cai_args,
