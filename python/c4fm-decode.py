@@ -411,8 +411,9 @@ def decode_frame(symbols):
 			print "A/N: 0x%01x" % an
 			print "I/O: 0x%01x" % io
 			print "Manufacturer's ID: 0x%02x" % manufacturers_id
-			if manufacturers_id > 0:
-				print "Non-standard Manufacturer's ID"
+			if manufacturers_id > 1:
+				sys.stderr.write("Non-standard Manufacturer's ID\n")
+				decode_error += 1
 			print "Logical Link ID: 0x%06x" % logical_link_id
 		if format == 0x16:
 			if options.verbose:
@@ -563,8 +564,9 @@ def decode_frame(symbols):
 			# Manufacturer's ID (MFID) 8 bits
 			manufacturers_id = (header_data_unit >> 40) & 0xFF
 			print "Manufacturer's ID: 0x%02x" % manufacturers_id
-			if manufacturers_id > 0:
-				print "Non-standard Manufacturer's ID"
+			if manufacturers_id > 1:
+				sys.stderr.write("Non-standard Manufacturer's ID\n")
+				decode_error += 1
 			# Algorithm ID (ALGID) 8 bits
 			algorithm_id = (header_data_unit >> 32) & 0xFF
 			print "Algorithm ID: 0x%02x" % algorithm_id
