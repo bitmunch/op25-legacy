@@ -19,22 +19,24 @@ parser.add_option("-p", "--pad", action="store_true", dest="pad", default=False,
 parser.add_option("-v", "--verbose", action="store_true", dest="verbose", default=False, help="verbose decoding")
 parser.add_option("-l", "--loopback-inject", action="store_true", dest="loopback", default=False, help="inject raw frames on loopback interface")
 parser.add_option("-c", "--correlation-threshold", type="float", default=1.0, help="set lower than 1.0 for greater correlation sensitivity")
+parser.add_option("-b", "--input-buffer", type="int", default=4, help="set low (e.g. 1) for real-time responsiveness, high(e.g. 10) for efficient reading of large input files")
 (options, args) = parser.parse_args()
 
 # frame synchronization header (in form most useful for correlation)
 frame_sync = [1, 1, 1, 1, 1, -1, 1, 1, -1, -1, 1, 1, -1, -1, -1, -1, 1, -1, 1, -1, -1, -1, -1, -1]
-minimum_span = options.samples_per_symbol // 2 # minimum number of adjacent correlations required to convince us
+# minimum number of adjacent correlations required to convince us
+minimum_span = options.samples_per_symbol // 2
 # The constant 0.2 below was experimentally determined but may not be ideal
 correlation_threshold = len(frame_sync) * options.correlation_threshold * 0.2
 # maximum number of symbols to look for in a frame  (Is this correct?)
 max_frame_length = 864
 # minimum number of symbols in a frame
 min_frame_length = 56
+bytes_per_sample = 4 # input is 32 bit floats
+chunk_size = max_frame_length * options.samples_per_symbol
 symbol_rate = 4800
-data = open(options.input_file).read()
-input_samples = struct.unpack('f1'*(len(data)/4), data)
-sync_samples = [] # subset of input samples synchronized with respect to frame sync
-symbols = [] # recovered symbols (including frame sync)
+file = open(options.input_file)
+input_samples = []
 
 # return average (mean) of a list of values
 def average(list):
@@ -257,14 +259,14 @@ def imbe_decode(input):
 		print "Raw IMBE frame: 0x%036x" % (dibits_to_integer(input))
 
 # correlate (multiply-accumulate) frame sync
-def correlate(start):
+def correlate(samples):
 	first = 0
 	last = 0
 	interesting = 0
-	for i in range(start,len(input_samples) - len(frame_sync) * options.samples_per_symbol):
+	for i in range(0,len(samples) - chunk_size):
 		correlation = 0
 		for j in range(len(frame_sync)):
-			correlation += frame_sync[j] * input_samples[i + j * options.samples_per_symbol]
+			correlation += frame_sync[j] * samples[i + j * options.samples_per_symbol]
 		#print i, correlation
 		if interesting:
 			if correlation < correlation_threshold:
@@ -287,7 +289,7 @@ def correlate(start):
 def downsample(start):
 	sync_samples = []
 	# grab samples for symbols starting with frame sync
-	for i in range(start, start + (max_frame_length * options.samples_per_symbol), options.samples_per_symbol):
+	for i in range(start, start + chunk_size, options.samples_per_symbol):
 		# "integrate and dump"
 		# Add up several (samples_per_symbol) adjacent samples to create a single
 		# (downsampled) sample as specified by the P25 CAI standard.
@@ -314,7 +316,6 @@ def hard_decision(samples):
 			lows.append(samples[i])
 	high = average(highs)
 	low = average(lows)
-	#print "scale", high - low
 	# Use these averages to establish thresholds between ranges of frequency deviations.
 	step = (high - low) / 6
 	low_threshold = low + step
@@ -442,7 +443,8 @@ def decode_frame(symbols):
 				data_block_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
 				status_symbols.extend(block_status_symbols)
 				consumed += block_consumed
-				data_block = trellis_3_4_decode(data_deinterleave(data_block_symbols))
+				data_block, error_count = trellis_3_4_decode(data_deinterleave(data_block_symbols))
+				decode_error += error_count
 				# data_block is 144 bits
 				# CRC-9, 9 bits
 				data_block_crc = (data_block >> 128) & 0x1FF
@@ -553,6 +555,8 @@ def decode_frame(symbols):
 			print "Found a Header Data Unit"
 			rs_codeword = golay_18_6_8_decode(hdu_symbols)
 			header_data_unit = rs_36_20_17_decode(rs_codeword)
+			print "Raw HDU: 0x%0162x" % dibits_to_integer(hdu_symbols)
+			print "Decoded HDU: 0x%030x" % header_data_unit
 			# Message Indicator (MI) 72 bits
 			message_indicator = header_data_unit >> 48
 			print "Message Indicator: 0x%018x" % message_indicator
@@ -696,19 +700,37 @@ def decode_frame(symbols):
 	return consumed
 
 # main loop
-#
-# This is a first pass at carving this mess up into repeatable chunks.  Bear with me.
-correlation_index = 0
-for i in range(100):
-	frame_start = correlate(correlation_index)
-	if frame_start > 0:
-		time = float(frame_start) / (symbol_rate * options.samples_per_symbol)
-		print "Frame detected at %.3f seconds." % time
-		sync_samples = downsample(frame_start)
-		symbols = hard_decision(sync_samples)
-		consumed = decode_frame(symbols)
-		correlation_index = frame_start + ((consumed - 1) * options.samples_per_symbol)
-		print
-	else:
-		print "Reached end of input without correlation."
+index = 0
+while True:
+	# Read some samples from the input file.
+	data = file.read(chunk_size * bytes_per_sample * options.input_buffer)
+	input_samples.extend(struct.unpack('f1'*(len(data)/bytes_per_sample), data))
+	if len(input_samples) < chunk_size:
+		# We failed to read enough samples (at or near end of file).
 		break
+	# Don't bother unless we have enough samples to work with (chunk_size).
+	# This is good for arbitrary input length but may miss small frames at the
+	# end of the input.
+	while len(input_samples) >= chunk_size:
+		# Find the beginning of the next frame.
+		frame_start = correlate(input_samples)
+		if frame_start > 0:
+			# This timestamp is bogus if the input is not constant (e.g. squelch).
+			time = float(frame_start + index) / (symbol_rate * options.samples_per_symbol)
+			print "Frame detected at %.3f seconds." % time
+			# Retrive a subset of input samples synchronized with respect to frame sync.
+			# Also downsample to the symbol rate.
+			sync_samples = downsample(frame_start)
+			# Decide which symbol is represented by each sample.
+			symbols = hard_decision(sync_samples)
+			# Decode the frame.
+			symbols_consumed = decode_frame(symbols)
+			samples_consumed = frame_start + ((symbols_consumed - 1) * options.samples_per_symbol)
+			input_samples = input_samples[samples_consumed:]
+			index += samples_consumed
+			print
+		else:
+			samples_consumed = chunk_size
+			input_samples = input_samples[samples_consumed:]
+			index += samples_consumed
+			break
