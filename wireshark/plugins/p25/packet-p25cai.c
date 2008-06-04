@@ -38,7 +38,7 @@ void dissect_voice(tvbuff_t *tvb, proto_tree *tree, int offset);
 void dissect_lsd(tvbuff_t *tvb, proto_tree *tree, int offset);
 void dissect_lc(tvbuff_t *tvb, proto_tree *tree);
 void dissect_es(tvbuff_t *tvb, proto_tree *tree);
-tvbuff_t* extract_status_symbols(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree);
+tvbuff_t* extract_status_symbols(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int *outbound);
 tvbuff_t* build_hdu_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
 tvbuff_t* build_tsdu_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
 tvbuff_t* build_term_lc_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
@@ -392,7 +392,7 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 /* Set up structures needed to add the protocol subtree and manage it */
 	proto_item *ti, *nid_item, *du_item;
 	proto_tree *p25cai_tree, *nid_tree, *du_tree;
-	int offset;
+	int offset, outbound;
 	tvbuff_t *extracted_tvb, *du_tvb;
 	guint8 duid, last_block, mfid;
 
@@ -444,7 +444,7 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		offset += 6;
 
 		/* Extract Status Symbols */
-		extracted_tvb = extract_status_symbols(tvb, pinfo, p25cai_tree);
+		extracted_tvb = extract_status_symbols(tvb, pinfo, p25cai_tree, &outbound);
 
 		/* process extracted_tvb from here on */
 
@@ -503,9 +503,10 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 				proto_tree_add_item(du_tree, hf_p25cai_ptbf, du_tvb, offset, 1, FALSE);
 				if (mfid > 1) {
 					proto_tree_add_item(du_tree, hf_p25cai_unknown_opcode, du_tvb, offset, 1, FALSE);
-				} else {
-					/* FIXME: how to know it is OSP vs. ISP? */
+				} else if (outbound) {
 					proto_tree_add_item(du_tree, hf_p25cai_osp_opcode, du_tvb, offset, 1, FALSE);
+				} else {
+					proto_tree_add_item(du_tree, hf_p25cai_isp_opcode, du_tvb, offset, 1, FALSE);
 				}
 				offset += 1;
 				proto_tree_add_item(du_tree, hf_p25cai_mfid, du_tvb, offset, 1, FALSE);
@@ -625,7 +626,7 @@ dissect_es(tvbuff_t *tvb, proto_tree *tree)
 
 /* Extract status symbols, display them, and return frame without status symbols */
 tvbuff_t*
-extract_status_symbols(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
+extract_status_symbols(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int *outbound)
 {
 	proto_item *ss_parent_item;
 	proto_tree *ss_tree;
@@ -648,6 +649,14 @@ extract_status_symbols(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		if (i % 36 == 35) {
 			/* After every 35 dibits is a status symbol. */
 			proto_tree_add_item(ss_tree, hf_p25cai_ss, tvb, i/4, 1, FALSE);
+			/* Check to see if the status symbol is odd. */
+			if (tvb_get_guint8(tvb, i/4) & 0x1) {
+				/* Flag as outbound (only outbound frames should have odd status symbols).
+				 * This may not be a very reliable means of determining the direction, but
+				 * I haven't found anything better.
+				 */
+				*outbound &= 1;
+			}
 		} else {
 			/* Extract frame bits from between status symbols. */
 			/* I'm sure there is a more efficient way to do this. */
