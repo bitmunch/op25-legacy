@@ -35,13 +35,13 @@
 /* function prototypes */
 void proto_reg_handoff_p25cai(void);
 void dissect_voice(tvbuff_t *tvb, proto_tree *tree, int offset);
-void dissect_lsd(tvbuff_t *tvb, proto_tree *tree, int offset);
 void dissect_lc(tvbuff_t *tvb, proto_tree *tree);
 void dissect_es(tvbuff_t *tvb, proto_tree *tree);
 tvbuff_t* extract_status_symbols(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int *outbound);
 tvbuff_t* build_hdu_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
 tvbuff_t* build_tsdu_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
 tvbuff_t* build_term_lc_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
+tvbuff_t* build_ldu_lsd_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
 tvbuff_t* build_ldu_lc_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
 tvbuff_t* build_ldu_es_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
 void data_deinterleave(tvbuff_t *tvb, guint8 *deinterleaved, int bit_offset);
@@ -49,6 +49,7 @@ void trellis_1_2_decode(guint8 *encoded, guint8 *decoded, int offset);
 guint8 golay_18_6_8_decode(guint32 codeword);
 guint16 golay_24_12_8_decode(guint32 codeword);
 guint8 hamming_10_6_3_decode(guint32 codeword);
+void cyclic_16_8_5_decode(guint32 codeword, guint8 *decoded);
 void rs_24_12_13_decode(guint8 *codeword, guint8 *decoded);
 void rs_24_16_9_decode(guint8 *codeword, guint8 *decoded);
 void rs_36_20_17_decode(guint8 *codeword, guint8 *decoded);
@@ -487,7 +488,7 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			du_tree = proto_item_add_subtree(du_item, ett_du);
 			dissect_voice(extracted_tvb, du_tree, offset);
 			dissect_lc(build_ldu_lc_tvb(extracted_tvb, pinfo, offset), du_tree);
-			dissect_lsd(extracted_tvb, du_tree, offset);
+			proto_tree_add_item(du_tree, hf_p25cai_lsd, build_ldu_lsd_tvb(extracted_tvb, pinfo, offset), 0, 2, FALSE);
 			break;
 		/* Trunking Signaling Data Unit */
 		case 0x7:
@@ -525,7 +526,7 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			du_tree = proto_item_add_subtree(du_item, ett_du);
 			dissect_voice(extracted_tvb, du_tree, offset);
 			dissect_es(build_ldu_es_tvb(extracted_tvb, pinfo, offset), du_tree);
-			dissect_lsd(extracted_tvb, du_tree, offset);
+			proto_tree_add_item(du_tree, hf_p25cai_lsd, build_ldu_lsd_tvb(extracted_tvb, pinfo, offset), 0, 2, FALSE);
 			break;
 		/* Packet Data Unit */
 		case 0xC:
@@ -573,19 +574,6 @@ dissect_voice(tvbuff_t *tvb, proto_tree *tree, int offset)
 	offset += 22;
 	proto_tree_add_item(tree, hf_p25cai_imbe, tvb, offset, 18, FALSE);
 	offset += 18;
-}
-
-/* Dissect Low Speed Data from an LDU */
-void
-dissect_lsd(tvbuff_t *tvb, proto_tree *tree, int offset)
-{
-	/* we were passed the offset to the beginning of the LDU */
-	offset += 174;
-
-	DISSECTOR_ASSERT(tvb_length_remaining(tvb, offset) >= 4);
-
-	/* TODO: error correction decoding */
-	proto_tree_add_item(tree, hf_p25cai_lsd, tvb, offset, 4, FALSE);
 }
 
 /* Dissect Link Control */
@@ -714,6 +702,30 @@ build_hdu_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset)
 	add_new_data_source(pinfo, hdu_tvb, "data units");
 
 	return hdu_tvb;
+}
+
+/* Build Low Speed Data tvb from LDU */
+tvbuff_t*
+build_ldu_lsd_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset)
+{
+	guint8 *lsd_buffer;
+	tvbuff_t *lsd_tvb;
+
+	/* we were passed the offset to the beginning of the LDU */
+	offset += 174;
+
+	DISSECTOR_ASSERT(tvb_length_remaining(tvb, offset) >= 4);
+
+	lsd_buffer = (guint8*)ep_alloc0(2);
+
+	cyclic_16_8_5_decode(tvb_get_ntohl(tvb, offset), lsd_buffer);
+
+	/* Setup a new tvb buffer with the decoded data. */
+	lsd_tvb = tvb_new_real_data(lsd_buffer, 2, 2);
+	tvb_set_child_real_data_tvbuff(tvb, lsd_tvb);
+	add_new_data_source(pinfo, lsd_tvb, "Low Speed Data");
+
+	return lsd_tvb;
 }
 
 /* Build Link Control tvb from LDU1 */
@@ -992,6 +1004,16 @@ hamming_10_6_3_decode(guint32 codeword)
 	return (codeword >> 4) & 0x3F;
 }
 
+/* fake (16,8,5) shortened cyclic decoder, no error correction */
+/* TODO: make less fake */
+void
+cyclic_16_8_5_decode(guint32 codeword, guint8 *decoded)
+{
+	/* Take the first byte of each 16 bit word. */
+	decoded[0] = codeword >> 24;
+	decoded[1] = codeword >> 8;
+}
+
 /* fake (24,12,13) Reed-Solomon decoder, no error correction */
 /* TODO: make less fake */
 void
@@ -1167,7 +1189,7 @@ proto_register_p25cai(void)
 		},
 		{ &hf_p25cai_lsd,
 			{ "Low Speed Data", "p25cai.lsd",
-			FT_UINT32, BASE_HEX, NULL, 0x0,
+			FT_UINT16, BASE_HEX, NULL, 0x0,
 			NULL, HFILL }
 		},
 		{ &hf_p25cai_es,
