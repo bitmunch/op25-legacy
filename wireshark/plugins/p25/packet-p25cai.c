@@ -37,6 +37,11 @@ void proto_reg_handoff_p25cai(void);
 void dissect_voice(tvbuff_t *tvb, proto_tree *tree, int offset);
 void dissect_lc(tvbuff_t *tvb, proto_tree *tree);
 void dissect_es(tvbuff_t *tvb, proto_tree *tree);
+void dissect_pdu(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tree);
+void dissect_pdu_response(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tree, guint8 *header, int num_blocks);
+void dissect_pdu_unconfirmed(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tree, guint8 *header, int num_blocks);
+void dissect_pdu_confirmed(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tree, guint8 *header, int num_blocks);
+void dissect_pdu_ambt(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tree, guint8 *header, int num_blocks);
 tvbuff_t* extract_status_symbols(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int *outbound);
 tvbuff_t* build_hdu_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
 tvbuff_t* build_tsdu_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
@@ -46,6 +51,7 @@ tvbuff_t* build_ldu_lc_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
 tvbuff_t* build_ldu_es_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset);
 void data_deinterleave(tvbuff_t *tvb, guint8 *deinterleaved, int bit_offset);
 void trellis_1_2_decode(guint8 *encoded, guint8 *decoded, int offset);
+void trellis_3_4_decode(guint8 *encoded, guint8 *decoded, int offset);
 guint8 golay_18_6_8_decode(guint32 codeword);
 guint16 golay_24_12_8_decode(guint32 codeword);
 guint8 hamming_10_6_3_decode(guint32 codeword);
@@ -86,6 +92,28 @@ static int hf_p25cai_crc = -1;
 static int hf_p25cai_imbe = -1;
 static int hf_p25cai_lsd = -1;
 static int hf_p25cai_es = -1;
+static int hf_p25cai_an = -1;
+static int hf_p25cai_io = -1;
+static int hf_p25cai_pdu_format = -1;
+static int hf_p25cai_sapid = -1;
+static int hf_p25cai_llid = -1;
+static int hf_p25cai_fmf = -1;
+static int hf_p25cai_btf = -1;
+static int hf_p25cai_poc = -1;
+static int hf_p25cai_syn = -1;
+static int hf_p25cai_ns = -1;
+static int hf_p25cai_fsnf = -1;
+static int hf_p25cai_dho = -1;
+static int hf_p25cai_db = -1;
+static int hf_p25cai_dbsn = -1;
+static int hf_p25cai_crc9 = -1;
+static int hf_p25cai_ud = -1;
+static int hf_p25cai_packet_crc = -1;
+static int hf_p25cai_class = -1;
+static int hf_p25cai_type = -1;
+static int hf_p25cai_status = -1;
+static int hf_p25cai_x = -1;
+static int hf_p25cai_sllid = -1;
 
 /* Field values */
 static const value_string data_unit_ids[] = {
@@ -377,6 +405,21 @@ static const range_string queued_response_reason_codes[] = {
 	{ 0, 0, NULL }
 };
 
+static const value_string pdu_formats[] = {
+	{ 0x03, "Response Packet" },
+	{ 0x15, "Unconfirmed Data Packet" },
+	{ 0x16, "Confirmed Data Packet" },
+	{ 0x17, "Alternate Multiple Block Trunking Control Packet" },
+	{ 0, NULL }
+};
+
+static const value_string sap_ids[] = {
+	/* I doubt this is complete. */
+	{ 61, "Trunked Control SAP (Multi-block)" },
+	{ 63, "Protected Trunked Control SAP (Multi-block)" },
+	{ 0, NULL }
+};
+
 /* Initialize the subtree pointers */
 static gint ett_p25cai = -1;
 static gint ett_ss = -1;
@@ -384,6 +427,7 @@ static gint ett_nid = -1;
 static gint ett_du = -1;
 static gint ett_lc = -1;
 static gint ett_es = -1;
+static gint ett_db = -1;
 
 /* Code to actually dissect the packets */
 static int
@@ -479,9 +523,6 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 		case 0x3:
 			/* nothing left to decode */
 			break;
-
-		/* TODO: much more dissection below */
-
 		/* Logical Link Data Unit 1 */
 		case 0x5:
 			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_ldu1, extracted_tvb, offset, -1, FALSE);
@@ -529,8 +570,9 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			proto_tree_add_item(du_tree, hf_p25cai_lsd, build_ldu_lsd_tvb(extracted_tvb, pinfo, offset), 0, 2, FALSE);
 			break;
 		/* Packet Data Unit */
+		/* TODO: This case is hasn't been tested. */
 		case 0xC:
-			du_item = proto_tree_add_item(p25cai_tree, hf_p25cai_pdu, extracted_tvb, offset, -1, FALSE);
+			dissect_pdu(extracted_tvb, pinfo, offset, p25cai_tree);
 			break;
 		/* Terminator Data Unit with Link Control */
 		case 0xF:
@@ -610,6 +652,363 @@ dissect_es(tvbuff_t *tvb, proto_tree *tree)
 	proto_tree_add_item(es_tree, hf_p25cai_algid, tvb, offset, 1, FALSE);
 	offset += 1;
 	proto_tree_add_item(es_tree, hf_p25cai_kid, tvb, offset, 2, FALSE);
+}
+
+/* Dissect Packet Data Unit */
+void
+dissect_pdu(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tree)
+{
+	proto_tree *pdu_tree;
+	proto_item *pdu_item;
+	guint8 *header_buffer, *trellis_buffer, pdu_format;
+	int blocks_to_follow;
+
+	pdu_item = proto_tree_add_item(tree, hf_p25cai_pdu, tvb, offset, -1, FALSE);
+	pdu_tree = proto_item_add_subtree(pdu_item, ett_du);
+	pdu_format = tvb_get_guint8(tvb, offset) & 0x1F;
+
+	/* Prepare the header portion of the tvb. */
+	DISSECTOR_ASSERT(tvb_length_remaining(tvb, 0) >= 25);
+	header_buffer = (guint8*)ep_alloc0(12);
+	trellis_buffer = (guint8*)ep_alloc0(25);
+	data_deinterleave(tvb, trellis_buffer, 0);
+	trellis_1_2_decode(trellis_buffer, header_buffer, 0);
+
+	/* Find out how many data blocks we are supposed to have. */
+	blocks_to_follow = header_buffer[6] & 0x7F;
+
+	switch (pdu_format) {
+	/* Response Packet */
+	case 0x03:
+		dissect_pdu_response(tvb, pinfo, offset, pdu_tree, header_buffer, blocks_to_follow);
+		break;
+	/* Unconfirmed Data Packet */
+	case 0x15:
+		dissect_pdu_unconfirmed(tvb, pinfo, offset, pdu_tree, header_buffer, blocks_to_follow);
+		break;
+	/* Confirmed Data Packet */
+	case 0x16:
+		dissect_pdu_confirmed(tvb, pinfo, offset, pdu_tree, header_buffer, blocks_to_follow);
+		break;
+	/* Alternate Multiple Block Trunking (MBT) Control Packet */
+	case 0x17:
+		dissect_pdu_ambt(tvb, pinfo, offset, pdu_tree, header_buffer, blocks_to_follow);
+		break;
+	/* Unknown PDU format */
+	default:
+		break;
+	}
+}
+
+/* Dissect Response Packet */
+void
+dissect_pdu_response(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tree, guint8 *header, int num_blocks)
+{
+	tvbuff_t *pdu_tvb;
+	proto_tree *db_tree;
+	proto_item *db_item;
+	guint8 *pdu_buffer, *trellis_buffer;
+	int i, tvb_bit_offset, pdu_offset, pdu_buffer_length;
+
+	pdu_buffer_length = 12 + num_blocks * 12;
+	pdu_buffer = (guint8*)ep_alloc0(pdu_buffer_length);
+
+	/* Our tvb offset doesn't fall on bit boundaries, so we track it by bits
+	 * instead of bytes.
+	 */
+	tvb_bit_offset = 196;
+	pdu_offset = 12;
+
+	/* Copy the temporary header onto the pdu_buffer. */
+	for (i = 0; i < 12; i++)
+		pdu_buffer[i] = header[i];
+
+	/* Add the data blocks to the pdu_buffer. */
+	for (i = 0; i < num_blocks; i++) {
+		DISSECTOR_ASSERT(tvb_length_remaining(tvb, tvb_bit_offset / 8) >= 25);
+		trellis_buffer = (guint8*)ep_alloc0(25);
+		data_deinterleave(tvb, trellis_buffer, tvb_bit_offset);
+		trellis_1_2_decode(trellis_buffer, pdu_buffer, pdu_offset);
+		tvb_bit_offset += 196;
+		pdu_offset += 12;
+	}
+
+	/* Setup a new tvb buffer with the decoded data. */
+	pdu_tvb = tvb_new_real_data(pdu_buffer, pdu_buffer_length, pdu_buffer_length);
+	tvb_set_child_real_data_tvbuff(tvb, pdu_tvb);
+	add_new_data_source(pinfo, pdu_tvb, "Packet Data Unit");
+
+	/* Dissect the PDU header. */
+	proto_tree_add_item(tree, hf_p25cai_io, pdu_tvb, offset, 1, FALSE);
+	proto_tree_add_item(tree, hf_p25cai_pdu_format, pdu_tvb, offset, 1, FALSE);
+	offset += 1;
+	proto_tree_add_item(tree, hf_p25cai_class, pdu_tvb, offset, 1, FALSE);
+	proto_tree_add_item(tree, hf_p25cai_type, pdu_tvb, offset, 1, FALSE);
+	proto_tree_add_item(tree, hf_p25cai_status, pdu_tvb, offset, 1, FALSE);
+	offset += 1;
+	proto_tree_add_item(tree, hf_p25cai_mfid, pdu_tvb, offset, 1, FALSE);
+	offset += 1;
+	proto_tree_add_item(tree, hf_p25cai_llid, pdu_tvb, offset, 3, FALSE);
+	offset += 3;
+	proto_tree_add_item(tree, hf_p25cai_x, pdu_tvb, offset, 1, FALSE);
+	proto_tree_add_item(tree, hf_p25cai_btf, pdu_tvb, offset, 1, FALSE);
+	offset += 1;
+	proto_tree_add_item(tree, hf_p25cai_sllid, pdu_tvb, offset, 3, FALSE);
+	offset += 3;
+	proto_tree_add_item(tree, hf_p25cai_crc, pdu_tvb, offset, 2, FALSE);
+	offset += 2;
+
+	/* Dissect the data blocks. */
+	for (i = 0; i < num_blocks; i++) {
+		db_item = proto_tree_add_item(tree, hf_p25cai_db, pdu_tvb, offset, 12, FALSE);
+		db_tree = proto_item_add_subtree(db_item, ett_db);
+		if (i == num_blocks - 1) {
+			/* The last data block includes the packet CRC */
+			proto_tree_add_item(db_tree, hf_p25cai_ud, pdu_tvb, offset, 8, FALSE);
+			offset += 8;
+			proto_tree_add_item(db_tree, hf_p25cai_packet_crc, pdu_tvb, offset, 4, FALSE);
+		} else {
+			proto_tree_add_item(db_tree, hf_p25cai_ud, pdu_tvb, offset, 12, FALSE);
+		}
+	}
+}
+
+/* Dissect Unonfirmed Data Packet */
+void
+dissect_pdu_unconfirmed(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tree, guint8 *header, int num_blocks)
+{
+	tvbuff_t *pdu_tvb;
+	proto_tree *db_tree;
+	proto_item *db_item;
+	guint8 *pdu_buffer, *trellis_buffer;
+	int i, tvb_bit_offset, pdu_offset, pdu_buffer_length;
+
+	pdu_buffer_length = 12 + num_blocks * 12;
+	pdu_buffer = (guint8*)ep_alloc0(pdu_buffer_length);
+
+	/* Our tvb offset doesn't fall on bit boundaries, so we track it by bits
+	 * instead of bytes.
+	 */
+	tvb_bit_offset = 196;
+	pdu_offset = 12;
+
+	/* Copy the temporary header onto the pdu_buffer. */
+	for (i = 0; i < 12; i++)
+		pdu_buffer[i] = header[i];
+
+	/* Add the data blocks to the pdu_buffer. */
+	for (i = 0; i < num_blocks; i++) {
+		DISSECTOR_ASSERT(tvb_length_remaining(tvb, tvb_bit_offset / 8) >= 25);
+		trellis_buffer = (guint8*)ep_alloc0(25);
+		data_deinterleave(tvb, trellis_buffer, tvb_bit_offset);
+		trellis_1_2_decode(trellis_buffer, pdu_buffer, pdu_offset);
+		tvb_bit_offset += 196;
+		pdu_offset += 12;
+	}
+
+	/* Setup a new tvb buffer with the decoded data. */
+	pdu_tvb = tvb_new_real_data(pdu_buffer, pdu_buffer_length, pdu_buffer_length);
+	tvb_set_child_real_data_tvbuff(tvb, pdu_tvb);
+	add_new_data_source(pinfo, pdu_tvb, "Packet Data Unit");
+
+	/* Dissect the PDU header. */
+	proto_tree_add_item(tree, hf_p25cai_an, pdu_tvb, offset, 1, FALSE);
+	proto_tree_add_item(tree, hf_p25cai_io, pdu_tvb, offset, 1, FALSE);
+	proto_tree_add_item(tree, hf_p25cai_pdu_format, pdu_tvb, offset, 1, FALSE);
+	offset += 1;
+	proto_tree_add_item(tree, hf_p25cai_sapid, pdu_tvb, offset, 1, FALSE);
+	offset += 1;
+	proto_tree_add_item(tree, hf_p25cai_mfid, pdu_tvb, offset, 1, FALSE);
+	offset += 1;
+	proto_tree_add_item(tree, hf_p25cai_llid, pdu_tvb, offset, 3, FALSE);
+	offset += 3;
+	proto_tree_add_item(tree, hf_p25cai_btf, pdu_tvb, offset, 1, FALSE);
+	offset += 1;
+	proto_tree_add_item(tree, hf_p25cai_poc, pdu_tvb, offset, 1, FALSE);
+	offset += 1;
+	/* reserved octet here */
+	offset += 1;
+	proto_tree_add_item(tree, hf_p25cai_dho, pdu_tvb, offset, 1, FALSE);
+	offset += 1;
+	proto_tree_add_item(tree, hf_p25cai_crc, pdu_tvb, offset, 2, FALSE);
+	offset += 2;
+
+	/* Dissect the data blocks. */
+	for (i = 0; i < num_blocks; i++) {
+		db_item = proto_tree_add_item(tree, hf_p25cai_db, pdu_tvb, offset, 12, FALSE);
+		db_tree = proto_item_add_subtree(db_item, ett_db);
+		if (i == num_blocks - 1) {
+			/* The last data block includes the packet CRC */
+			proto_tree_add_item(db_tree, hf_p25cai_ud, pdu_tvb, offset, 8, FALSE);
+			offset += 8;
+			proto_tree_add_item(db_tree, hf_p25cai_packet_crc, pdu_tvb, offset, 4, FALSE);
+		} else {
+			proto_tree_add_item(db_tree, hf_p25cai_ud, pdu_tvb, offset, 12, FALSE);
+		}
+	}
+}
+
+/* Dissect Confirmed Data Packet */
+void
+dissect_pdu_confirmed(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tree, guint8 *header, int num_blocks)
+{
+	tvbuff_t *pdu_tvb;
+	proto_tree *db_tree;
+	proto_item *db_item;
+	guint8 *pdu_buffer, *trellis_buffer;
+	int i, tvb_bit_offset, pdu_offset, pdu_buffer_length;
+
+	pdu_buffer_length = 12 + num_blocks * 18;
+	pdu_buffer = (guint8*)ep_alloc0(pdu_buffer_length);
+
+	/* Our tvb offset doesn't fall on bit boundaries, so we track it by bits
+	 * instead of bytes.
+	 */
+	tvb_bit_offset = 196;
+	pdu_offset = 12;
+
+	/* Copy the temporary header onto the pdu_buffer. */
+	for (i = 0; i < 12; i++)
+		pdu_buffer[i] = header[i];
+
+	/* Add the data blocks to the pdu_buffer. */
+	for (i = 0; i < num_blocks; i++) {
+		DISSECTOR_ASSERT(tvb_length_remaining(tvb, tvb_bit_offset / 8) >= 25);
+		trellis_buffer = (guint8*)ep_alloc0(25);
+		data_deinterleave(tvb, trellis_buffer, tvb_bit_offset);
+		trellis_3_4_decode(trellis_buffer, pdu_buffer, pdu_offset);
+		tvb_bit_offset += 196;
+		pdu_offset += 18;
+	}
+
+	/* Setup a new tvb buffer with the decoded data. */
+	pdu_tvb = tvb_new_real_data(pdu_buffer, pdu_buffer_length, pdu_buffer_length);
+	tvb_set_child_real_data_tvbuff(tvb, pdu_tvb);
+	add_new_data_source(pinfo, pdu_tvb, "Packet Data Unit");
+
+	/* Dissect the PDU header. */
+	proto_tree_add_item(tree, hf_p25cai_an, pdu_tvb, offset, 1, FALSE);
+	proto_tree_add_item(tree, hf_p25cai_io, pdu_tvb, offset, 1, FALSE);
+	proto_tree_add_item(tree, hf_p25cai_pdu_format, pdu_tvb, offset, 1, FALSE);
+	offset += 1;
+	proto_tree_add_item(tree, hf_p25cai_sapid, pdu_tvb, offset, 1, FALSE);
+	offset += 1;
+	proto_tree_add_item(tree, hf_p25cai_mfid, pdu_tvb, offset, 1, FALSE);
+	offset += 1;
+	proto_tree_add_item(tree, hf_p25cai_llid, pdu_tvb, offset, 3, FALSE);
+	offset += 3;
+	proto_tree_add_item(tree, hf_p25cai_fmf, pdu_tvb, offset, 1, FALSE);
+	proto_tree_add_item(tree, hf_p25cai_btf, pdu_tvb, offset, 1, FALSE);
+	offset += 1;
+	proto_tree_add_item(tree, hf_p25cai_poc, pdu_tvb, offset, 1, FALSE);
+	offset += 1;
+	proto_tree_add_item(tree, hf_p25cai_syn, pdu_tvb, offset, 1, FALSE);
+	proto_tree_add_item(tree, hf_p25cai_ns, pdu_tvb, offset, 1, FALSE);
+	proto_tree_add_item(tree, hf_p25cai_fsnf, pdu_tvb, offset, 1, FALSE);
+	offset += 1;
+	proto_tree_add_item(tree, hf_p25cai_dho, pdu_tvb, offset, 1, FALSE);
+	offset += 1;
+	proto_tree_add_item(tree, hf_p25cai_crc, pdu_tvb, offset, 2, FALSE);
+	offset += 2;
+
+	/* Dissect the data blocks. */
+	for (i = 0; i < num_blocks; i++) {
+		db_item = proto_tree_add_item(tree, hf_p25cai_db, pdu_tvb, offset, 18, FALSE);
+		db_tree = proto_item_add_subtree(db_item, ett_db);
+		proto_tree_add_item(db_tree, hf_p25cai_dbsn, pdu_tvb, offset, 1, FALSE);
+		proto_tree_add_item(db_tree, hf_p25cai_crc9, pdu_tvb, offset, 2, FALSE);
+		offset += 2;
+		if (i == num_blocks - 1) {
+			/* The last data block includes the packet CRC */
+			proto_tree_add_item(db_tree, hf_p25cai_ud, pdu_tvb, offset, 12, FALSE);
+			offset += 12;
+			proto_tree_add_item(db_tree, hf_p25cai_packet_crc, pdu_tvb, offset, 4, FALSE);
+		} else {
+			proto_tree_add_item(db_tree, hf_p25cai_ud, pdu_tvb, offset, 16, FALSE);
+		}
+	}
+}
+
+/* Dissect Alternate Multiple Block Trunking (MBT) Control Packet */
+void
+dissect_pdu_ambt(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tree, guint8 *header, int num_blocks)
+{
+	tvbuff_t *pdu_tvb;
+	proto_tree *db_tree;
+	proto_item *db_item;
+	guint8 *pdu_buffer, *trellis_buffer, outbound, mfid;
+	int i, tvb_bit_offset, pdu_offset, pdu_buffer_length;
+
+	pdu_buffer_length = 12 + num_blocks * 12;
+	pdu_buffer = (guint8*)ep_alloc0(pdu_buffer_length);
+
+	/* Our tvb offset doesn't fall on bit boundaries, so we track it by bits
+	 * instead of bytes.
+	 */
+	tvb_bit_offset = 196;
+	pdu_offset = 12;
+
+	/* Copy the temporary header onto the pdu_buffer. */
+	for (i = 0; i < 12; i++)
+		pdu_buffer[i] = header[i];
+
+	/* Add the data blocks to the pdu_buffer. */
+	for (i = 0; i < num_blocks; i++) {
+		DISSECTOR_ASSERT(tvb_length_remaining(tvb, tvb_bit_offset / 8) >= 25);
+		trellis_buffer = (guint8*)ep_alloc0(25);
+		data_deinterleave(tvb, trellis_buffer, tvb_bit_offset);
+		trellis_1_2_decode(trellis_buffer, pdu_buffer, pdu_offset);
+		tvb_bit_offset += 196;
+		pdu_offset += 12;
+	}
+
+	/* Setup a new tvb buffer with the decoded data. */
+	pdu_tvb = tvb_new_real_data(pdu_buffer, pdu_buffer_length, pdu_buffer_length);
+	tvb_set_child_real_data_tvbuff(tvb, pdu_tvb);
+	add_new_data_source(pinfo, pdu_tvb, "Packet Data Unit");
+
+	/* Dissect the PDU header. */
+	proto_tree_add_item(tree, hf_p25cai_an, pdu_tvb, offset, 1, FALSE);
+	outbound = (tvb_get_guint8(pdu_tvb, offset) >> 5) & 0x01;
+	proto_tree_add_item(tree, hf_p25cai_io, pdu_tvb, offset, 1, FALSE);
+	proto_tree_add_item(tree, hf_p25cai_pdu_format, pdu_tvb, offset, 1, FALSE);
+	offset += 1;
+	proto_tree_add_item(tree, hf_p25cai_sapid, pdu_tvb, offset, 1, FALSE);
+	offset += 1;
+	mfid = tvb_get_guint8(pdu_tvb, offset);
+	proto_tree_add_item(tree, hf_p25cai_mfid, pdu_tvb, offset, 1, FALSE);
+	offset += 1;
+	proto_tree_add_item(tree, hf_p25cai_llid, pdu_tvb, offset, 3, FALSE);
+	offset += 3;
+	proto_tree_add_item(tree, hf_p25cai_btf, pdu_tvb, offset, 1, FALSE);
+	offset += 1;
+	if (mfid > 1) {
+		proto_tree_add_item(tree, hf_p25cai_unknown_opcode, pdu_tvb, offset, 1, FALSE);
+	} else if (outbound) {
+		proto_tree_add_item(tree, hf_p25cai_osp_opcode, pdu_tvb, offset, 1, FALSE);
+	} else {
+		proto_tree_add_item(tree, hf_p25cai_isp_opcode, pdu_tvb, offset, 1, FALSE);
+	}
+	offset += 1;
+	/* TODO: 2 octets defined by trunking messages */
+	offset += 2;
+	proto_tree_add_item(tree, hf_p25cai_crc, pdu_tvb, offset, 2, FALSE);
+	offset += 2;
+
+	/* Dissect the data blocks. */
+	for (i = 0; i < num_blocks; i++) {
+		db_item = proto_tree_add_item(tree, hf_p25cai_db, pdu_tvb, offset, 12, FALSE);
+		db_tree = proto_item_add_subtree(db_item, ett_db);
+		if (i == num_blocks - 1) {
+			/* The last data block includes the packet CRC */
+			/* really "MBT data" not "user data" */
+			proto_tree_add_item(db_tree, hf_p25cai_ud, pdu_tvb, offset, 8, FALSE);
+			offset += 8;
+			proto_tree_add_item(db_tree, hf_p25cai_packet_crc, pdu_tvb, offset, 4, FALSE);
+		} else {
+			proto_tree_add_item(db_tree, hf_p25cai_ud, pdu_tvb, offset, 12, FALSE);
+		}
+	}
 }
 
 /* Extract status symbols, display them, and return frame without status symbols */
@@ -865,7 +1264,6 @@ build_tsdu_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset)
 }
 
 /* Build Link Control tvb from Terminator */
-/* TODO: This one is completely untested. */
 tvbuff_t*
 build_term_lc_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset)
 {
@@ -932,7 +1330,7 @@ data_deinterleave(tvbuff_t *tvb, guint8 *deinterleaved, int bit_offset)
 void
 trellis_1_2_decode(guint8 *encoded, guint8 *decoded, int offset)
 {
-	int i, j, k;
+	int i, j;
 	int state = 0;
 	guint8 codeword;
 
@@ -950,8 +1348,6 @@ trellis_1_2_decode(guint8 *encoded, guint8 *decoded, int offset)
 	/* step through 4 bit codewords in input */
 	for (i = 0; i < 196; i += 4) {
 		codeword = (encoded[i / 8] >> (4 - (i % 8))) & 0xF;
-		for (k = 0; k < 4; k++)
-			hd[k] = 0;
 		/* try each codeword in a row of the state transition table */
 		for (j = 0; j < 4; j++) {
 			/* find Hamming distance for candidate */
@@ -970,6 +1366,55 @@ trellis_1_2_decode(guint8 *encoded, guint8 *decoded, int offset)
 
 		/* append dibit onto output buffer */
 		if (i < 192)
+			decoded[(i / 16) + offset] |= state << (6 - (i / 2) % 8);
+	}
+}
+
+/* 3/4 rate trellis decoder.  Assumes output buffer is already zeroed. */
+void
+trellis_3_4_decode(guint8 *encoded, guint8 *decoded, int offset)
+{
+	int i, j;
+	int state = 0;
+	guint8 codeword;
+
+	/* Hamming distance */
+	guint8 hd[8];
+
+	/* state transition table, including constellation to dibit pair mapping */
+	guint8 next_words[8][8] = {
+		{0x2, 0xD, 0xE, 0x1, 0x7, 0x8, 0xB, 0x4},
+		{0xE, 0x1, 0x7, 0x8, 0xB, 0x4, 0x2, 0xD},
+		{0xA, 0x5, 0x6, 0x9, 0xF, 0x0, 0x3, 0xC},
+		{0x6, 0x9, 0xF, 0x0, 0x3, 0xC, 0xA, 0x5},
+		{0xF, 0x0, 0x3, 0xC, 0xA, 0x5, 0x6, 0x9},
+		{0x3, 0xC, 0xA, 0x5, 0x6, 0x9, 0xF, 0x0},
+		{0x7, 0x8, 0xB, 0x4, 0x2, 0xD, 0xE, 0x1},
+		{0xB, 0x4, 0x2, 0xD, 0xE, 0x1, 0x7, 0x8}
+	};
+
+	/* step through 4 bit codewords in input */
+	for (i = 0; i < 196; i += 4) {
+		codeword = (encoded[i / 8] >> (4 - (i % 8))) & 0xF;
+		/* try each codeword in a row of the state transition table */
+		for (j = 0; j < 8; j++) {
+			/* find Hamming distance for candidate */
+			hd[j] = count_bits(codeword ^ next_words[state][j]);
+		}
+		/* find the dibit that matches the most codeword bits (minimum Hamming distance) */
+		state = find_min(hd, 8);
+		/* error if minimum can't be found */
+		DISSECTOR_ASSERT(state != -1);
+		/* It also might be nice to report a condition where the minimum is
+		 * non-zero, i.e. an error has been corrected.  It probably shouldn't
+		 * be a permanent failure, though.
+		 *
+		 * DISSECTOR_ASSERT(hd[state] == 0);
+		 */
+
+		/* append tribit onto output buffer */
+		if (i < 192)
+			/* FIXME adapt from 1/2 to 3/4 rate */
 			decoded[(i / 16) + offset] |= state << (6 - (i / 2) % 8);
 	}
 }
@@ -1196,6 +1641,116 @@ proto_register_p25cai(void)
 			{ "Encryption Sync", "p25cai.es",
 			FT_NONE, BASE_NONE, NULL, 0x0,
 			NULL, HFILL }
+		},
+		{ &hf_p25cai_an,
+			{ "A/N", "p25cai.an",
+			FT_BOOLEAN, BASE_NONE, NULL, 0x40,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_io,
+			{ "I/O", "p25cai.io",
+			FT_BOOLEAN, BASE_NONE, NULL, 0x20,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_pdu_format,
+			{ "Format", "p25cai.pdu.format",
+			FT_UINT8, BASE_HEX, VALS(pdu_formats), 0x1F,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_sapid,
+			{ "SAP ID", "p25cai.sapid",
+			FT_UINT8, BASE_HEX, VALS(sap_ids), 0x3F,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_llid,
+			{ "Logical Link ID", "p25cai.llid",
+			FT_UINT24, BASE_HEX, NULL, 0x0,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_fmf,
+			{ "Full Message Flag", "p25cai.fmf",
+			FT_BOOLEAN, BASE_NONE, NULL, 0x80,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_btf,
+			{ "Blocks to Follow", "p25cai.btf",
+			FT_UINT8, BASE_HEX, NULL, 0x7F,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_poc,
+			{ "Pad Octet Count", "p25cai.poc",
+			FT_UINT8, BASE_HEX, NULL, 0x1F,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_syn,
+			{ "Syn", "p25cai.syn",
+			FT_BOOLEAN, BASE_NONE, NULL, 0x80,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_ns,
+			{ "N(S)", "p25cai.ns",
+			FT_UINT8, BASE_HEX, NULL, 0x70,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_fsnf,
+			{ "Fragment Sequence Number Field", "p25cai.fsnf",
+			FT_UINT8, BASE_HEX, NULL, 0x0F,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_dho,
+			{ "Data Header Offset", "p25cai.dho",
+			FT_UINT8, BASE_HEX, NULL, 0x3F,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_db,
+			{ "Data Block", "p25cai.db",
+			FT_NONE, BASE_NONE, NULL, 0x0,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_dbsn,
+			{ "Data Block Serial Number", "p25cai.dbsn",
+			FT_UINT8, BASE_HEX, NULL, 0xFE,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_crc9,
+			{ "CRC", "p25cai.crc9",
+			FT_UINT16, BASE_HEX, NULL, 0x1FF,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_ud,
+			{ "User Data", "p25cai.ud",
+			FT_BYTES, BASE_HEX, NULL, 0x0,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_packet_crc,
+			{ "Packet CRC", "p25cai.packet_crc",
+			FT_UINT32, BASE_HEX, NULL, 0x0,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_class,
+			{ "Response Class", "p25cai.class",
+			FT_UINT8, BASE_HEX, NULL, 0xA0,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_type,
+			{ "Response Type", "p25cai.type",
+			FT_UINT8, BASE_HEX, NULL, 0x38,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_status,
+			{ "Response Status", "p25cai.status",
+			FT_UINT8, BASE_HEX, NULL, 0x07,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_x,
+			{ "X", "p25cai.x",
+			FT_BOOLEAN, BASE_HEX, NULL, 0x80,
+			NULL, HFILL }
+		},
+		{ &hf_p25cai_sllid,
+			{ "Source Logical Link ID", "p25cai.sllid",
+			FT_UINT24, BASE_HEX, NULL, 0x0,
+			NULL, HFILL }
 		}
 	};
 
@@ -1206,7 +1761,8 @@ proto_register_p25cai(void)
 		&ett_nid,
 		&ett_du,
 		&ett_lc,
-		&ett_es
+		&ett_es,
+		&ett_db
 	};
 
 /* Register the protocol name and description */
