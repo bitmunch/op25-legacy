@@ -37,7 +37,7 @@ bool
 abstract_data_unit::complete(dibit d)
 {
    d_symbols.push_back(d);
-   return nof_symbols_reqd() == d_symbols.size();
+   return nof_symbols_reqd() == (d_symbols.size() + 56);
 }
 
 /*

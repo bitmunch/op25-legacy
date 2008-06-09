@@ -95,7 +95,7 @@ bool
 op25_decoder_f::correlates(dibit d)
 {
    size_t errs = 0;
-   const size_t ERR_THRESHOLD = 3;
+   const size_t ERR_THRESHOLD = 4;
    const size_t NOF_FS_BITS = 48;
    const uint64_t FS = 0x5575f5ff77ffL;
    const uint64_t FS_MASK = 0xffffffffffffL;
@@ -109,7 +109,7 @@ op25_decoder_f::correlates(dibit d)
       }
       diff >>= 1;
    }
-   return errs <= ERR_THRESHOLD;
+   return errs < ERR_THRESHOLD;
 }
 
 /*
@@ -125,7 +125,7 @@ op25_decoder_f::identifies(dibit d)
    d_network_ID |= d;
    const size_t LAST_NETWORK_ID_SYMBOL = 56;
    if(LAST_NETWORK_ID_SYMBOL == d_symbol) {
-      // ToDo: BCH decoding
+      // ToDo: BCH (64,16,23) decoding
       identified = true;
    }
    return identified;
@@ -168,6 +168,8 @@ op25_decoder_f::sync_receive_symbol(dibit d)
       if(identifies(d)) {
          d_data_unit = data_unit::make_data_unit(d_frame_sync, d_network_ID);
          if(d_data_unit) {
+            const char *type_name(typeid(*d_data_unit).name());
+            printf("frame_sync: %lx, network_ID: %lx, data_unit: %s\n", d_frame_sync, d_network_ID, type_name);
             d_substate = READING;
          } else {
             ++d_unrecognized;
