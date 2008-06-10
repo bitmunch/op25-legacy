@@ -41,6 +41,9 @@ else:
 	file = open(options.input_file)
 input_samples = []
 
+# exceptions
+class ExtractionLengthException(Exception): pass
+
 # return average (mean) of a list of values
 def average(list):
 	total = 0.0
@@ -67,6 +70,8 @@ def tribits_to_integer(tribits):
 # return extracted block, list of status symbols, and number of symbols consumed
 def extract_block(symbols, length, index):
 	maximum_raw_length = length + 2 + (length // 36)
+	if len(symbols) < index + maximum_raw_length:
+		raise ExtractionLengthException
 	block = symbols[index:index + maximum_raw_length]
 	status_symbols = []
 	# adjust position of first status symbol according to starting index of input
@@ -374,7 +379,12 @@ def decode_frame(symbols):
 		# contains one to four Trunking Signaling Blocks (TSBK)
 		last_block_flag = 0
 		while last_block_flag < 1:
-			tsbk_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
+			try:
+				tsbk_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
+			except ExtractionLengthException:
+				decode_error += 1
+				sys.stderr.write("Not enough symbols to extract TSBK.\n")
+				break
 			status_symbols.extend(block_status_symbols)
 			consumed += block_consumed
 			tsbk, error_count = trellis_1_2_decode(data_deinterleave(tsbk_symbols))
@@ -444,19 +454,24 @@ def decode_frame(symbols):
 				print "Data Header Offset: 0x%02x" % data_header_offset
 			user_data = 0
 			for i in range(blocks_to_follow):
-				data_block_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
-				status_symbols.extend(block_status_symbols)
-				consumed += block_consumed
-				data_block, error_count = trellis_3_4_decode(data_deinterleave(data_block_symbols))
-				decode_error += error_count
-				# data_block is 144 bits
-				# CRC-9, 9 bits
-				data_block_crc = (data_block >> 128) & 0x1FF
-				#TODO: verify data block CRC
-				user_data = (user_data << 128) + (data_block & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
-				if options.verbose:
-					# Data Block Serial Number, 7 bits
-					data_block_serial_number = (data_block >> 137)
+				try:
+					data_block_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
+				except ExtractionLengthException:
+					decode_error += 1
+					sys.stderr.write("Not enough symbols to extract data block.\n")
+				else:
+					status_symbols.extend(block_status_symbols)
+					consumed += block_consumed
+					data_block, error_count = trellis_3_4_decode(data_deinterleave(data_block_symbols))
+					decode_error += error_count
+					# data_block is 144 bits
+					# CRC-9, 9 bits
+					data_block_crc = (data_block >> 128) & 0x1FF
+					#TODO: verify data block CRC
+					user_data = (user_data << 128) + (data_block & 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
+					if options.verbose:
+						# Data Block Serial Number, 7 bits
+						data_block_serial_number = (data_block >> 137)
 			packet_crc = user_data & 0xFFFFFFFF
 			user_data = user_data >> 32
 			#TODO: verify packet CRC
@@ -479,12 +494,17 @@ def decode_frame(symbols):
 				print "Source Logical Link ID: 0x%06x" % source_logical_link_id
 			response_data = 0
 			for i in range(blocks_to_follow):
-				data_block_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
-				status_symbols.extend(block_status_symbols)
-				consumed += block_consumed
-				data_block, error_count = trellis_1_2_decode(data_deinterleave(data_block_symbols))
-				decode_error += error_count
-				response_data = (response_data << 64) + data_block
+				try:
+					data_block_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
+				except ExtractionLengthException:
+					decode_error += 1
+					sys.stderr.write("Not enough symbols to extract data block.\n")
+				else:
+					status_symbols.extend(block_status_symbols)
+					consumed += block_consumed
+					data_block, error_count = trellis_1_2_decode(data_deinterleave(data_block_symbols))
+					decode_error += error_count
+					response_data = (response_data << 64) + data_block
 			# Not absolutely certain that this CRC location is correct.  Spec unclear if more than one data block.
 			packet_crc = response_data & 0xFFFFFFFF
 			response_data = response_data >> 32
@@ -509,12 +529,17 @@ def decode_frame(symbols):
 				print "Data Header Offset: 0x%02x" % data_header_offset
 			user_data = 0
 			for i in range(blocks_to_follow):
-				data_block_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
-				status_symbols.extend(block_status_symbols)
-				consumed += block_consumed
-				data_block, error_count = trellis_1_2_decode(data_deinterleave(data_block_symbols))
-				decode_error += error_count
-				user_data = (data_block << 64) + data_block
+				try:
+					data_block_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
+				except ExtractionLengthException:
+					decode_error += 1
+					sys.stderr.write("Not enough symbols to extract data block.\n")
+				else:
+					status_symbols.extend(block_status_symbols)
+					consumed += block_consumed
+					data_block, error_count = trellis_1_2_decode(data_deinterleave(data_block_symbols))
+					decode_error += error_count
+					user_data = (data_block << 64) + data_block
 			packet_crc = user_data & 0xFFFFFFFF
 			user_data = user_data >> 32
 			#TODO: verify packet CRC
@@ -535,12 +560,17 @@ def decode_frame(symbols):
 				print "Opcode: 0x%02x" % opcode
 			mbt_data = 0
 			for i in range(blocks_to_follow):
-				data_block_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
-				status_symbols.extend(block_status_symbols)
-				consumed += block_consumed
-				data_block, error_count = trellis_1_2_decode(data_deinterleave(data_block_symbols))
-				decode_error += error_count
-				mbt_data = (data_block << 64) + data_block
+				try:
+					data_block_symbols, block_status_symbols, block_consumed = extract_block(symbols, 98, consumed)
+				except ExtractionLengthException:
+					decode_error += 1
+					sys.stderr.write("Not enough symbols to extract data block.\n")
+				else:
+					status_symbols.extend(block_status_symbols)
+					consumed += block_consumed
+					data_block, error_count = trellis_1_2_decode(data_deinterleave(data_block_symbols))
+					decode_error += error_count
+					mbt_data = (data_block << 64) + data_block
 			packet_crc = mbt_data & 0xFFFFFFFF
 			mbt_data = mbt_data >> 32
 			#TODO: verify packet CRC
@@ -673,9 +703,14 @@ def decode_frame(symbols):
 		sys.stderr.write("Unknown Data Unit ID: %1x\n" % data_unit_id)
 		decode_error += 1
 	if options.pad and consumed % 36 > 0:
-		pad_symbols, final_status_symbol, block_consumed = extract_block(symbols, ((36 - (consumed % 36)) % 36) - 1, consumed)
-		status_symbols.extend(final_status_symbol)
-		consumed += block_consumed
+		try:
+			pad_symbols, final_status_symbol, block_consumed = extract_block(symbols, ((36 - (consumed % 36)) % 36) - 1, consumed)
+		except ExtractionLengthException:
+			decode_error += 1
+			sys.stderr.write("Not enough symbols to extract final status symbol.\n")
+		else:
+			status_symbols.extend(final_status_symbol)
+			consumed += block_consumed
 	if options.verbose:
 		print "Status Symbols:",
 		for ss in status_symbols:
