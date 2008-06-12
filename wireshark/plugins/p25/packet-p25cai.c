@@ -576,7 +576,7 @@ dissect_p25cai(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree)
 			break;
 		/* Terminator Data Unit with Link Control */
 		case 0xF:
-			dissect_lc(build_term_lc_tvb(extracted_tvb, pinfo, offset), tree);
+			dissect_lc(build_term_lc_tvb(extracted_tvb, pinfo, offset), p25cai_tree);
 			break;
 		/* Unknown Data Unit */
 		default:
@@ -665,34 +665,35 @@ dissect_pdu(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tree)
 
 	pdu_item = proto_tree_add_item(tree, hf_p25cai_pdu, tvb, offset, -1, FALSE);
 	pdu_tree = proto_item_add_subtree(pdu_item, ett_du);
-	pdu_format = tvb_get_guint8(tvb, offset) & 0x1F;
 
 	/* Prepare the header portion of the tvb. */
-	DISSECTOR_ASSERT(tvb_length_remaining(tvb, 0) >= 25);
+	DISSECTOR_ASSERT(tvb_length_remaining(tvb, offset) >= 25);
 	header_buffer = (guint8*)ep_alloc0(12);
 	trellis_buffer = (guint8*)ep_alloc0(25);
-	data_deinterleave(tvb, trellis_buffer, 0);
+	data_deinterleave(tvb, trellis_buffer, offset * 8);
 	trellis_1_2_decode(trellis_buffer, header_buffer, 0);
 
 	/* Find out how many data blocks we are supposed to have. */
 	blocks_to_follow = header_buffer[6] & 0x7F;
 
+	pdu_format = header_buffer[0] & 0x1F;
+
 	switch (pdu_format) {
 	/* Response Packet */
 	case 0x03:
-		dissect_pdu_response(tvb, pinfo, offset, pdu_tree, header_buffer, blocks_to_follow);
+		dissect_pdu_response(tvb, pinfo, 0, pdu_tree, header_buffer, blocks_to_follow);
 		break;
 	/* Unconfirmed Data Packet */
 	case 0x15:
-		dissect_pdu_unconfirmed(tvb, pinfo, offset, pdu_tree, header_buffer, blocks_to_follow);
+		dissect_pdu_unconfirmed(tvb, pinfo, 0, pdu_tree, header_buffer, blocks_to_follow);
 		break;
 	/* Confirmed Data Packet */
 	case 0x16:
-		dissect_pdu_confirmed(tvb, pinfo, offset, pdu_tree, header_buffer, blocks_to_follow);
+		dissect_pdu_confirmed(tvb, pinfo, 0, pdu_tree, header_buffer, blocks_to_follow);
 		break;
 	/* Alternate Multiple Block Trunking (MBT) Control Packet */
 	case 0x17:
-		dissect_pdu_ambt(tvb, pinfo, offset, pdu_tree, header_buffer, blocks_to_follow);
+		dissect_pdu_ambt(tvb, pinfo, 0, pdu_tree, header_buffer, blocks_to_follow);
 		break;
 	/* Unknown PDU format */
 	default:
@@ -716,7 +717,7 @@ dissect_pdu_response(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *
 	/* Our tvb offset doesn't fall on bit boundaries, so we track it by bits
 	 * instead of bytes.
 	 */
-	tvb_bit_offset = 196;
+	tvb_bit_offset = 308;
 	pdu_offset = 12;
 
 	/* Copy the temporary header onto the pdu_buffer. */
@@ -789,7 +790,7 @@ dissect_pdu_unconfirmed(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tre
 	/* Our tvb offset doesn't fall on bit boundaries, so we track it by bits
 	 * instead of bytes.
 	 */
-	tvb_bit_offset = 196;
+	tvb_bit_offset = 308;
 	pdu_offset = 12;
 
 	/* Copy the temporary header onto the pdu_buffer. */
@@ -864,7 +865,7 @@ dissect_pdu_confirmed(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree 
 	/* Our tvb offset doesn't fall on bit boundaries, so we track it by bits
 	 * instead of bytes.
 	 */
-	tvb_bit_offset = 196;
+	tvb_bit_offset = 308;
 	pdu_offset = 12;
 
 	/* Copy the temporary header onto the pdu_buffer. */
@@ -945,7 +946,7 @@ dissect_pdu_ambt(tvbuff_t *tvb, packet_info *pinfo, int offset, proto_tree *tree
 	/* Our tvb offset doesn't fall on bit boundaries, so we track it by bits
 	 * instead of bytes.
 	 */
-	tvb_bit_offset = 196;
+	tvb_bit_offset = 308;
 	pdu_offset = 12;
 
 	/* Copy the temporary header onto the pdu_buffer. */
@@ -1298,7 +1299,7 @@ build_term_lc_tvb(tvbuff_t *tvb, packet_info *pinfo, int offset)
 	rs_24_12_13_decode(rs_codeword, lc_buffer);
 
 	/* Setup a new tvb buffer with the decoded data. */
-	lc_tvb = tvb_new_real_data(lc_buffer, 15, 15);
+	lc_tvb = tvb_new_real_data(lc_buffer, 9, 9);
 	tvb_set_child_real_data_tvbuff(tvb, lc_tvb);
 	add_new_data_source(pinfo, lc_tvb, "data units");
 
