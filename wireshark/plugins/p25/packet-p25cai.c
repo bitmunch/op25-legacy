@@ -420,6 +420,19 @@ static const value_string sap_ids[] = {
 	{ 0, NULL }
 };
 
+static const true_false_string inbound_outbound = {
+	"Outbound",
+	"Inbound"
+};
+
+static const value_string status_symbols[] = {
+	{ 0x0, "Unknown" },
+	{ 0x1, "Busy" },
+	{ 0x2, "Unknown" },
+	{ 0x3, "Idle (start of inbound slot)" },
+	{ 0, NULL }
+};
+
 /* Initialize the subtree pointers */
 static gint ett_p25cai = -1;
 static gint ett_ss = -1;
@@ -1581,7 +1594,7 @@ proto_register_p25cai(void)
 		},
 		{ &hf_p25cai_ss,
 			{ "Status Symbol", "p25cai.ss",
-			FT_UINT8, BASE_HEX, NULL, 0x3,
+			FT_UINT8, BASE_HEX, VALS(status_symbols), 0x3,
 			NULL, HFILL }
 		},
 		{ &hf_p25cai_lc,
@@ -1651,7 +1664,7 @@ proto_register_p25cai(void)
 		},
 		{ &hf_p25cai_io,
 			{ "I/O", "p25cai.io",
-			FT_BOOLEAN, BASE_NONE, NULL, 0x20,
+			FT_BOOLEAN, BASE_NONE, TFS(&inbound_outbound), 0x20,
 			NULL, HFILL }
 		},
 		{ &hf_p25cai_pdu_format,
@@ -1676,7 +1689,7 @@ proto_register_p25cai(void)
 		},
 		{ &hf_p25cai_btf,
 			{ "Blocks to Follow", "p25cai.btf",
-			FT_UINT8, BASE_HEX, NULL, 0x7F,
+			FT_UINT8, BASE_DEC, NULL, 0x7F,
 			NULL, HFILL }
 		},
 		{ &hf_p25cai_poc,
