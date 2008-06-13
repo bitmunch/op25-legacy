@@ -20,6 +20,8 @@ parser.add_option("-v", "--verbose", action="store_true", dest="verbose", defaul
 parser.add_option("-l", "--loopback-inject", action="store_true", dest="loopback", default=False, help="inject raw frames on loopback interface")
 parser.add_option("-c", "--correlation-threshold", type="float", default=1.0, help="set lower than 1.0 for greater correlation sensitivity")
 parser.add_option("-b", "--input-buffer", type="int", default=4, help="set low (e.g. 1) for real-time responsiveness, high(e.g. 10) for efficient reading of large input files")
+parser.add_option("-q", "--quiet", action="store_true", dest="quiet", default=False, help="don't decode to stdout")
+parser.add_option("-t", "--table", action="store_true", dest="table", default=False, help="produce soft decision table (e.g. for gnuplot)")
 (options, args) = parser.parse_args()
 
 # frame synchronization header (in form most useful for correlation)
@@ -450,7 +452,7 @@ def decode_frame(symbols):
 				print "Pad Octet Count: 0x%02x" % pad_octet_count
 				print "Syn: 0x%01x" % syn
 				print "N(S): 0x%01x" % sequence_number
-				print "Fragment Sequence Number: 0x%01x" % fragment_squence_number
+				print "Fragment Sequence Number: 0x%01x" % fragment_sequence_number
 				print "Data Header Offset: 0x%02x" % data_header_offset
 			user_data = 0
 			for i in range(blocks_to_follow):
@@ -721,7 +723,8 @@ def decode_frame(symbols):
 		# make it start at the most significant bit of a hex digit
 		if (consumed % 2) > 0:
 			raw_frame = raw_frame << 2
-	print "Raw Frame: 0x%x" % raw_frame
+	if not options.quiet:
+		print "Raw Frame: 0x%x" % raw_frame
 	# inject raw frames on the loopback interface for wireshark to pick up
 	# requires scapy
 	if options.loopback:
@@ -741,6 +744,7 @@ def decode_frame(symbols):
 
 # main loop
 index = 0
+frame_count = 0
 while True:
 	# Read some samples from the input file.
 	data = file.read(chunk_size * bytes_per_sample * options.input_buffer)
@@ -757,7 +761,10 @@ while True:
 		if frame_start > 0:
 			# This timestamp is bogus if the input is not constant (e.g. squelch).
 			time = float(frame_start + index) / (symbol_rate * options.samples_per_symbol)
-			print "Frame detected at %.3f seconds." % time
+			frame_count += 1
+			if not options.quiet:
+				print
+				print "Frame %d detected at %.3f seconds." % (frame_count, time)
 			# Retrive a subset of input samples synchronized with respect to frame sync.
 			# Also downsample to the symbol rate.
 			sync_samples = downsample(frame_start)
@@ -767,8 +774,13 @@ while True:
 			symbols_consumed = decode_frame(symbols)
 			samples_consumed = frame_start + ((symbols_consumed - 1) * options.samples_per_symbol)
 			input_samples = input_samples[samples_consumed:]
+
+			if options.table:
+				for i in range(symbols_consumed):
+					j = index + (i * options.samples_per_symbol)
+					print j, sync_samples[i]
+
 			index += samples_consumed
-			print
 		else:
 			samples_consumed = chunk_size
 			input_samples = input_samples[samples_consumed:]
