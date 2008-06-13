@@ -413,13 +413,6 @@ static const value_string pdu_formats[] = {
 	{ 0, NULL }
 };
 
-static const value_string sap_ids[] = {
-	/* I doubt this is complete. */
-	{ 61, "Trunked Control SAP (Multi-block)" },
-	{ 63, "Protected Trunked Control SAP (Multi-block)" },
-	{ 0, NULL }
-};
-
 static const true_false_string inbound_outbound = {
 	"Outbound",
 	"Inbound"
@@ -1674,7 +1667,7 @@ proto_register_p25cai(void)
 		},
 		{ &hf_p25cai_sapid,
 			{ "SAP ID", "p25cai.sapid",
-			FT_UINT8, BASE_HEX, VALS(sap_ids), 0x3F,
+			FT_UINT8, BASE_HEX, VALS(service_access_points), 0x3F,
 			NULL, HFILL }
 		},
 		{ &hf_p25cai_llid,
