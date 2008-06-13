@@ -512,7 +512,7 @@ def decode_frame(symbols):
 			response_data = response_data >> 32
 			#TODO: verify packet CRC
 			if options.verbose:
-				print "Response Data: 0x%x" % user_data
+				print "Response Data: 0x%x" % response_data
 		elif format == 0x15:
 			if options.verbose:
 				print "PDU is an Unconfirmed Data Packet"
