@@ -1024,6 +1024,7 @@ extract_status_symbols(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int 
 
 	raw_length = tvb_length(tvb);
 	extracted_length = raw_length - (raw_length / 36);
+	*outbound = 0;
 
 	/* Create buffer to become new tvb. */
 	extracted_buffer = (guint8*)ep_alloc0(extracted_length);
@@ -1043,7 +1044,7 @@ extract_status_symbols(tvbuff_t *tvb, packet_info *pinfo, proto_tree *tree, int 
 				 * This may not be a very reliable means of determining the direction, but
 				 * I haven't found anything better.
 				 */
-				*outbound &= 1;
+				*outbound |= 1;
 			}
 		} else {
 			/* Extract frame bits from between status symbols. */
