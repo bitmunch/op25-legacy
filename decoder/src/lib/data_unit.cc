@@ -20,6 +20,7 @@
  * 02110-1301, USA.
  */
 
+#include <bch.h>
 #include <data_unit.h>
 #include <header.h>
 #include <ldu1.h>
@@ -27,32 +28,37 @@
 #include <packet.h>
 #include <terminator.h>
 
+/*
+ * Construct a data unit given the initial frame_sync and network ID.
+ */
 data_unit_sptr
 data_unit::make_data_unit(uint64_t frame_sync, uint64_t network_ID)
 {
    data_unit_sptr d;
-   uint8_t type = (network_ID >> 48) & 0xf;
-   switch(type) {
-   case 0x0:
-      d = data_unit_sptr(new header(frame_sync, network_ID));
-      break;
-   case 0x3:
-      d = data_unit_sptr(new terminator(frame_sync, network_ID, false));
-      break;
-   case 0x5:
-      d = data_unit_sptr(new ldu1(frame_sync, network_ID));
-      break;
-   case 0xa:
-      d = data_unit_sptr(new ldu2(frame_sync, network_ID));
-      break;
-   case 0x9: // VSELP "voice packet"
-   case 0xc:
-      d = data_unit_sptr(new packet(frame_sync, network_ID));
-      break;
-   case 0xf:
-      d = data_unit_sptr(new terminator(frame_sync, network_ID, true));
-      break;
-   };
+   if(bch_64_decode(network_ID)) {
+      uint8_t type = (network_ID >> 48) & 0xf;
+      switch(type) {
+      case 0x0:
+         d = data_unit_sptr(new header(frame_sync, network_ID));
+         break;
+      case 0x3:
+         d = data_unit_sptr(new terminator(frame_sync, network_ID, false));
+         break;
+      case 0x5:
+         d = data_unit_sptr(new ldu1(frame_sync, network_ID));
+         break;
+      case 0xa:
+         d = data_unit_sptr(new ldu2(frame_sync, network_ID));
+         break;
+      case 0x9: // VSELP "voice packet"
+      case 0xc:
+         d = data_unit_sptr(new packet(frame_sync, network_ID));
+         break;
+      case 0xf:
+         d = data_unit_sptr(new terminator(frame_sync, network_ID, true));
+         break;
+      };
+   }
    return d;
 }
 

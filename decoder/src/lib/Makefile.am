@@ -60,6 +60,7 @@ ourlib_LTLIBRARIES = _op25.la
 # These are the source files that go into the shared library
 _op25_la_SOURCES = \
 	abstract_data_unit.cc \
+	bch.cc \
 	data_unit.cc \
 	header.cc \
 	ldu1.cc \

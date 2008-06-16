@@ -46,7 +46,7 @@ op25_decoder_f::~op25_decoder_f()
 }
 
 /*
- * Take an incoming float value, convert to a symbol and process.
+ * Take an incoming float value, convert to a dibit symbol and process.
  */
 int  
 op25_decoder_f::work(int nof_output_items, gr_vector_const_void_star& input_items, gr_vector_void_star& output_items)
@@ -125,7 +125,6 @@ op25_decoder_f::identifies(dibit d)
    d_network_ID |= d;
    const size_t LAST_NETWORK_ID_SYMBOL = 56;
    if(LAST_NETWORK_ID_SYMBOL == d_symbol) {
-      // ToDo: BCH (64,16,23) decoding
       identified = true;
    }
    return identified;
@@ -181,7 +180,7 @@ op25_decoder_f::sync_receive_symbol(dibit d)
       if(d_data_unit->complete(d)) {
          gr_message_sptr msg(d_data_unit->decode());
          if(msg) {
-            // ToDo: prefix frame with status symbols + other header stuff
+            // ToDo: prefix frame with status symbols
             d_msgq->insert_tail(msg);
          }
          ++d_data_units;
