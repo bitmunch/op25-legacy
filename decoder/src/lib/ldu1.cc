@@ -33,5 +33,5 @@ ldu1::~ldu1()
 size_t
 ldu1::nof_symbols_reqd() const
 {
-   return 840;
+   return 864;
 }

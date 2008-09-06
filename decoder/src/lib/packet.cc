@@ -34,8 +34,8 @@ size_t
 packet::nof_symbols_reqd() const
 {
    size_t reqd = 0;
-   const size_t LAST_HEADER_BLOCK_SYMBOL = 154;
-   if(nof_symbols() == LAST_HEADER_BLOCK_SYMBOL) {
+   const size_t LAST_HEADER_BLOCK_SYMBOL = 156;
+   if(LAST_HEADER_BLOCK_SYMBOL < nof_symbols()) {
       // ToDo: 1/2 rate trellis decoding of header
       reqd = LAST_HEADER_BLOCK_SYMBOL; // re-sync
       // const size_t SYMBOLS_PER_BLOCK = 98;

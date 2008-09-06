@@ -26,13 +26,15 @@
 #include <stdint.h>
 
 /*
- * BCH encode val and return the result.
+ * APCO P25 BCH(64,16,23) encoder. BCH encodes val and returns the
+ * codeword.
  */
 extern uint64_t bch_64_encode(uint16_t val);
 
 /*
- * BCH decode codeword cw and correct errors. If successful, the cw is
- * error-corrected and  true is returned; otherwise returns false.
+ * APCO P25 BCH(64,16,23) decoder. BCH decodes codeword cw and
+ * corrects errors. If decoding is successful, cw is error-corrected
+ * and true is returned; otherwise returns false.
  */
 extern bool bch_64_decode(uint64_t& cw);
 

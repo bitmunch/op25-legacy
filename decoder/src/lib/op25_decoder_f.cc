@@ -24,7 +24,6 @@
 #include "config.h"
 #endif
 
-#include <cstdio>
 #include <op25_decoder_f.h>
 #include <gr_io_signature.h>
 
@@ -99,8 +98,7 @@ op25_decoder_f::correlates(dibit d)
    const size_t NOF_FS_BITS = 48;
    const uint64_t FS = 0x5575f5ff77ffL;
    const uint64_t FS_MASK = 0xffffffffffffL;
-   d_frame_sync <<= 2;
-   d_frame_sync |= d;
+   d_frame_sync = (d_frame_sync << 2) | d;
    d_frame_sync &= FS_MASK;
    size_t diff = FS ^ d_frame_sync;
    for(size_t i = 0; i < NOF_FS_BITS; ++i) {
@@ -145,12 +143,7 @@ op25_decoder_f::receive_symbol(dibit d)
       }
       break;
    case SYNCHRONIZED:
-      const size_t SS_DISTANCE = 36;
-      if(d_symbol % SS_DISTANCE) {
-         sync_receive_symbol(d);
-      } else {
-         // d_status_symbols[d_symbol % SS_DISTANCE] = d;
-      }
+      sync_receive_symbol(d);
       ++d_symbol;
       break;
    }
@@ -167,8 +160,6 @@ op25_decoder_f::sync_receive_symbol(dibit d)
       if(identifies(d)) {
          d_data_unit = data_unit::make_data_unit(d_frame_sync, d_network_ID);
          if(d_data_unit) {
-            const char *type_name(typeid(*d_data_unit).name());
-            printf("frame_sync: %lx, network_ID: %lx, data_unit: %s\n", d_frame_sync, d_network_ID, type_name);
             d_substate = READING;
          } else {
             ++d_unrecognized;
@@ -180,7 +171,6 @@ op25_decoder_f::sync_receive_symbol(dibit d)
       if(d_data_unit->complete(d)) {
          gr_message_sptr msg(d_data_unit->decode());
          if(msg) {
-            // ToDo: prefix frame with status symbols
             d_msgq->insert_tail(msg);
          }
          ++d_data_units;

@@ -34,5 +34,5 @@ terminator::~terminator()
 size_t
 terminator::nof_symbols_reqd() const
 {
-   return d_has_link_control ? 210 : 70;
+   return d_has_link_control ? 216 : 72;
 }

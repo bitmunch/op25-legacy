@@ -37,7 +37,7 @@ bool
 abstract_data_unit::complete(dibit d)
 {
    d_symbols.push_back(d);
-   return nof_symbols_reqd() == (d_symbols.size() + 56);
+   return nof_symbols_reqd() <= d_symbols.size();
 }
 
 /*
@@ -69,10 +69,18 @@ abstract_data_unit::abstract_data_unit(uint64_t frame_sync, uint64_t network_ID,
    d_network_ID(network_ID),
    d_symbols(size_hint)
 {
+   for(size_t i = 0; i < 48; i += 2) {
+      dibit d = (frame_sync >> (46 - i)) & 0x3;
+      d_symbols.push_back(d);
+   }
+   for(size_t i = 0; i < 64; i += 2) {
+      dibit d = (network_ID >> (62 - i)) & 0x3;
+      d_symbols.push_back(d);     
+   }
 }
 
 /*
- * Return the frame sync for this data unit.
+ * Return the frame sync value for this data unit.
  */
 uint64_t
 abstract_data_unit::frame_sync() const

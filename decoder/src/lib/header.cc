@@ -33,5 +33,5 @@ header::~header()
 size_t
 header::nof_symbols_reqd() const
 {
-   return 335;
+   return 396;
 }
