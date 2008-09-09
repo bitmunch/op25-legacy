@@ -20,31 +20,32 @@
  * 02110-1301, USA.
  */
 
-#ifndef INCLUDED_OP25_DECODER_F_H
-#define INCLUDED_OP25_DECODER_F_H
+#ifndef INCLUDED_OP25_DECODER_FF_H
+#define INCLUDED_OP25_DECODER_FF_H
 
 #include <data_unit.h>
-#include <gr_sync_block.h>
+#include <gr_block.h>
 #include <gr_msg_queue.h>
 
-typedef boost::shared_ptr<class op25_decoder_f> op25_decoder_f_sptr;
+typedef boost::shared_ptr<class op25_decoder_ff> op25_decoder_ff_sptr;
 
-op25_decoder_f_sptr op25_make_decoder_f(gr_msg_queue_sptr msgq);
+op25_decoder_ff_sptr op25_make_decoder_ff(gr_msg_queue_sptr msgq);
 
 /*
- * op25_decoder_f is a GNU Radio block for decoding APCO P25
+ * op25_decoder_ff is a GNU Radio block for decoding APCO P25
  * signals. This file expects its input to be a stream of symbols from
  * the demodulator and is a signal sink that produces no outputs.
  * Processed messages are sent to the message queue.
  */
-class op25_decoder_f : public gr_sync_block
+class op25_decoder_ff : public gr_block
 {
 public:
-   virtual ~op25_decoder_f();
-   virtual int work(int nof_output_items, gr_vector_const_void_star& input_items, gr_vector_void_star& output_items);
+   virtual ~op25_decoder_ff();
+   virtual void forecast(int nof_output_items, gr_vector_int &nof_input_items_reqd);
+   virtual int general_work(int nof_output_items, gr_vector_int& nof_input_items, gr_vector_const_void_star& input_items, gr_vector_void_star& output_items);
 private:
-   friend op25_decoder_f_sptr op25_make_decoder_f(gr_msg_queue_sptr msgq); // expose class to public ctor
-   op25_decoder_f(gr_msg_queue_sptr msgq);
+   friend op25_decoder_ff_sptr op25_make_decoder_ff(gr_msg_queue_sptr msgq); // expose class to public ctor
+   op25_decoder_ff(gr_msg_queue_sptr msgq);
    bool correlates(dibit d);
    bool identifies(dibit d);
    void receive_symbol(dibit d);
@@ -61,4 +62,4 @@ private:
    uint32_t d_unrecognized;
 };
 
-#endif /* INCLUDED_OP25_DECODER_F_H */
+#endif /* INCLUDED_OP25_DECODER_FF_H */

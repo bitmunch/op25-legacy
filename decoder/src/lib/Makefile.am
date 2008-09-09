@@ -21,7 +21,7 @@
 
 include $(top_srcdir)/Makefile.common
 
-# Install this stuff so that it ends up as the op25.decoder_f
+# Install this stuff so that it ends up as the op25.decoder_ff
 # module. This usually ends up at:
 # ${prefix}/lib/python${python_version}/site-packages/gnuradio
 
@@ -68,7 +68,7 @@ _op25_la_SOURCES = \
 	packet.cc \
 	terminator.cc \
 	op25.cc \
-	op25_decoder_f.cc
+	op25_decoder_ff.cc
 
 # magic flags
 _op25_la_LDFLAGS = $(NO_UNDEFINED) -module -avoid-version
@@ -84,7 +84,7 @@ op25.cc op25.py: $(LOCAL_IFILES) $(ALL_IFILES)
 
 # These headers get installed in ${prefix}/include/gnuradio
 grinclude_HEADERS = \
-	op25_decoder_f.h		
+	op25_decoder_ff.h		
 
 # These swig headers get installed in ${prefix}/include/gnuradio/swig
 swiginclude_HEADERS = \

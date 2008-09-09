@@ -24,31 +24,43 @@
 #include "config.h"
 #endif
 
-#include <op25_decoder_f.h>
+#include <algorithm>
+#include <op25_decoder_ff.h>
 #include <gr_io_signature.h>
 
 /*
- * Create a new instance of op25_decoder_f and wrap it in a
+ * Create a new instance of op25_decoder_ff and wrap it in a
  * shared_ptr. This is effectively the public constructor.
  */
-op25_decoder_f_sptr
-op25_make_decoder_f(gr_msg_queue_sptr msgq)
+op25_decoder_ff_sptr
+op25_make_decoder_ff(gr_msg_queue_sptr msgq)
 {
-   return op25_decoder_f_sptr(new op25_decoder_f(msgq));
+   return op25_decoder_ff_sptr(new op25_decoder_ff(msgq));
 }
 
 /*
  * Destruct an instance of this class.
  */
-op25_decoder_f::~op25_decoder_f()
+op25_decoder_ff::~op25_decoder_ff()
 {
+}
+
+/*
+ * Estimate nof_input_items_reqd for a given nof_output_items.
+ */
+void
+op25_decoder_ff::forecast(int nof_output_items, gr_vector_int &nof_input_items_reqd)
+{
+   const int nof_symbols_per_LDU = 864;
+   const size_t nof_inputs = nof_input_items_reqd.size();
+   std::fill(&nof_input_items_reqd[0], &nof_input_items_reqd[nof_inputs], nof_symbols_per_LDU);
 }
 
 /*
  * Take an incoming float value, convert to a dibit symbol and process.
  */
 int  
-op25_decoder_f::work(int nof_output_items, gr_vector_const_void_star& input_items, gr_vector_void_star& output_items)
+op25_decoder_ff::general_work(int nof_output_items, gr_vector_int& nof_input_items, gr_vector_const_void_star& input_items, gr_vector_void_star& output_items)
 {
    const float *in = reinterpret_cast<const float*>(input_items[0]);
    for(int i = 0; i < nof_output_items; ++i) {
@@ -64,14 +76,18 @@ op25_decoder_f::work(int nof_output_items, gr_vector_const_void_star& input_item
       }
       receive_symbol(d);
    }
-   return nof_output_items;
+   // ToDo: get IMBE decoder to provide audio
+   float *out = reinterpret_cast<float*>(output_items[0]);
+   std::fill(&out[0], &out[nof_output_items], 0);
+   consume_each(nof_output_items);
+   return 0; // ToDo: return IMBE-decoded audio
 }
 
 /*
  * The private constructor.
  */
-op25_decoder_f::op25_decoder_f(gr_msg_queue_sptr msgq) :
-   gr_sync_block("decoder_f", gr_make_io_signature(1, 1, sizeof(float)), gr_make_io_signature(0, 0, 0)),
+op25_decoder_ff::op25_decoder_ff(gr_msg_queue_sptr msgq) :
+   gr_block("decoder_ff", gr_make_io_signature(1, 1, sizeof(float)), gr_make_io_signature(1, 1, sizeof(float))),
    d_msgq(msgq),
    d_state(SYNCHRONIZING),
    d_substate(IDENTIFYING),
@@ -91,7 +107,7 @@ op25_decoder_f::op25_decoder_f(gr_msg_queue_sptr msgq) :
  * sync value.
  */
 bool
-op25_decoder_f::correlates(dibit d)
+op25_decoder_ff::correlates(dibit d)
 {
    size_t errs = 0;
    const size_t ERR_THRESHOLD = 4;
@@ -116,7 +132,7 @@ op25_decoder_f::correlates(dibit d)
  * false. When found d_network_ID contains the network ID value.
  */
 bool
-op25_decoder_f::identifies(dibit d)
+op25_decoder_ff::identifies(dibit d)
 {
    bool identified = false;
    d_network_ID <<= 2;
@@ -132,7 +148,7 @@ op25_decoder_f::identifies(dibit d)
  * Process a received symbol.
  */
 void
-op25_decoder_f::receive_symbol(dibit d)
+op25_decoder_ff::receive_symbol(dibit d)
 {
    switch(d_state) {
    case SYNCHRONIZING:
@@ -153,7 +169,7 @@ op25_decoder_f::receive_symbol(dibit d)
  * Process a received symbol when synchronized.
  */
 void
-op25_decoder_f::sync_receive_symbol(dibit d)
+op25_decoder_ff::sync_receive_symbol(dibit d)
 {
    switch(d_substate) {
    case IDENTIFYING:
@@ -169,6 +185,9 @@ op25_decoder_f::sync_receive_symbol(dibit d)
       break;
    case READING:    
       if(d_data_unit->complete(d)) {
+
+         // ToDo: ask data_unit to produce audio here
+
          gr_message_sptr msg(d_data_unit->decode());
          if(msg) {
             d_msgq->insert_tail(msg);

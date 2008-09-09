@@ -21,7 +21,6 @@
 # 
 
 from gnuradio import gr, gr_unittest
-#from gnuradio import op25
 import op25
 
 # import os
@@ -37,20 +36,15 @@ class qa_op25(gr_unittest.TestCase):
     def tearDown(self):
         self.fg = None
 
-#     def test_op25_decoder_f_ctor(self):
-#         msgq = gr.msg_queue()
-#         self.fg.connect(src, p25)
-#         p25 = op25.decoder_f(msgq)
-#         # assert not null
-
-    def test_correlator(self):
+    def test_constructor(self):
         framing_sequence = (3, 3, 3, 3, 3, -3, 3, 3, -3, -3, 3, 3, -3, -3, -3, -3, 3, -3, 3, -3, -3, -3, -3, -3)
         src = gr.vector_source_f(framing_sequence, False)
         msgq = gr.msg_queue()
-        p25 = op25.decoder_f(msgq)
+        p25 = op25.decoder_ff(msgq)
         self.fg.connect(src, p25)
+        bit_bucket = gr.null_sink(gr.sizeof_float)
+        self.fg.connect(p25, bit_bucket)
         self.fg.run()
-        # check the msgq output (needs separate thread and terminate the flow graph)
         
 if __name__ == '__main__':
     gr_unittest.main ()
