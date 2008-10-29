@@ -41,6 +41,7 @@ class op25_decoder_ff : public gr_block
 {
 public:
    virtual ~op25_decoder_ff();
+   virtual uint32_t audio_rate() const;
    virtual void forecast(int nof_output_items, gr_vector_int &nof_input_items_reqd);
    virtual int general_work(int nof_output_items, gr_vector_int& nof_input_items, gr_vector_const_void_star& input_items, gr_vector_void_star& output_items);
 private:

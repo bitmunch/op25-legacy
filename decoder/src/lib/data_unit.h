@@ -29,7 +29,6 @@
 #include <stdint.h>
 
 typedef uint8_t dibit;
-
 typedef boost::shared_ptr<class data_unit> data_unit_sptr;
 
 /*
@@ -42,7 +41,9 @@ public:
    static data_unit_sptr make_data_unit(uint64_t frame_sync, uint64_t network_ID);
    virtual ~data_unit();
    virtual bool complete(dibit d) = 0;
-   virtual gr_message_sptr decode() = 0;
+   // virtual gr_message_sptr decode() = 0;
+   // virtual const decode(float_queue& samples) = 0;
+   // virtual size_t audio(float *samples, size_t max_samples_sz) = 0;
 protected:
    data_unit();
 };

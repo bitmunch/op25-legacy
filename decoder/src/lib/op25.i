@@ -30,6 +30,8 @@ op25_decoder_ff_sptr op25_make_decoder_ff(gr_msg_queue_sptr msgq);
  */
 class op25_decoder_ff : public gr_block
 {
+public:
+   uint32_t audio_rate() const;
 private:
    op25_decoder_ff(gr_msg_queue_sptr msgq);
 };

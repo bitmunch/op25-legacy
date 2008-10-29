@@ -46,6 +46,16 @@ op25_decoder_ff::~op25_decoder_ff()
 }
 
 /*
+ * Return the rate this block produces output at.
+ */
+uint32_t
+op25_decoder_ff::audio_rate() const
+{
+   const uint32_t samples_per_sec = 8000;
+   return samples_per_sec;
+}
+
+/*
  * Estimate nof_input_items_reqd for a given nof_output_items.
  */
 void
@@ -63,6 +73,8 @@ int
 op25_decoder_ff::general_work(int nof_output_items, gr_vector_int& nof_input_items, gr_vector_const_void_star& input_items, gr_vector_void_star& output_items)
 {
    const float *in = reinterpret_cast<const float*>(input_items[0]);
+   float *out = reinterpret_cast<float*>(output_items[0]);
+//   std::fill(&out[0], &out[nof_output_items], 0.0);
    for(int i = 0; i < nof_output_items; ++i) {
       dibit d;
       if(in[i] < -2.0) {
@@ -76,11 +88,8 @@ op25_decoder_ff::general_work(int nof_output_items, gr_vector_int& nof_input_ite
       }
       receive_symbol(d);
    }
-   // ToDo: get IMBE decoder to provide audio
-   float *out = reinterpret_cast<float*>(output_items[0]);
-   std::fill(&out[0], &out[nof_output_items], 0);
-   consume_each(nof_output_items);
-   return 0; // ToDo: return IMBE-decoded audio
+   consume_each(nof_output_items); // how much did we eat?
+   return 0; // how much did we produce
 }
 
 /*
@@ -112,8 +121,8 @@ op25_decoder_ff::correlates(dibit d)
    size_t errs = 0;
    const size_t ERR_THRESHOLD = 4;
    const size_t NOF_FS_BITS = 48;
-   const uint64_t FS = 0x5575f5ff77ffL;
-   const uint64_t FS_MASK = 0xffffffffffffL;
+   const uint64_t FS = 0x5575f5ff77ffLL;
+   const uint64_t FS_MASK = 0xffffffffffffLL;
    d_frame_sync = (d_frame_sync << 2) | d;
    d_frame_sync &= FS_MASK;
    size_t diff = FS ^ d_frame_sync;
@@ -185,13 +194,13 @@ op25_decoder_ff::sync_receive_symbol(dibit d)
       break;
    case READING:    
       if(d_data_unit->complete(d)) {
-
-         // ToDo: ask data_unit to produce audio here
-
+#if 0
+         // ToDo: ask data_unit to produce audio and message body here
          gr_message_sptr msg(d_data_unit->decode());
          if(msg) {
             d_msgq->insert_tail(msg);
          }
+#endif
          ++d_data_units;
          data_unit_sptr null;
          d_data_unit = null;
