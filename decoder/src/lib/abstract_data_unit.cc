@@ -22,11 +22,27 @@
 
 #include <abstract_data_unit.h>
 
+#include <algorithm>
+
+using namespace std;
+
 /*
  * Destruct an instance of an abstract_data_unit.
  */
 abstract_data_unit::~abstract_data_unit()
 {
+}
+
+/*
+ * Returns the size of this data unit in octets.  For variable-length
+ * data units its acceptable to return 0 until the actual length is
+ * known.
+ */
+size_t
+abstract_data_unit::size() const
+{
+   const size_t symbols_per_octet = 4;
+   return nof_symbols_reqd() / symbols_per_octet;
 }
 
 /*
@@ -41,16 +57,6 @@ abstract_data_unit::complete(dibit d)
 }
 
 /*
- * Decode this data unit.
- */
-gr_message_sptr
-abstract_data_unit::decode()
-{
-   gr_message_sptr null;
-   return null;
-}
-
-/*
  * Return the number of symbols in this data_unit. For variable-length
  * data units its acceptable to return 0 until the actual length is
  * known.
@@ -59,6 +65,17 @@ size_t
 abstract_data_unit::nof_symbols_reqd() const
 {
    return 0;
+}
+
+/*
+ * Decode this data unit.
+ */
+size_t
+abstract_data_unit::decode(size_t &msg_sz, uint8_t *msg)
+{
+   fill(&msg[0], &msg[msg_sz], 0x0);
+   // ToDo: decode the message
+   return msg_sz;
 }
 
 /*

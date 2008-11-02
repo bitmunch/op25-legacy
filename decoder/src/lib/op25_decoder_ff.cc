@@ -27,6 +27,7 @@
 #include <algorithm>
 #include <op25_decoder_ff.h>
 #include <gr_io_signature.h>
+#include <gr_message.h>
 
 /*
  * Create a new instance of op25_decoder_ff and wrap it in a
@@ -73,7 +74,7 @@ int
 op25_decoder_ff::general_work(int nof_output_items, gr_vector_int& nof_input_items, gr_vector_const_void_star& input_items, gr_vector_void_star& output_items)
 {
    const float *in = reinterpret_cast<const float*>(input_items[0]);
-   float *out = reinterpret_cast<float*>(output_items[0]);
+//   float *out = reinterpret_cast<float*>(output_items[0]);
 //   std::fill(&out[0], &out[nof_output_items], 0.0);
    for(int i = 0; i < nof_output_items; ++i) {
       dibit d;
@@ -88,7 +89,7 @@ op25_decoder_ff::general_work(int nof_output_items, gr_vector_int& nof_input_ite
       }
       receive_symbol(d);
    }
-   consume_each(nof_output_items); // how much did we eat?
+   consume_each(nof_output_items); // how much did we consume?
    return 0; // how much did we produce
 }
 
@@ -194,14 +195,12 @@ op25_decoder_ff::sync_receive_symbol(dibit d)
       break;
    case READING:    
       if(d_data_unit->complete(d)) {
-#if 0
-         // ToDo: ask data_unit to produce audio and message body here
-         gr_message_sptr msg(d_data_unit->decode());
-         if(msg) {
-            d_msgq->insert_tail(msg);
+         size_t msg_sz = d_data_unit->size();
+         gr_message_sptr msg = gr_make_message(/*type*/0, /*arg1*/++d_data_units, /*arg2*/0, msg_sz);
+         uint8_t *msg_data = static_cast<uint8_t*>(msg->msg());
+         if(d_data_unit->decode(msg_sz, msg_data)) {
+            d_msgq->handle(msg);
          }
-#endif
-         ++d_data_units;
          data_unit_sptr null;
          d_data_unit = null;
          d_state = SYNCHRONIZING;

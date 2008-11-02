@@ -35,9 +35,10 @@ class abstract_data_unit : public data_unit
 {
 public:
    virtual ~abstract_data_unit();
+   virtual size_t size() const;
    virtual bool complete(dibit d);
-   virtual gr_message_sptr decode();
    virtual size_t nof_symbols_reqd() const = 0;
+   virtual size_t decode(size_t &msg_sz, uint8_t *msg);
 protected:
    abstract_data_unit(uint64_t frame_sync, uint64_t network_ID, size_t size_hint = 0);
    uint64_t frame_sync() const;

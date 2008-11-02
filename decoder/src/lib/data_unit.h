@@ -25,7 +25,6 @@
 
 #include <boost/shared_ptr.hpp>
 #include <boost/noncopyable.hpp>
-#include <gr_message.h>
 #include <stdint.h>
 
 typedef uint8_t dibit;
@@ -40,10 +39,9 @@ class data_unit : public boost::noncopyable
 public:
    static data_unit_sptr make_data_unit(uint64_t frame_sync, uint64_t network_ID);
    virtual ~data_unit();
+   virtual size_t size() const = 0;
    virtual bool complete(dibit d) = 0;
-   // virtual gr_message_sptr decode() = 0;
-   // virtual const decode(float_queue& samples) = 0;
-   // virtual size_t audio(float *samples, size_t max_samples_sz) = 0;
+   virtual size_t decode(size_t &msg_sz, uint8_t *msg) = 0;
 protected:
    data_unit();
 };
