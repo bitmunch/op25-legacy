@@ -62,9 +62,14 @@ op25_decoder_ff::audio_rate() const
 void
 op25_decoder_ff::forecast(int nof_output_items, gr_vector_int &nof_input_items_reqd)
 {
+#if 0
    const int nof_symbols_per_LDU = 864;
    const size_t nof_inputs = nof_input_items_reqd.size();
    std::fill(&nof_input_items_reqd[0], &nof_input_items_reqd[nof_inputs], nof_symbols_per_LDU);
+#else
+   const size_t nof_inputs = nof_input_items_reqd.size();
+   std::fill(&nof_input_items_reqd[0], &nof_input_items_reqd[nof_inputs], nof_output_items);
+#endif
 }
 
 /*
@@ -74,8 +79,6 @@ int
 op25_decoder_ff::general_work(int nof_output_items, gr_vector_int& nof_input_items, gr_vector_const_void_star& input_items, gr_vector_void_star& output_items)
 {
    const float *in = reinterpret_cast<const float*>(input_items[0]);
-//   float *out = reinterpret_cast<float*>(output_items[0]);
-//   std::fill(&out[0], &out[nof_output_items], 0.0);
    for(int i = 0; i < nof_output_items; ++i) {
       dibit d;
       if(in[i] < -2.0) {
@@ -89,8 +92,12 @@ op25_decoder_ff::general_work(int nof_output_items, gr_vector_int& nof_input_ite
       }
       receive_symbol(d);
    }
-   consume_each(nof_output_items); // how much did we consume?
-   return 0; // how much did we produce
+   consume_each(nof_input_items[0]);
+
+   // for now audio silence is output
+   float *out = reinterpret_cast<float*>(output_items[0]);
+   std::fill(&out[0], &out[nof_output_items], 0.0);
+   return nof_output_items;
 }
 
 /*
@@ -198,7 +205,7 @@ op25_decoder_ff::sync_receive_symbol(dibit d)
          size_t msg_sz = d_data_unit->size();
          gr_message_sptr msg = gr_make_message(/*type*/0, /*arg1*/++d_data_units, /*arg2*/0, msg_sz);
          uint8_t *msg_data = static_cast<uint8_t*>(msg->msg());
-         if(d_data_unit->decode(msg_sz, msg_data)) {
+         if(msg_sz = d_data_unit->decode(msg_sz, msg_data)) {
             d_msgq->handle(msg);
          }
          data_unit_sptr null;

@@ -23,6 +23,7 @@
 #include <abstract_data_unit.h>
 
 #include <algorithm>
+#include <stdexcept>
 
 using namespace std;
 
@@ -52,6 +53,7 @@ abstract_data_unit::size() const
 bool
 abstract_data_unit::complete(dibit d)
 {
+   // ToDo: use map to push bits into a struct
    d_symbols.push_back(d);
    return nof_symbols_reqd() <= d_symbols.size();
 }
@@ -67,15 +69,26 @@ abstract_data_unit::nof_symbols_reqd() const
    return 0;
 }
 
-/*
- * Decode this data unit.
+/**
+ * Decode this data unit. Perform error correction on the received
+ * frame and write the corrected frame contents to msg.
+ * \param msg_sz The size of the message buffer.
+ * \param msg A pointer to where the data unit content will be written.
+ * \return The number of octets written to msg.
  */
 size_t
-abstract_data_unit::decode(size_t &msg_sz, uint8_t *msg)
+abstract_data_unit::decode(size_t msg_sz, uint8_t *msg)
 {
-   fill(&msg[0], &msg[msg_sz], 0x0);
-   // ToDo: decode the message
-   return msg_sz;
+      fill(&msg[0], &msg[msg_sz], 0x0);
+
+#if 0
+   if(msg_sz) {
+      // ToDo: decode the message
+   } else {
+      throw length_error();
+   }
+#endif
+   return 0;
 }
 
 /*

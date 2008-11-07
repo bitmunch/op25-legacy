@@ -26,16 +26,19 @@
 #include <data_unit.h>
 #include <gr_block.h>
 #include <gr_msg_queue.h>
+#if 0
+#include <imbe_decoder.h>
+#endif
 
 typedef boost::shared_ptr<class op25_decoder_ff> op25_decoder_ff_sptr;
 
 op25_decoder_ff_sptr op25_make_decoder_ff(gr_msg_queue_sptr msgq);
 
-/*
+/**
  * op25_decoder_ff is a GNU Radio block for decoding APCO P25
- * signals. This file expects its input to be a stream of symbols from
- * the demodulator and is a signal sink that produces no outputs.
- * Processed messages are sent to the message queue.
+ * signals. This class expects its input to be a stream of dibit
+ * symbols from the demodulator and produces an audio stream. Frame
+ * contents are sent to the message queue.
  */
 class op25_decoder_ff : public gr_block
 {
@@ -61,6 +64,9 @@ private:
    data_unit_sptr d_data_unit;
    uint32_t d_data_units;
    uint32_t d_unrecognized;
+#if 0
+   float_dequeue d_audio_output;
+#endif
 };
 
 #endif /* INCLUDED_OP25_DECODER_FF_H */
