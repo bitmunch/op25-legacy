@@ -32,6 +32,11 @@ from math import pi
 from optparse import OptionParser
 from usrpm import usrp_dbid
 
+class DangerConstruction(wx.Panel):
+    def __init__(self, parent):
+        wx.Panel.__init__(self, parent)
+        t = wx.StaticText(self, -1, "This is where the messages go!", (60,60))
+
 class p25_rx_block (stdgui2.std_top_block):
 
     def __init__(self, frame, panel, vbox, argv):
@@ -41,6 +46,8 @@ class p25_rx_block (stdgui2.std_top_block):
         self.frame.CreateStatusBar()
         self.frame.SetStatusText("")
         self.panel = panel
+        self.notebook = wx.Notebook(self.panel)
+        vbox.Add(self.notebook, 1, wx.EXPAND)       
 
         parser = OptionParser(option_class=eng_option)
         # either these
@@ -48,7 +55,7 @@ class p25_rx_block (stdgui2.std_top_block):
         parser.add_option("-d", "--decim", type="int", default=256, help="set decimation")
         parser.add_option("-l", "--loop", action="store_true", default=False, help="loop input file")
         # or these
-        parser.add_option("-f", "--frequency", type="eng_float", default=0.0, help="set channel frequency", metavar="Hz")
+        parser.add_option("-f", "--frequency", type="eng_float", default=0.0, help="set center frequency", metavar="Hz")
         parser.add_option("-b", "--bandwidth", type="eng_float", default=12.5e3, help="set bandwidth")
         parser.add_option("-s", "--channel-decim", type="int", default=1, help="channel decimation")
         # not used at present....
@@ -81,10 +88,25 @@ class p25_rx_block (stdgui2.std_top_block):
             print "no input specified!"
             exit(1)
 
-        self.spectrum = fftsink2.fft_sink_c(self.panel, fft_size=512, sample_rate=source_rate, title="RF Spectrum", average=False, peak_hold=False)
+#         Embedding the panel inside a wx.Panel traps resizing and lets us 
+#         decide on the resizing policy for the embedded control.
+
+#         self.spectrum_panel = wx.Panel(self.notebook)
+#         self.spectrum = fftsink2.fft_sink_c(self.spectrum_panel, fft_size=512, sample_rate=source_rate, average=True, peak_hold=True)
+#         self.spectrum_plotter = self.spectrum.win.plot
+#         self.notebook.AddPage(self.spectrum_panel, "RF Spectrum")
+#         self.spectrum_plotter.Bind(wx.EVT_LEFT_DOWN, self.OnSpectrumLeftClick)
+#         self.connect(self.source, self.spectrum)
+#         self.SetChannelOffset(0.0)
+
+        # Embedding the control directly means it gets resized
+        # whenever the notebook resizes.
+        self.spectrum = fftsink2.fft_sink_c(self.notebook, fft_size=512, sample_rate=source_rate, average=True, peak_hold=True)
+        self.spectrum_plotter = self.spectrum.win.plot
+        self.notebook.AddPage(self.spectrum.win, "RF Spectrum")
+        self.spectrum_plotter.Bind(wx.EVT_LEFT_DOWN, self.OnSpectrumLeftClick)
         self.connect(self.source, self.spectrum)
-        vbox.Add(self.spectrum.win, 4, wx.EXPAND)
-        self.spectrum.win.plot.Bind(wx.EVT_LEFT_DOWN, self.spectrum_on_left_click)
+        self.SetChannelOffset(0.0)
 
         self.offset = 0.0
 #         channel_decim = 1
@@ -115,21 +137,27 @@ class p25_rx_block (stdgui2.std_top_block):
         self.p25_decoder = op25.decoder_ff(self.msgq)
         self.connect(self.demod_fsk4, self.p25_decoder)
 
+        self.traffic = DangerConstruction(self.notebook)
+        self.notebook.AddPage(self.traffic, "Traffic")
+
         self.sink = gr.null_sink(gr.sizeof_float)
         self.connect(self.p25_decoder, self.sink)
 
-    def spectrum_on_left_click(self, event):
-        chanWid = 12.5e3
-        x, y = self.spectrum.win.plot.GetXY(event)
-        # ugly kludge to cope when units shift from KHz to MHz
-        if x < 1.0:
-            x *= 1e6
-        elif x < 100.0:
-            x *= 1e3
-        # ToDo: query the scope for the nearest unit
-        x = (x // chanWid) * chanWid
-        self.channel_filter.set_center_freq(-x)
-        self.frame.SetStatusText(str(x))
+    def OnSpectrumLeftClick(self, event):
+        x,y = self.spectrum_plotter.GetXY(event)
+        xmin, xmax = self.spectrum_plotter.GetXCurrentRange()
+        x = min(x, xmax)
+        x = max(x, xmin)
+        scale_factor = self.spectrum.win._scale_factor
+        chan_width = 12.5e3
+        x /= scale_factor
+        x  = (x // chan_width) * chan_width
+        x *= scale_factor
+        self.SetChannelOffset(x)
+
+    def SetChannelOffset(self, offset_hz):
+#         self.channel_filter.set_center_freq(-offset_hz)       
+        self.frame.SetStatusText("Channel offset: " + str(offset_hz) + self.spectrum.win._units)
 
 if '__main__' == __name__:
     app = stdgui2.stdapp(p25_rx_block, "APCO P25 Receiver")
