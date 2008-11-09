@@ -1,4 +1,5 @@
 /* -*- C++ -*- */
+
 /*
  * Copyright 2008 Steve Glass
  * 
@@ -22,40 +23,37 @@
 
 #include <bch.h>
 #include <data_unit.h>
-#include <header.h>
+#include <hdu.h>
 #include <ldu1.h>
 #include <ldu2.h>
-#include <packet.h>
-#include <terminator.h>
+#include <pdu.h>
+#include <tdu.h>
 
-/*
- * Construct a data unit given the initial frame_sync and network ID.
- */
 data_unit_sptr
-data_unit::make_data_unit(uint64_t frame_sync, uint64_t network_ID)
+data_unit::make_data_unit(uint64_t fs, uint64_t nid)
 {
    data_unit_sptr d;
-   if(bch_64_decode(network_ID)) {
-      uint8_t type = (network_ID >> 48) & 0xf;
-      switch(type) {
+   if(bch_64_decode(nid)) {
+      uint8_t duid = (nid >> 48) & 0xf;
+      switch(duid) {
       case 0x0:
-         d = data_unit_sptr(new header(frame_sync, network_ID));
+         d = data_unit_sptr(new hdu(fs, nid));
          break;
       case 0x3:
-         d = data_unit_sptr(new terminator(frame_sync, network_ID, false));
+         d = data_unit_sptr(new tdu(fs, nid, false));
          break;
       case 0x5:
-         d = data_unit_sptr(new ldu1(frame_sync, network_ID));
+         d = data_unit_sptr(new ldu1(fs, nid));
          break;
       case 0xa:
-         d = data_unit_sptr(new ldu2(frame_sync, network_ID));
+         d = data_unit_sptr(new ldu2(fs, nid));
          break;
-      case 0x9: // VSELP "voice packet"
+      case 0x9: // VSELP "voice pdu"
       case 0xc:
-         d = data_unit_sptr(new packet(frame_sync, network_ID));
+         d = data_unit_sptr(new pdu(fs, nid));
          break;
       case 0xf:
-         d = data_unit_sptr(new terminator(frame_sync, network_ID, true));
+         d = data_unit_sptr(new tdu(fs, nid, true));
          break;
       };
    }

@@ -26,19 +26,10 @@
 #include <stdexcept>
 
 using namespace std;
-
-/*
- * Destruct an instance of an abstract_data_unit.
- */
 abstract_data_unit::~abstract_data_unit()
 {
 }
 
-/*
- * Returns the size of this data unit in octets.  For variable-length
- * data units its acceptable to return 0 until the actual length is
- * known.
- */
 size_t
 abstract_data_unit::size() const
 {
@@ -46,57 +37,21 @@ abstract_data_unit::size() const
    return nof_symbols_reqd() / symbols_per_octet;
 }
 
-/*
- * Does the dibit complete the data unit?  If the frame is complete
- * this returns true otherwise returns false.
- */
 bool
 abstract_data_unit::complete(dibit d)
 {
-   // ToDo: use map to push bits into a struct
    d_symbols.push_back(d);
    return nof_symbols_reqd() <= d_symbols.size();
 }
 
-/*
- * Return the number of symbols in this data_unit. For variable-length
- * data units its acceptable to return 0 until the actual length is
- * known.
- */
-size_t
-abstract_data_unit::nof_symbols_reqd() const
-{
-   return 0;
-}
-
-/**
- * Decode this data unit. Perform error correction on the received
- * frame and write the corrected frame contents to msg.
- * \param msg_sz The size of the message buffer.
- * \param msg A pointer to where the data unit content will be written.
- * \return The number of octets written to msg.
- */
 size_t
 abstract_data_unit::decode(size_t msg_sz, uint8_t *msg)
 {
-      fill(&msg[0], &msg[msg_sz], 0x0);
-
-#if 0
-   if(msg_sz) {
-      // ToDo: decode the message
-   } else {
-      throw length_error();
-   }
-#endif
-   return 0;
+   correct_errors(d_symbols);
+   return decode_symbols(msg_sz, msg, d_symbols);
 }
 
-/*
- * Construct an abstract_data_unit instance.
- */
 abstract_data_unit::abstract_data_unit(uint64_t frame_sync, uint64_t network_ID, size_t size_hint) :
-   d_frame_sync(frame_sync),
-   d_network_ID(network_ID),
    d_symbols(size_hint)
 {
    for(size_t i = 0; i < 48; i += 2) {
@@ -107,41 +62,4 @@ abstract_data_unit::abstract_data_unit(uint64_t frame_sync, uint64_t network_ID,
       dibit d = (network_ID >> (62 - i)) & 0x3;
       d_symbols.push_back(d);     
    }
-}
-
-/*
- * Return the frame sync value for this data unit.
- */
-uint64_t
-abstract_data_unit::frame_sync() const
-{
-   return d_frame_sync;
-}
-
-/*
- * Return the network ID for this data unit.
- */
-uint64_t
-abstract_data_unit::network_ID() const
-{
-   return d_network_ID;
-}
-
-/*
- * Return the index of the last symbol received by this data
- * unit. Note that this is the index after status symbol suppression.
- */
-uint64_t
-abstract_data_unit::nof_symbols() const
-{
-   return d_symbols.size();
-}
-
-/*
- * Return a pointer to the array of dibit symbols for this data unit.
- */
-const dibit*
-abstract_data_unit::symbols() const
-{
-   return d_symbols.data();
 }

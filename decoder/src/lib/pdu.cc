@@ -1,4 +1,5 @@
 /* -*- C++ -*- */
+
 /*
  * Copyright 2008 Steve Glass
  * 
@@ -19,19 +20,44 @@
  * Software Foundation, Inc., 51 Franklin Street, Boston, MA
  * 02110-1301, USA.
  */
-#include <header.h>
+#include <pdu.h>
 
-header::header(uint64_t frame_sync, uint64_t network_ID) :
+pdu::pdu(uint64_t frame_sync, uint64_t network_ID) :
    abstract_data_unit(frame_sync, network_ID)
 {
 }
 
-header::~header()
+pdu::~pdu()
 {
 }
 
 size_t
-header::nof_symbols_reqd() const
+pdu::nof_symbols_reqd() const
 {
-   return 396;
+   size_t reqd = 0;
+#if 1
+   const size_t LAST_HEADER_BLOCK_SYMBOL = 156;
+   reqd = LAST_HEADER_BLOCK_SYMBOL;
+#else
+   const size_t LAST_HEADER_BLOCK_SYMBOL = 156;
+   // ToDo pass nof_symbols_read as input param
+   if(LAST_HEADER_BLOCK_SYMBOL < nof_symbols_read) {
+      // ToDo: 1/2 rate trellis decoding of header
+      reqd = LAST_HEADER_BLOCK_SYMBOL; // force c
+      // const size_t SYMBOLS_PER_BLOCK = 98;
+      // ToDo: reqd = LAST_HEADER_BLOCK_SYMBOL + header.blocks_to_follow * SYMBOLS_PER_BLOCK;
+   }
+#endif
+   return reqd;
+}
+
+void
+pdu::correct_errors(dibit_vector& symbols)
+{
+}
+
+size_t
+pdu::decode_symbols(size_t msg_sz, uint8_t *msg, const_dibit_vector& symbols)
+{
+   return 0;
 }

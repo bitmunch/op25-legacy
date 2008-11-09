@@ -1,4 +1,5 @@
 /* -*- C++ -*- */
+
 /*
  * Copyright 2008 Steve Glass
  * 
@@ -20,29 +21,28 @@
  * 02110-1301, USA.
  */
 
-#ifndef INCLUDED_LDU1_H
-#define INCLUDED_LDU1_H
+#ifndef INCLUDED_PDU_H
+#define INCLUDED_PDU_H
 
 #include <abstract_data_unit.h>
 
 /*
- * P25 Logical Data Unit 1 (an IBME/AMBE voice frame).
+ * P25 packet data unit (PDU).
  */
-class ldu1 : public abstract_data_unit
+class pdu : public abstract_data_unit
 {
 public:
 
-   /**
-    * ldu1 constuctor
+	/**
+    * P25 packet data unit (PDU) constructor.
     */
-   ldu1(uint64_t frame_sync, uint64_t network_ID);
+   pdu(uint64_t frame_sync, uint64_t network_ID);
 
-   /**
-    * ldu1 destuctor
+
+	/**
+    * pdu virtual destructor.
     */
-   virtual ~ldu1();
-
-protected:
+   virtual ~pdu();
 
    /**
     * Returns the number of symbols required by this data_unit.  For
@@ -67,7 +67,6 @@ protected:
     * \return The number of octets written to msg.
     */
    virtual size_t decode_symbols(size_t msg_sz, uint8_t *msg, const_dibit_vector& symbols);
-
 };
 
-#endif /* INCLUDED_LDU1_H */
+#endif /* INCLUDED_PDU_H */

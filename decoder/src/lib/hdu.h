@@ -1,4 +1,5 @@
 /* -*- C++ -*- */
+
 /*
  * Copyright 2008 Steve Glass
  * 
@@ -18,29 +19,30 @@
  * along with OP25; see the file COPYING.  If not, write to the Free
  * Software Foundation, Inc., 51 Franklin Street, Boston, MA
  * 02110-1301, USA.
- */
+*/
 
-#ifndef INCLUDED_LDU1_H
-#define INCLUDED_LDU1_H
+#ifndef INCLUDED_HDU_H
+#define INCLUDED_HDU_H
 
 #include <abstract_data_unit.h>
 
-/*
- * P25 Logical Data Unit 1 (an IBME/AMBE voice frame).
+/**
+ * P25 header data unit (HDU).
  */
-class ldu1 : public abstract_data_unit
+class hdu : public abstract_data_unit
 {
+
 public:
 
    /**
-    * ldu1 constuctor
+    * hdu constructor.
     */
-   ldu1(uint64_t frame_sync, uint64_t network_ID);
+   hdu(uint64_t frame_sync, uint64_t network_ID);
 
    /**
-    * ldu1 destuctor
+    * hdu virtual destructor.
     */
-   virtual ~ldu1();
+   virtual ~hdu();
 
 protected:
 
@@ -70,4 +72,4 @@ protected:
 
 };
 
-#endif /* INCLUDED_LDU1_H */
+#endif /* INCLUDED_HDU_H */

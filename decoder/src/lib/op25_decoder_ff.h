@@ -1,4 +1,5 @@
 /* -*- C++ -*- */
+
 /*
  * Copyright 2008 Steve Glass
  * 
@@ -26,9 +27,6 @@
 #include <data_unit.h>
 #include <gr_block.h>
 #include <gr_msg_queue.h>
-#if 0
-#include <imbe_decoder.h>
-#endif
 
 typedef boost::shared_ptr<class op25_decoder_ff> op25_decoder_ff_sptr;
 
@@ -37,36 +35,77 @@ op25_decoder_ff_sptr op25_make_decoder_ff(gr_msg_queue_sptr msgq);
 /**
  * op25_decoder_ff is a GNU Radio block for decoding APCO P25
  * signals. This class expects its input to be a stream of dibit
- * symbols from the demodulator and produces an audio stream. Frame
- * contents are sent to the message queue.
+ * symbols from the demodulator and produces an 8KS/s mono audio
+ * stream. Frame contents are sent to the message queue.
  */
 class op25_decoder_ff : public gr_block
 {
 public:
+
+   /**
+    * op25_decoder_ff (virtual) destructor.
+    */
    virtual ~op25_decoder_ff();
-   virtual uint32_t audio_rate() const;
+
+   /**
+    * Estimate nof_input_items_reqd for a given nof_output_items.
+    */
    virtual void forecast(int nof_output_items, gr_vector_int &nof_input_items_reqd);
+
+   /**
+    *
+    */
    virtual int general_work(int nof_output_items, gr_vector_int& nof_input_items, gr_vector_const_void_star& input_items, gr_vector_void_star& output_items);
 private:
-   friend op25_decoder_ff_sptr op25_make_decoder_ff(gr_msg_queue_sptr msgq); // expose class to public ctor
+
+   /**
+    * Expose class to public ctor. Create a new instance of
+    * op25_decoder_ff and wrap it in a shared_ptr. This is effectively
+    * the public constructor.
+    */
+   friend op25_decoder_ff_sptr op25_make_decoder_ff(gr_msg_queue_sptr msgq);
+
+   /**
+    * op25_decoder_ff protected constructor.
+    * \param msgq A pointer to the msgq.
+    */
    op25_decoder_ff(gr_msg_queue_sptr msgq);
+
+   /**
+    * Tests whether the received dibit completes a frame sync
+    * sequence. Returns true when d completes a frame sync bit string
+    * otherwise returns false. When found d_frame_sync contains the
+    * frame sync value.
+    */
    bool correlates(dibit d);
+
+   /**
+    * Tests whether this dibit identifies a known frame type. Returns
+    * true when d completes a network ID bit string otherwise returns
+    * false. When found d_network_ID contains the network ID value.
+    */
    bool identifies(dibit d);
+
+   /**
+    * Process a received symbol.
+    */
    void receive_symbol(dibit d);
+
+   /**
+    * Process a received symbol when synchronized.
+    */
    void sync_receive_symbol(dibit d);
+
 private:
    gr_msg_queue_sptr d_msgq;
    enum { SYNCHRONIZING, SYNCHRONIZED } d_state;
    enum { IDENTIFYING, READING } d_substate;
+   data_unit_sptr d_data_unit;
+   uint32_t d_data_units;
    uint64_t d_frame_sync;
    uint64_t d_network_ID;
    uint32_t d_symbol;
-   data_unit_sptr d_data_unit;
-   uint32_t d_data_units;
    uint32_t d_unrecognized;
-#if 0
-   float_dequeue d_audio_output;
-#endif
 };
 
 #endif /* INCLUDED_OP25_DECODER_FF_H */

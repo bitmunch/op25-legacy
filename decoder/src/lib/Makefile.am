@@ -62,11 +62,12 @@ _op25_la_SOURCES = \
 	abstract_data_unit.cc \
 	bch.cc \
 	data_unit.cc \
-	header.cc \
+	hdu.cc \
+	imbe_decoder.cc \
 	ldu1.cc \
 	ldu2.cc \
-	packet.cc \
-	terminator.cc \
+	pdu.cc \
+	tdu.cc \
 	op25.cc \
 	op25_decoder_ff.cc
 

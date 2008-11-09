@@ -1,4 +1,5 @@
 /* -*- C++ -*- */
+
 /*
  * Copyright 2008 Steve Glass
  * 
@@ -29,36 +30,16 @@
 #include <gr_io_signature.h>
 #include <gr_message.h>
 
-/*
- * Create a new instance of op25_decoder_ff and wrap it in a
- * shared_ptr. This is effectively the public constructor.
- */
 op25_decoder_ff_sptr
 op25_make_decoder_ff(gr_msg_queue_sptr msgq)
 {
    return op25_decoder_ff_sptr(new op25_decoder_ff(msgq));
 }
 
-/*
- * Destruct an instance of this class.
- */
 op25_decoder_ff::~op25_decoder_ff()
 {
 }
 
-/*
- * Return the rate this block produces output at.
- */
-uint32_t
-op25_decoder_ff::audio_rate() const
-{
-   const uint32_t samples_per_sec = 8000;
-   return samples_per_sec;
-}
-
-/*
- * Estimate nof_input_items_reqd for a given nof_output_items.
- */
 void
 op25_decoder_ff::forecast(int nof_output_items, gr_vector_int &nof_input_items_reqd)
 {
@@ -72,9 +53,6 @@ op25_decoder_ff::forecast(int nof_output_items, gr_vector_int &nof_input_items_r
 #endif
 }
 
-/*
- * Take an incoming float value, convert to a dibit symbol and process.
- */
 int  
 op25_decoder_ff::general_work(int nof_output_items, gr_vector_int& nof_input_items, gr_vector_const_void_star& input_items, gr_vector_void_star& output_items)
 {
@@ -100,29 +78,20 @@ op25_decoder_ff::general_work(int nof_output_items, gr_vector_int& nof_input_ite
    return nof_output_items;
 }
 
-/*
- * The private constructor.
- */
 op25_decoder_ff::op25_decoder_ff(gr_msg_queue_sptr msgq) :
    gr_block("decoder_ff", gr_make_io_signature(1, 1, sizeof(float)), gr_make_io_signature(1, 1, sizeof(float))),
    d_msgq(msgq),
    d_state(SYNCHRONIZING),
    d_substate(IDENTIFYING),
-   d_frame_sync(0L),
-   d_network_ID(0L),
-   d_symbol(0),
    d_data_unit(),
    d_data_units(0),
+   d_frame_sync(0),
+   d_network_ID(0),
+   d_symbol(0),
    d_unrecognized(0)
 {
 }
 
-/*
- * Tests whether the received dibit completes a frame sync
- * sequence. Returns true when d completes a frame sync bit string
- * otherwise returns false. When found d_frame_sync contains the frame
- * sync value.
- */
 bool
 op25_decoder_ff::correlates(dibit d)
 {
@@ -143,11 +112,6 @@ op25_decoder_ff::correlates(dibit d)
    return errs < ERR_THRESHOLD;
 }
 
-/*
- * Tests whether this dibit identifies a known frame type. Returns
- * true when d completes a network ID bit string otherwise returns
- * false. When found d_network_ID contains the network ID value.
- */
 bool
 op25_decoder_ff::identifies(dibit d)
 {
@@ -161,9 +125,6 @@ op25_decoder_ff::identifies(dibit d)
    return identified;
 }
 
-/*
- * Process a received symbol.
- */
 void
 op25_decoder_ff::receive_symbol(dibit d)
 {
@@ -182,9 +143,6 @@ op25_decoder_ff::receive_symbol(dibit d)
    }
 }
 
-/*
- * Process a received symbol when synchronized.
- */
 void
 op25_decoder_ff::sync_receive_symbol(dibit d)
 {
@@ -205,7 +163,7 @@ op25_decoder_ff::sync_receive_symbol(dibit d)
          size_t msg_sz = d_data_unit->size();
          gr_message_sptr msg = gr_make_message(/*type*/0, /*arg1*/++d_data_units, /*arg2*/0, msg_sz);
          uint8_t *msg_data = static_cast<uint8_t*>(msg->msg());
-         if(msg_sz = d_data_unit->decode(msg_sz, msg_data)) {
+         if((msg_sz = d_data_unit->decode(msg_sz, msg_data))) {
             d_msgq->handle(msg);
          }
          data_unit_sptr null;

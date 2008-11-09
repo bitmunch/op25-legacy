@@ -35,3 +35,14 @@ ldu1::nof_symbols_reqd() const
 {
    return 864;
 }
+
+void
+ldu1::correct_errors(dibit_vector& symbols)
+{
+}
+
+size_t
+ldu1::decode_symbols(size_t msg_sz, uint8_t *msg, const_dibit_vector& symbols)
+{
+   return 0;
+}

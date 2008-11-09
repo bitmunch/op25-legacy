@@ -31,9 +31,42 @@
 class ldu2 : public abstract_data_unit
 {
 public:
+
+   /**
+    * ldu2 constructor.
+    */
    ldu2(uint64_t frame_sync, uint64_t network_ID);
+
+   /**
+    * ldu2 virtual destructor.
+    */
    virtual ~ldu2();
+
+protected:
+
+   /**
+    * Returns the number of symbols required by this data_unit.  For
+    * variable-length data this may return 0 if the actual length is
+    * not yet known.
+    * \return The size in of this data_unit.
+    */
    virtual size_t nof_symbols_reqd() const;
+
+   /**
+    * Correct any errors found in the dibit stream.
+    * \param symbols The dibit stream to correct.
+    */
+   virtual void correct_errors(dibit_vector& symbols);
+
+   /**
+    * Decode this data unit. Perform error correction on the received
+    * frame and write the corrected frame contents to msg.
+    * \param msg_sz The size of the message buffer.
+    * \param msg A pointer to where the data unit content will be written.
+    * \param symbols The dibit_vector which is to be decode_symbolsd.
+    * \return The number of octets written to msg.
+    */
+   virtual size_t decode_symbols(size_t msg_sz, uint8_t *msg, const_dibit_vector& symbols);
 };
 
 #endif /* INCLUDED_LDU2_H */

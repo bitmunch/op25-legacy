@@ -1,4 +1,5 @@
 /* -*- C++ -*- */
+
 /*
  * Copyright 2008 Steve Glass
  * 
@@ -20,27 +21,27 @@
  * 02110-1301, USA.
  */
 
-#ifndef INCLUDED_LDU1_H
-#define INCLUDED_LDU1_H
+#ifndef INCLUDED_TDU_H
+#define INCLUDED_TDU_H
 
 #include <abstract_data_unit.h>
 
 /*
- * P25 Logical Data Unit 1 (an IBME/AMBE voice frame).
+ * P25 terminator data unit (TDU).
  */
-class ldu1 : public abstract_data_unit
+class tdu : public abstract_data_unit
 {
 public:
 
    /**
-    * ldu1 constuctor
+    * tdu constructor.
     */
-   ldu1(uint64_t frame_sync, uint64_t network_ID);
+   tdu(uint64_t frame_sync, uint64_t network_ID, bool has_link_control);
 
    /**
-    * ldu1 destuctor
+    * tdu constructor.
     */
-   virtual ~ldu1();
+   virtual ~tdu();
 
 protected:
 
@@ -68,6 +69,9 @@ protected:
     */
    virtual size_t decode_symbols(size_t msg_sz, uint8_t *msg, const_dibit_vector& symbols);
 
+private:
+   bool d_has_link_control;
+
 };
 
-#endif /* INCLUDED_LDU1_H */
+#endif /* INCLUDED_TDU_H */

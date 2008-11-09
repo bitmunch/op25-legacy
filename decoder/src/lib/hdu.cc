@@ -1,4 +1,5 @@
 /* -*- C++ -*- */
+
 /*
  * Copyright 2008 Steve Glass
  * 
@@ -20,22 +21,30 @@
  * 02110-1301, USA.
  */
 
-#ifndef INCLUDED_TERMINATOR_H
-#define INCLUDED_TERMINATOR_H
+#include <hdu.h>
 
-#include <abstract_data_unit.h>
-
-/*
- * P25 terminator data unit.
- */
-class terminator : public abstract_data_unit
+hdu::hdu(uint64_t frame_sync, uint64_t network_ID) :
+   abstract_data_unit(frame_sync, network_ID)
 {
-public:
-   terminator(uint64_t frame_sync, uint64_t network_ID, bool has_link_control);
-   virtual ~terminator();
-   virtual size_t nof_symbols_reqd() const;
-private:
-   bool d_has_link_control;
-};
+}
 
-#endif /* INCLUDED_TERMINATOR_H */
+hdu::~hdu()
+{
+}
+
+size_t
+hdu::nof_symbols_reqd() const
+{
+   return 396;
+}
+
+void
+hdu::correct_errors(dibit_vector& symbols)
+{
+}
+
+size_t
+hdu::decode_symbols(size_t msg_sz, uint8_t *msg, const_dibit_vector& symbols)
+{
+   return 0;
+}

@@ -1,4 +1,5 @@
 /* -*- C++ -*- */
+
 /*
  * Copyright 2008 Steve Glass
  * 
@@ -28,22 +29,50 @@
 #include <stdint.h>
 
 typedef uint8_t dibit;
+
 typedef boost::shared_ptr<class data_unit> data_unit_sptr;
 
 /*
- * A P25 data unit.
+ * A P25 data unit. This is the interface to the parsing and decoding
+ * behaviours for handling P25 frames. For physical layouts of the
+ * decoded frames see p25_frame_formats.h.
  *
  */
 class data_unit : public boost::noncopyable
 {
 public:
-   static data_unit_sptr make_data_unit(uint64_t frame_sync, uint64_t network_ID);
+
+   /**
+    * data_unit virtual constructor. Returns a pointer to an
+    * appropriate data unit given the initial frame_sync and
+    * network_id.
+    * \param fs The frame sync value for this data_unit.
+    * \param nid The network ID for this data_unit.
+    * \return A (possibly null-valued) pointer to the data_unit.
+    */
+   static data_unit_sptr make_data_unit(uint64_t frame_sync, uint64_t network_id);
+
+   /**
+    * data_unit virtual destructor.
+    */
    virtual ~data_unit();
+
+   /**
+    * Returns the size of this data unit in octets.  For
+    * variable-length data this may return 0 if the actual length is
+    * not yet known.
+    * \return The size in octets of this data_unit.
+    */
    virtual size_t size() const = 0;
-   // virtual data_unit_type type() const = 0;
+
+   /**
+    * Tests whether the dibit d completes the data unit.
+    * \param d The dibit to extend the frame with.
+    * \return  true when the frame is complete otherwise false.
+    */
    virtual bool complete(dibit d) = 0;
 
-	/**
+   /**
     * Decode this data unit. Perform error correction on the received
     * frame and write the corrected frame contents to msg.
     * \param msg_sz The size of the message buffer.
@@ -52,9 +81,13 @@ public:
     */
    virtual size_t decode(size_t msg_sz, uint8_t *msg) = 0;
 
-   // virtual size_t audio(float *samples, size_t max_samples_sz) = 0;
 protected:
+
+   /**
+    * data_unit default constructor.
+    */
    data_unit();
 };
 
 #endif /* INCLUDED_DATA_UNIT_H */
+        
