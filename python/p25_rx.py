@@ -32,12 +32,7 @@ from math import pi
 from optparse import OptionParser
 from usrpm import usrp_dbid
 
-class DangerConstruction(wx.Panel):
-    def __init__(self, parent):
-        wx.Panel.__init__(self, parent)
-        t = wx.StaticText(self, -1, "This is where the messages go!", (60,60))
-
-class p25_rx_block (stdgui2.std_top_block):
+class P25Receiver (stdgui2.std_top_block):
 
     def __init__(self, frame, panel, vbox, argv):
         stdgui2.std_top_block.__init__(self, frame, panel, vbox, argv)
@@ -58,8 +53,6 @@ class p25_rx_block (stdgui2.std_top_block):
         parser.add_option("-f", "--frequency", type="eng_float", default=0.0, help="set center frequency", metavar="Hz")
         parser.add_option("-b", "--bandwidth", type="eng_float", default=12.5e3, help="set bandwidth")
         parser.add_option("-s", "--channel-decim", type="int", default=1, help="channel decimation")
-        # not used at present....
-        parser.add_option("-o", "--output", type="string", default="audio.dat", help="output file")
         (options, args) = parser.parse_args()
         if len(args) != 0:
             parser.print_help()
@@ -134,9 +127,10 @@ class p25_rx_block (stdgui2.std_top_block):
         self.decode_watcher = DecodeWatcher(msgq)
         self.p25_decoder = op25.decoder_ff(msgq)
         self.connect(self.demod_fsk4, self.p25_decoder)
-
-        self.traffic = DangerConstruction(self.notebook)
-        self.notebook.AddPage(self.traffic, "Traffic")
+        
+        if False:
+            self.traffic = wx.StaticText(self.notebook, -1, "This is where the messages will be displayed!")
+            self.notebook.AddPage(self.traffic, "Traffic")
 
         self.sink = gr.null_sink(gr.sizeof_float)
         self.connect(self.p25_decoder, self.sink)
@@ -194,5 +188,5 @@ class DecodeWatcher(threading.Thread):
             # ToDo: display msg in "traffic" tab and push to WireShark using scapy
 
 if '__main__' == __name__:
-    app = stdgui2.stdapp(p25_rx_block, "APCO P25 Receiver")
+    app = stdgui2.stdapp(P25Receiver, "APCO P25 Receiver")
     app.MainLoop()
