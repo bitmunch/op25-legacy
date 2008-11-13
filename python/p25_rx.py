@@ -20,7 +20,7 @@
 # 02110-1301, USA.
 
 import sys
-# import threading
+import threading
 import wx
 
 from gnuradio import gr, gru, optfir, fsk4
@@ -88,53 +88,51 @@ class p25_rx_block (stdgui2.std_top_block):
             print "no input specified!"
             exit(1)
 
-#         Embedding the panel inside a wx.Panel traps resizing and lets us 
-#         decide on the resizing policy for the embedded control.
-
-#         self.spectrum_panel = wx.Panel(self.notebook)
-#         self.spectrum = fftsink2.fft_sink_c(self.spectrum_panel, fft_size=512, sample_rate=source_rate, average=True, peak_hold=True)
-#         self.spectrum_plotter = self.spectrum.win.plot
-#         self.notebook.AddPage(self.spectrum_panel, "RF Spectrum")
-#         self.spectrum_plotter.Bind(wx.EVT_LEFT_DOWN, self.OnSpectrumLeftClick)
-#         self.connect(self.source, self.spectrum)
-#         self.SetChannelOffset(0.0)
-
-        # Embedding the control directly means it gets resized
-        # whenever the notebook resizes.
         self.spectrum = fftsink2.fft_sink_c(self.notebook, fft_size=512, sample_rate=source_rate, average=True, peak_hold=True)
         self.spectrum_plotter = self.spectrum.win.plot
         self.notebook.AddPage(self.spectrum.win, "RF Spectrum")
-        self.spectrum_plotter.Bind(wx.EVT_LEFT_DOWN, self.OnSpectrumLeftClick)
+        self.spectrum_plotter.Bind(wx.EVT_LEFT_DOWN, self.on_spectrum_left_click)
         self.connect(self.source, self.spectrum)
-        self.SetChannelOffset(0.0)
 
         self.offset = 0.0
-#         channel_decim = 1
-#         channel_rate = source_rate
-        channel_decim = source_rate // 125000
-        channel_rate = source_rate // channel_decim
+        self.channel_decim = source_rate // 125000
+        self.channel_rate = source_rate // self.channel_decim
         trans_width = options.bandwidth / 2;
         trans_centre = trans_width + (trans_width / 2)
         coeffs = gr.firdes.low_pass(1.0, source_rate, trans_centre, trans_width, gr.firdes.WIN_HANN)
-        self.channel_filter = gr.freq_xlating_fir_filter_ccf(channel_decim, coeffs, -options.frequency, source_rate)
+        self.channel_filter = gr.freq_xlating_fir_filter_ccf(self.channel_decim, coeffs, -options.frequency, source_rate)
         self.connect(self.source, self.channel_filter);
+        self.set_channel_offset(0.0, 0, self.spectrum.win._units)
 
         self.symbol_rate = 4800
         self.symbol_deviation = 600.0
-        fm_demod_gain = channel_rate / (2.0 * pi * self.symbol_deviation)
+        fm_demod_gain = self.channel_rate / (2.0 * pi * self.symbol_deviation)
         self.fm_demod = gr.quadrature_demod_cf(fm_demod_gain)
         self.connect(self.channel_filter, self.fm_demod)
 
         symbol_decim = 1
-        symbol_coeffs = gr.firdes.root_raised_cosine(61.0, channel_rate, self.symbol_rate, 0.2, 500)
+        symbol_coeffs = gr.firdes.root_raised_cosine(61.0, self.channel_rate, self.symbol_rate, 0.2, 500)
         self.symbol_filter = gr.fir_filter_fff (symbol_decim, symbol_coeffs)
         self.connect(self.fm_demod, self.symbol_filter)
 
-        self.msgq = gr.msg_queue(2)
-        self.demod_fsk4 = fsk4.demod_ff(self.msgq, channel_rate, self.symbol_rate)
+        if False:
+            self.signal_scope = scopesink2.scope_sink_f(self.notebook, sample_rate=source_rate)
+            self.notebook.AddPage(self.signal_scope.win, "C4FM Signal")
+            self.connect(self.symbol_filter, self.signal_scope)
+
+        autotuneq = gr.msg_queue(2)
+        self.demod_watcher = DemodWatcher(autotuneq, self.adjust_channel_offset)
+        self.demod_fsk4 = fsk4.demod_ff(autotuneq, self.channel_rate, self.symbol_rate)
         self.connect(self.symbol_filter, self.demod_fsk4)
 
-        self.p25_decoder = op25.decoder_ff(self.msgq)
+        if False:
+            self.symbol_scope = scopesink2.scope_sink_f(self.notebook, sample_rate=source_rate)
+            self.notebook.AddPage(self.symbol_scope.win, "Demodulated Symbols")
+            self.connect(self.demod_fsk4, self.symbol_scope)
+
+        msgq = gr.msg_queue(2)
+        self.decode_watcher = DecodeWatcher(msgq)
+        self.p25_decoder = op25.decoder_ff(msgq)
         self.connect(self.demod_fsk4, self.p25_decoder)
 
         self.traffic = DangerConstruction(self.notebook)
@@ -143,7 +141,7 @@ class p25_rx_block (stdgui2.std_top_block):
         self.sink = gr.null_sink(gr.sizeof_float)
         self.connect(self.p25_decoder, self.sink)
 
-    def OnSpectrumLeftClick(self, event):
+    def on_spectrum_left_click(self, event):
         x,y = self.spectrum_plotter.GetXY(event)
         xmin, xmax = self.spectrum_plotter.GetXCurrentRange()
         x = min(x, xmax)
@@ -152,12 +150,48 @@ class p25_rx_block (stdgui2.std_top_block):
         chan_width = 12.5e3
         x /= scale_factor
         x  = (x // chan_width) * chan_width
-        x *= scale_factor
-        self.SetChannelOffset(x)
+        self.set_channel_offset(x, scale_factor, self.spectrum.win._units)
 
-    def SetChannelOffset(self, offset_hz):
-#         self.channel_filter.set_center_freq(-offset_hz)       
-        self.frame.SetStatusText("Channel offset: " + str(offset_hz) + self.spectrum.win._units)
+    def set_channel_offset(self, offset, scale, units):
+        self.channel_filter.set_center_freq(-offset)
+        self.frame.SetStatusText("Channel offset: " + str(offset * scale) + units)
+
+    def adjust_channel_offset(self, frequency_offset):
+        max_frequency_offset = 6000.0 # Hz
+        offset = frequency_offset * self.symbol_deviation      
+        offset = min(offset, max_frequency_offset)
+        offset = max(offset, -max_frequency_offset)
+        self.channel_filter.set_center_freq(self.offset)
+
+class DemodWatcher(threading.Thread):
+
+    def __init__(self, msgq,  callback, **kwds):
+        threading.Thread.__init__ (self, **kwds)
+        self.setDaemon(1)
+        self.msgq = msgq
+        self.callback = callback
+        self.keep_running = True
+        self.start()
+
+    def run(self):
+        while(self.keep_running):
+            msg = self.msgq.delete_head()
+            frequency_correction = msg.arg1() 
+            self.callback(frequency_correction)
+
+class DecodeWatcher(threading.Thread):
+
+    def __init__(self, msgq, **kwds):
+        threading.Thread.__init__ (self, **kwds)
+        self.setDaemon(1)
+        self.msgq = msgq
+        self.keep_running = True
+        self.start()
+
+    def run(self):
+        while(self.keep_running):
+            msg = self.msgq.delete_head()
+            # ToDo: display msg in "traffic" tab and push to WireShark using scapy
 
 if '__main__' == __name__:
     app = stdgui2.stdapp(p25_rx_block, "APCO P25 Receiver")
