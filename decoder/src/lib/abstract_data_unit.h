@@ -27,14 +27,15 @@
 #include <data_unit.h>
 #include <vector>
 
-typedef std::vector<dibit> dibit_vector;
-typedef std::vector<dibit> const_dibit_vector;
+typedef std::vector<bool> bit_vector;
+typedef const std::vector<bool> const_bit_vector;
 
-/*
+/**
  * Abstract P25 data unit.
  */
 class abstract_data_unit : public data_unit
 {
+
 public:
 
    /**
@@ -43,62 +44,77 @@ public:
    virtual ~abstract_data_unit();
 
    /**
-    * Returns the size of this data unit in octets.  For
-    * variable-length data this may return 0 if the actual length is
-    * not yet known.
-    * \return The size in octets of this data_unit.
+    * Returns the actual size of this data_unit in bits.
+    *
+    * \return The size (in dibits) of this data_unit.
     */
-   virtual size_t size() const;
+   virtual uint16_t size() const;
 
    /**
-    * Tests whether the dibit d completes the data unit.
+    * Extends this data_unit with the specified dibit. If this
+    * data_unit is already complete a range_error is thrown.
+    *
     * \param d The dibit to extend the frame with.
-    * \return  true when the frame is complete otherwise false.
+    * \throws range_error When the frame already is at its maximum size.
+    * \return true when the frame is complete otherwise false.
     */
-   virtual bool complete(dibit d);
+   virtual void extend(dibit d);
 
    /**
-    * Decode this data unit. Perform error correction on the received
-    * frame and write the corrected frame contents to msg.
+    * Decode, error correct and write the decoded frame contents to
+    * msg. If the frame contains compressed audio then the audio
+    * should be decoded using the supplied imbe_decoder and write it
+    * to audio.
+    *
     * \param msg_sz The size of the message buffer.
     * \param msg A pointer to where the data unit content will be written.
+    * \param imbe The imbe_decoder to use to generate the audio.
+    * \param audio A deque<float> to which the audio (if any) is appended.
     * \return The number of octets written to msg.
     */
-   virtual size_t decode(size_t msg_sz, uint8_t *msg);
+   virtual size_t decode(size_t msg_sz, uint8_t *msg, imbe_decoder& imbe, float_queue& audio);
 
 protected:
 
    /**
     * abstract_data_unit constructor.
+    *
+    * \param fs The frame synchronization header.
+    * \param nid The network ID.
     */
-   abstract_data_unit(uint64_t frame_sync, uint64_t network_ID, size_t size_hint = 0);
+   abstract_data_unit(frame_sync& fs, network_id& nid);
 
    /**
-    * Returns the number of symbols required by this data_unit. For
-    * variable-length data this may return 0 if the actual length is
-    * not yet known.
-    * \return The size in of this data_unit.
-    */
-   virtual size_t nof_symbols_reqd() const = 0;
-
-   /**
-    * Correct any errors found in the dibit stream.
-    * \param symbols The dibit stream to correct.
-    */
-   virtual void correct_errors(dibit_vector& symbols) = 0;
-
-   /**
-    * Decode symbols into data unit. Perform error correction on the
-    * received frame and write the corrected frame contents to msg.
+    * Decode frame_body, apply error correction and write the decoded
+    * frame contents to msg. If the frame contains compressed audio
+    * the audio should be decoded using the supplied imbe_decoder and
+    * written to audio.
+    *
+    * \param frame_body The bit vector to decode.
     * \param msg_sz The size of the message buffer.
     * \param msg A pointer to where the data unit content will be written.
-    * \param symbols The dibit_vector which is to be decoded.
+    * \param imbe The imbe_decoder to use to generate the audio.
+    * \param audio A deque<float> to which the audio (if any) is appended.
     * \return The number of octets written to msg.
     */
-   virtual size_t decode_symbols(size_t msg_sz, uint8_t *msg, const_dibit_vector& symbols) = 0;
+   virtual size_t decode_body(const_bit_vector& frame_body, size_t msg_sz, uint8_t *msg, imbe_decoder& imbe, float_queue& audio) = 0;
 
 private:
-   dibit_vector d_symbols;
+
+   /**
+    * The frame sync header.
+    */
+   frame_sync d_fs;
+
+   /**
+    * The network ID header.
+    */
+   network_id d_nid;
+
+   /**
+    * A bit vector containing the frame body.
+    */
+   bit_vector d_frame_body;
 
 };
 

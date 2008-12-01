@@ -26,47 +26,53 @@
 
 #include <abstract_data_unit.h>
 
-/*
+/**
  * P25 packet data unit (PDU).
  */
 class pdu : public abstract_data_unit
 {
 public:
 
-	/**
+   /**
     * P25 packet data unit (PDU) constructor.
+    *
+    * \param fs The frame synchronization header.
+    * \param nid The network ID.
     */
-   pdu(uint64_t frame_sync, uint64_t network_ID);
+   pdu(frame_sync& fs, network_id& nid);
 
 
-	/**
-    * pdu virtual destructor.
+   /**
+    * pdu (virtual) destructor.
     */
    virtual ~pdu();
 
    /**
-    * Returns the number of symbols required by this data_unit.  For
-    * variable-length data this may return 0 if the actual length is
-    * not yet known.
-    * \return The size in of this data_unit.
+    * Returns the expected size of this data_unit in bits. For
+    * variable-length data this should return UINT16_MAX until the
+    * actual length of this frame is known.
+    *
+    * \return The expected size (in bits) of this data_unit.
     */
-   virtual size_t nof_symbols_reqd() const;
+   virtual uint16_t max_size() const;
+
+protected:
 
    /**
-    * Correct any errors found in the dibit stream.
-    * \param symbols The dibit stream to correct.
-    */
-   virtual void correct_errors(dibit_vector& symbols);
-
-   /**
-    * Decode this data unit. Perform error correction on the received
-    * frame and write the corrected frame contents to msg.
+    * Decode frame_body, apply error correction and write the decoded
+    * frame contents to msg. If the frame contains compressed audio
+    * the audio should be decoded using the supplied imbe_decoder and
+    * written to audio.
+    *
+    * \param frame_body The bit vector to decode.
     * \param msg_sz The size of the message buffer.
     * \param msg A pointer to where the data unit content will be written.
-    * \param symbols The dibit_vector which is to be decode_symbolsd.
+    * \param imbe The imbe_decoder to use to generate the audio.
+    * \param audio A deque<float> to which the audio (if any) is appended.
     * \return The number of octets written to msg.
     */
-   virtual size_t decode_symbols(size_t msg_sz, uint8_t *msg, const_dibit_vector& symbols);
+   virtual size_t decode_body(const_bit_vector& frame_body, size_t msg_sz, uint8_t *msg, imbe_decoder& imbe, float_queue& audio);
+
 };
 
 #endif /* INCLUDED_PDU_H */

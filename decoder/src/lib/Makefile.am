@@ -60,14 +60,15 @@ ourlib_LTLIBRARIES = _op25.la
 # These are the source files that go into the shared library
 _op25_la_SOURCES = \
 	abstract_data_unit.cc \
-	bch.cc \
 	data_unit.cc \
 	hdu.cc \
-	imbe_decoder.cc \
 	ldu1.cc \
 	ldu2.cc \
 	pdu.cc \
 	tdu.cc \
+	imbe_decoder.cc \
+	imbe_error_corrector.cc \
+	dummy_imbe_decoder.cc \
 	op25.cc \
 	op25_decoder_ff.cc
 
@@ -78,7 +79,8 @@ _op25_la_LDFLAGS = $(NO_UNDEFINED) -module -avoid-version
 # c++ standard library
 _op25_la_LIBADD = \
 	$(PYTHON_LDFLAGS) \
-	-lstdc++
+	-lstdc++ \
+	-litpp
 
 op25.cc op25.py: $(LOCAL_IFILES) $(ALL_IFILES)
 	$(SWIG) $(SWIGPYTHONARGS) -module op25 -o op25.cc $(LOCAL_IFILES)

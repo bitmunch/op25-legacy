@@ -23,8 +23,8 @@
 
 #include <hdu.h>
 
-hdu::hdu(uint64_t frame_sync, uint64_t network_ID) :
-   abstract_data_unit(frame_sync, network_ID)
+hdu::hdu(frame_sync& fs,  network_id& nid) :
+   abstract_data_unit(fs, nid)
 {
 }
 
@@ -32,19 +32,14 @@ hdu::~hdu()
 {
 }
 
-size_t
-hdu::nof_symbols_reqd() const
+uint16_t
+hdu::max_size() const
 {
-   return 396;
-}
-
-void
-hdu::correct_errors(dibit_vector& symbols)
-{
+   return 792;
 }
 
 size_t
-hdu::decode_symbols(size_t msg_sz, uint8_t *msg, const_dibit_vector& symbols)
+hdu::decode_body(const_bit_vector& frame_body, size_t msg_sz, uint8_t *msg, imbe_decoder& imbe, float_queue& audio)
 {
-   return 0;
+   return max_size() / 8;
 }

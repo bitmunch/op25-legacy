@@ -20,10 +20,11 @@
  * Software Foundation, Inc., 51 Franklin Street, Boston, MA
  * 02110-1301, USA.
  */
+
 #include <tdu.h>
 
-tdu::tdu(uint64_t frame_sync, uint64_t network_ID, bool has_link_control) :
-   abstract_data_unit(frame_sync, network_ID),
+tdu::tdu(frame_sync& fs, network_id& nid, bool has_link_control) :
+   abstract_data_unit(fs, nid),
    d_has_link_control(has_link_control)
 {
 }
@@ -32,19 +33,14 @@ tdu::~tdu()
 {
 }
 
-size_t
-tdu::nof_symbols_reqd() const
+uint16_t
+tdu::max_size() const
 {
-   return d_has_link_control ? 216 : 72;
-}
-
-void
-tdu::correct_errors(dibit_vector& symbols)
-{
+   return d_has_link_control ? 432 : 144;
 }
 
 size_t
-tdu::decode_symbols(size_t msg_sz, uint8_t *msg, const_dibit_vector& symbols)
+tdu::decode_body(const_bit_vector& frame_body, size_t msg_sz, uint8_t *msg, imbe_decoder& imbe, float_queue& audio)
 {
-   return 0;
+   return max_size() / 8;
 }

@@ -20,44 +20,26 @@
  * Software Foundation, Inc., 51 Franklin Street, Boston, MA
  * 02110-1301, USA.
  */
+
 #include <pdu.h>
 
-pdu::pdu(uint64_t frame_sync, uint64_t network_ID) :
-   abstract_data_unit(frame_sync, network_ID)
+pdu::pdu(frame_sync& fs, network_id& nid) :
+   abstract_data_unit(fs, nid)
 {
 }
-
 pdu::~pdu()
 {
 }
 
-size_t
-pdu::nof_symbols_reqd() const
+uint16_t
+pdu::max_size() const
 {
-   size_t reqd = 0;
-#if 1
-   const size_t LAST_HEADER_BLOCK_SYMBOL = 156;
-   reqd = LAST_HEADER_BLOCK_SYMBOL;
-#else
-   const size_t LAST_HEADER_BLOCK_SYMBOL = 156;
-   // ToDo pass nof_symbols_read as input param
-   if(LAST_HEADER_BLOCK_SYMBOL < nof_symbols_read) {
-      // ToDo: 1/2 rate trellis decoding of header
-      reqd = LAST_HEADER_BLOCK_SYMBOL; // force c
-      // const size_t SYMBOLS_PER_BLOCK = 98;
-      // ToDo: reqd = LAST_HEADER_BLOCK_SYMBOL + header.blocks_to_follow * SYMBOLS_PER_BLOCK;
-   }
-#endif
-   return reqd;
-}
-
-void
-pdu::correct_errors(dibit_vector& symbols)
-{
+  const size_t LAST_HEADER_BLOCK_SYMBOL = 156;
+  return LAST_HEADER_BLOCK_SYMBOL;
 }
 
 size_t
-pdu::decode_symbols(size_t msg_sz, uint8_t *msg, const_dibit_vector& symbols)
+pdu::decode_body(const_bit_vector& frame_body, size_t msg_sz, uint8_t *msg, imbe_decoder& imbe, float_queue& audio)
 {
-   return 0;
+   return 7 + max_size() / 8;
 }

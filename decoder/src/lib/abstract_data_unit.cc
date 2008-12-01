@@ -1,4 +1,5 @@
 /* -*- C++ -*- */
+
 /*
  * Copyright 2008 Steve Glass
  * 
@@ -26,40 +27,36 @@
 #include <stdexcept>
 
 using namespace std;
+
 abstract_data_unit::~abstract_data_unit()
 {
 }
 
-size_t
+uint16_t
 abstract_data_unit::size() const
 {
-   const size_t symbols_per_octet = 4;
-   return nof_symbols_reqd() / symbols_per_octet;
+   return d_fs.size() + d_nid.size() + d_frame_body.size();
 }
 
-bool
-abstract_data_unit::complete(dibit d)
+void
+abstract_data_unit::extend(dibit d)
 {
-   d_symbols.push_back(d);
-   return nof_symbols_reqd() <= d_symbols.size();
+   d_frame_body.push_back(d & 0x2);
+   d_frame_body.push_back(d & 0x1);
+
+   // ToDo if(too big) throw range_error();
 }
 
 size_t
-abstract_data_unit::decode(size_t msg_sz, uint8_t *msg)
+abstract_data_unit::decode(size_t msg_sz, uint8_t *msg, imbe_decoder& imbe, float_queue& audio)
 {
-   correct_errors(d_symbols);
-   return decode_symbols(msg_sz, msg, d_symbols);
+   // ToDo: write d_fs and d_nid into start of msg!
+
+   return decode_body(d_frame_body, msg_sz, msg, imbe, audio);
 }
 
-abstract_data_unit::abstract_data_unit(uint64_t frame_sync, uint64_t network_ID, size_t size_hint) :
-   d_symbols(size_hint)
+abstract_data_unit::abstract_data_unit(frame_sync& fs, network_id& nid) :
+   d_fs(fs),
+   d_nid(nid)
 {
-   for(size_t i = 0; i < 48; i += 2) {
-      dibit d = (frame_sync >> (46 - i)) & 0x3;
-      d_symbols.push_back(d);
-   }
-   for(size_t i = 0; i < 64; i += 2) {
-      dibit d = (network_ID >> (62 - i)) & 0x3;
-      d_symbols.push_back(d);     
-   }
 }

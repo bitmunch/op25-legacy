@@ -1,4 +1,5 @@
 /* -*- C++ -*- */
+
 /*
  * Copyright 2008 Steve Glass
  * 
@@ -19,10 +20,11 @@
  * Software Foundation, Inc., 51 Franklin Street, Boston, MA
  * 02110-1301, USA.
  */
+
 #include <ldu1.h>
 
-ldu1::ldu1(uint64_t frame_sync, uint64_t network_ID) :
-   abstract_data_unit(frame_sync, network_ID)
+ldu1::ldu1(frame_sync& fs, network_id& nid) :
+   abstract_data_unit(fs, nid)
 {
 }
 
@@ -30,19 +32,14 @@ ldu1::~ldu1()
 {
 }
 
-size_t
-ldu1::nof_symbols_reqd() const
+uint16_t
+ldu1::max_size() const
 {
-   return 864;
-}
-
-void
-ldu1::correct_errors(dibit_vector& symbols)
-{
+   return 1728;
 }
 
 size_t
-ldu1::decode_symbols(size_t msg_sz, uint8_t *msg, const_dibit_vector& symbols)
+ldu1::decode_body(const_bit_vector& frame_body, size_t msg_sz, uint8_t *msg, imbe_decoder& imbe, float_queue& audio)
 {
-   return 0;
+   return max_size() / 8;
 }

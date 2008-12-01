@@ -24,62 +24,85 @@
 #ifndef INCLUDED_DATA_UNIT_H
 #define INCLUDED_DATA_UNIT_H
 
+#include <bitset>
 #include <boost/shared_ptr.hpp>
 #include <boost/noncopyable.hpp>
+#include <deque>
+#include <imbe_decoder.h>
 #include <stdint.h>
+#include <swab.h>
 
 typedef uint8_t dibit;
 
+typedef std::deque<float> float_queue;
+
+typedef std::bitset<48> frame_sync;
+
+typedef std::bitset<64> network_id;
+
 typedef boost::shared_ptr<class data_unit> data_unit_sptr;
 
-/*
- * A P25 data unit. This is the interface to the parsing and decoding
- * behaviours for handling P25 frames. For physical layouts of the
- * decoded frames see p25_frame_formats.h.
- *
+/**
+ * A P25 data unit.
  */
 class data_unit : public boost::noncopyable
 {
 public:
 
    /**
-    * data_unit virtual constructor. Returns a pointer to an
-    * appropriate data unit given the initial frame_sync and
+    * data_unit (virtual) constructor. Returns a pointer to an
+    * appropriate data_unit instance given the initial frame_sync and
     * network_id.
+    *
     * \param fs The frame sync value for this data_unit.
     * \param nid The network ID for this data_unit.
     * \return A (possibly null-valued) pointer to the data_unit.
     */
-   static data_unit_sptr make_data_unit(uint64_t frame_sync, uint64_t network_id);
+   static data_unit_sptr make_data_unit(frame_sync& fs, network_id& nid);
 
    /**
-    * data_unit virtual destructor.
+    * data_unit (virtual) destructor.
     */
    virtual ~data_unit();
 
    /**
-    * Returns the size of this data unit in octets.  For
-    * variable-length data this may return 0 if the actual length is
-    * not yet known.
-    * \return The size in octets of this data_unit.
+    * Returns the actual size of this data_unit in bits.
+    *
+    * \return The size (in dibits) of this data_unit.
     */
-   virtual size_t size() const = 0;
+   virtual uint16_t size() const = 0;
 
    /**
-    * Tests whether the dibit d completes the data unit.
+    * Returns the expected size of this data unit in bits. For
+    * variable-length data this should return UINT16_MAX until the
+    * actual length of this frame is known.
+    *
+    * \return The expected size (in bits) of this data_unit.
+    */
+   virtual uint16_t max_size() const = 0;
+
+   /**
+    * Extends this data_unit with the specified dibit. If this
+    * data_unit is already complete a range_error is thrown.
+    *
     * \param d The dibit to extend the frame with.
-    * \return  true when the frame is complete otherwise false.
+    * \throws range_error When the frame already is at its maximum size.
+    * \return true when the frame is complete otherwise false.
     */
-   virtual bool complete(dibit d) = 0;
+   virtual void extend(dibit d) = 0;
 
    /**
-    * Decode this data unit. Perform error correction on the received
-    * frame and write the corrected frame contents to msg.
+    * Decode, error correction and write the decoded frame contents to
+    * msg. If the frame contains compressed audio then decode it using
+    * the supplied imbe_decoder and write it to audio.
+    *
     * \param msg_sz The size of the message buffer.
     * \param msg A pointer to where the data unit content will be written.
+    * \param imbe The imbe_decoder to use to generate audio.
+    * \param audio A float_queue to which the audio (if any) is written.
     * \return The number of octets written to msg.
     */
-   virtual size_t decode(size_t msg_sz, uint8_t *msg) = 0;
+   virtual size_t decode(size_t msg_sz, uint8_t *msg, imbe_decoder& imbe, float_queue& audio) = 0;
 
 protected:
 
