@@ -1,4 +1,5 @@
 /* -*- C++ -*- */
+
 /*
  * Copyright 2008 Steve Glass
  * 
@@ -26,7 +27,7 @@
 #include <abstract_data_unit.h>
 
 /**
- * P25 Logical Data Unit 1 (an IBME/AMBE voice frame).
+ * P25 Logical Data Unit 1 (compressed IBME voice).
  */
 class ldu1 : public abstract_data_unit
 {
@@ -35,10 +36,9 @@ public:
    /**
     * ldu1 constuctor
     *
-    * \param fs The frame synchronization header.
-    * \param nid The network ID.
+    * \param frame_body A const_bit_vector representing the frame body.
     */
-   ldu1(frame_sync& fs, network_id& nid);
+   ldu1(const_bit_vector& frame_body);
 
    /**
     * ldu1 (virtual) destuctor
@@ -57,19 +57,24 @@ public:
 protected:
 
    /**
-    * Decode frame_body, apply error correction and write the decoded
-    * frame contents to msg. If the frame contains compressed audio
-    * the audio should be decoded using the supplied imbe_decoder and
-    * written to audio.
+    * Applies error correction code to the specified bit_vector.
     *
     * \param frame_body The bit vector to decode.
-    * \param msg_sz The size of the message buffer.
-    * \param msg A pointer to where the data unit content will be written.
+    * \return 
+    */
+   virtual void correct_errors(bit_vector& frame_body);
+
+   /**
+    * Decode compressed audio using the supplied imbe_decoder and
+    * writes output to audio.
+    *
+    * \param frame_body The const_bit_vector to decode.
     * \param imbe The imbe_decoder to use to generate the audio.
     * \param audio A deque<float> to which the audio (if any) is appended.
-    * \return The number of octets written to msg.
+    * \return The number of samples written to audio.
     */
-   virtual size_t decode_body(const_bit_vector& frame_body, size_t msg_sz, uint8_t *msg, imbe_decoder& imbe, float_queue& audio);
+   virtual size_t decode_audio(const_bit_vector& frame_body, imbe_decoder& imbe, float_queue& audio);
+
 
 };
 

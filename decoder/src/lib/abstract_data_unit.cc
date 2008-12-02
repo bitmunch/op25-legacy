@@ -35,28 +35,46 @@ abstract_data_unit::~abstract_data_unit()
 uint16_t
 abstract_data_unit::size() const
 {
-   return d_fs.size() + d_nid.size() + d_frame_body.size();
+   return d_frame_body.size();
 }
 
 void
 abstract_data_unit::extend(dibit d)
 {
+   // ToDo if(too big) throw range_error();
    d_frame_body.push_back(d & 0x2);
    d_frame_body.push_back(d & 0x1);
-
-   // ToDo if(too big) throw range_error();
 }
 
 size_t
 abstract_data_unit::decode(size_t msg_sz, uint8_t *msg, imbe_decoder& imbe, float_queue& audio)
 {
-   // ToDo: write d_fs and d_nid into start of msg!
-
-   return decode_body(d_frame_body, msg_sz, msg, imbe, audio);
+   correct_errors(d_frame_body);
+   size_t nof_octets = decode_body(d_frame_body, msg_sz, msg);
+   decode_audio(d_frame_body, imbe, audio);
+   return nof_octets;
 }
 
-abstract_data_unit::abstract_data_unit(frame_sync& fs, network_id& nid) :
-   d_fs(fs),
-   d_nid(nid)
+abstract_data_unit::abstract_data_unit(const_bit_vector& frame_body) :
+   d_frame_body(frame_body)
 {
+}
+
+void
+abstract_data_unit::correct_errors(bit_vector& frame_body)
+{
+}
+
+size_t
+abstract_data_unit::decode_body(const_bit_vector& frame_body, size_t msg_sz, uint8_t *msg)
+{
+   // ToDo: default implementation - marshall bits from frame into msg
+
+   return 0;
+}
+
+size_t
+abstract_data_unit::decode_audio(const_bit_vector& frame_body, imbe_decoder& imbe, float_queue& audio)
+{
+   return 0;
 }

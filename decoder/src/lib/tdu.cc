@@ -23,8 +23,8 @@
 
 #include <tdu.h>
 
-tdu::tdu(frame_sync& fs, network_id& nid, bool has_link_control) :
-   abstract_data_unit(fs, nid),
+tdu::tdu(const_bit_vector& frame_body, bool has_link_control) :
+   abstract_data_unit(frame_body),
    d_has_link_control(has_link_control)
 {
 }
@@ -39,8 +39,7 @@ tdu::max_size() const
    return d_has_link_control ? 432 : 144;
 }
 
-size_t
-tdu::decode_body(const_bit_vector& frame_body, size_t msg_sz, uint8_t *msg, imbe_decoder& imbe, float_queue& audio)
+void
+tdu::correct_errors(bit_vector& frame_body)
 {
-   return max_size() / 8;
 }

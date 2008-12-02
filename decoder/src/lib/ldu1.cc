@@ -23,8 +23,8 @@
 
 #include <ldu1.h>
 
-ldu1::ldu1(frame_sync& fs, network_id& nid) :
-   abstract_data_unit(fs, nid)
+ldu1::ldu1(const_bit_vector& frame_body) :
+   abstract_data_unit(frame_body)
 {
 }
 
@@ -38,8 +38,13 @@ ldu1::max_size() const
    return 1728;
 }
 
-size_t
-ldu1::decode_body(const_bit_vector& frame_body, size_t msg_sz, uint8_t *msg, imbe_decoder& imbe, float_queue& audio)
+void
+ldu1::correct_errors(bit_vector& frame_body)
 {
-   return max_size() / 8;
+}
+
+size_t
+ldu1::decode_audio(const_bit_vector& frame_body, imbe_decoder& imbe, float_queue& audio)
+{
+   return 0;
 }

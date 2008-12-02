@@ -24,7 +24,7 @@
 #ifndef INCLUDED_OP25_DECODER_FF_H
 #define INCLUDED_OP25_DECODER_FF_H
 
-#include <itpp/comm/bch.h>
+#include <bitset>
 #include <data_unit.h>
 #include <gr_block.h>
 #include <gr_msg_queue.h>
@@ -33,6 +33,8 @@
 typedef boost::shared_ptr<class op25_decoder_ff> op25_decoder_ff_sptr;
 
 op25_decoder_ff_sptr op25_make_decoder_ff(gr_msg_queue_sptr msgq);
+
+typedef std::bitset<48> frame_sync;
 
 /**
  * op25_decoder_ff is a GNU Radio block for decoding APCO P25
@@ -88,40 +90,22 @@ private:
    bool correlates(dibit d);
 
    /**
-    * Tests whether this dibit symbol identifies a known frame
-    * type. Returns true when d completes a network ID otherwise
-    * returns false. When found d_nid contains the network ID
-    * value.
-    *
-    * \param d The symbol to process.
-    */
-   bool identifies(dibit d);
-
-   /**
     * Process a received symbol.
     *
     * \param d The symbol to process.
     */
    void receive_symbol(dibit d);
 
-   /**
-    * Apply BCH error correction to the network_id.
-    *
-    * \param id The network_id to be corrected.
-    */
-   void correct(network_id& id);
-
 private:
-
+ 
    enum { SYNCHRONIZING, IDENTIFYING, READING } d_state;
    float_queue d_audio;
-   itpp::BCH d_bch;
    data_unit_sptr d_data_unit;
    uint32_t d_data_units;
+   bit_vector d_frame_hdr;
    frame_sync d_fs;
    imbe_decoder_sptr d_imbe;
    gr_msg_queue_sptr d_msgq;
-   network_id d_nid;
    uint32_t d_symbol;
    uint32_t d_unrecognized;
 };

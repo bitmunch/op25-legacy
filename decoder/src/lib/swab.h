@@ -4,62 +4,83 @@
 #include <bitset>
 #include <itpp/base/vec.h>
 #include <stdexcept>
+#include <vector>
+
+typedef std::vector<bool> bit_vector;
+typedef const std::vector<bool> const_bit_vector;
 
 /**
- * Construct a bitset<M> from a bitset<N>.
+ * Swab bits from bitset in[begin,end) to bit_vector at position where.
  *
- * \param b A bitset to copy from.
- * \return A new bitset<M> initialized from b[start,M);
- */
-template<size_t M, size_t N>
-std::bitset<M>
-extract(const std::bitset<N>& b, const size_t begin)
-{
-	// ToDo: argument checking
-	unsigned long val = (b.to_ulong() >> (N - (begin + M))) & ((1 << M) - 1);
-	return std::bitset<M>(val);
-}
-
-/**
- * Swab bits from bitset to bvec. The source bit vector in[begin,end)
- * is copied to out at the specified position and can be done in
- * reverse.
- *
- * \param in A const reference to the bvec bit source.
+ * \param in A const reference to the bitset.
  * \param begin The offset of the first bit to copy.
- * \param end The offset of rhe end bit (just beyond last bit).
- * \param out The bvec into which bits are written.
+ * \param end The offset of the end bit.
+ * \param out The bit_vector into which bits are written.
  * \param where The starting point for writing bits.
  */
 template<size_t N>
 void
-swab(const std::bitset<N>& in, size_t begin, size_t end, itpp::bvec& out, size_t where)
+swab(const std::bitset<N>& in, int begin, int end, bit_vector& out, int where)
 {
 	// ToDo: argument checking
-	for(size_t i = begin, j = where; i != end; (begin < end ? ++i : --i), ++j) {
+	for(int i = begin, j = where; i != end; (begin < end ? ++i : --i), ++j) {
 		out[j] = in[i];
 	}
 }
 
 /**
- * Swab bits from bitset to bvec. The source bvec in[begin,end)
- * is copied to out at the specified position and can be done in
- * reverse.
+ * Swab bits from bit_vector in[begin,end) to bvec at position where.
  *
- * \param in A const reference to the bvec bit source.
+ * \param in A const reference to the bitset.
  * \param begin The offset of the first bit to copy.
- * \param end The offset of rhe end bit (just beyond last bit).
- * \param out The bvec into which bits are written.
+ * \param end The offset of the end bit.
+ * \param out A bvec into which bits are written.
  * \param where The starting point for writing bits.
  */
-template<size_t N>
-void
-swab(const itpp::bvec& in, size_t begin, size_t end, std::bitset<N>& out, size_t where)
+inline void
+swab(const_bit_vector& in, int begin, int end, itpp::bvec& out, int where)
 {
 	// ToDo: argument checking
-	for(size_t i = begin, j = where; i != end; (begin < end ? ++i : --i), ++j) {
+	for(int i = begin, j = where; i != end; (begin < end ? ++i : --i), ++j) {
 		out[j] = in[i];
 	}
 }
+
+/**
+ * Swab bits from bit_vector in[begin,end) to bvec at position where.
+ *
+ * \param in A const reference to the bitset.
+ * \param begin The offset of the first bit to copy.
+ * \param end The offset of the end bit.
+ * \param out A bvec into which bits are written.
+ * \param where The starting point for writing bits.
+ */
+inline void
+swab(const itpp::bvec& in, int where, bit_vector& out, int begin, int end)
+{
+	// ToDo: argument checking
+	for(int i = begin, j = where; i != end; (begin < end ? ++i : --i), ++j) {
+		out[i] = in[j];
+	}
+}
+
+/**
+ * Extract value of bits from in[begin,end).
+ *
+ * \param in The input const_bit_vector.
+ * \param begin The offset of the first bit to extract (the MSB).
+ * \param end The offset of the end bit.
+ * \return 
+ */
+inline uint64_t
+extract(const_bit_vector& in, int begin, int end)
+{
+	uint64_t x = 0LL;
+	for(int i = begin; i != end; (begin < end ? ++i : --i)) {
+		x =  (x << 1) | (in[i] ? 1 : 0);
+	}
+	return x;
+}
+
 
 #endif // INCLUDED_SWAB_H

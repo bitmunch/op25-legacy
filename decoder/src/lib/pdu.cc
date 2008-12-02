@@ -23,8 +23,8 @@
 
 #include <pdu.h>
 
-pdu::pdu(frame_sync& fs, network_id& nid) :
-   abstract_data_unit(fs, nid)
+pdu::pdu(const_bit_vector& frame_body) :
+   abstract_data_unit(frame_body)
 {
 }
 pdu::~pdu()
@@ -34,12 +34,14 @@ pdu::~pdu()
 uint16_t
 pdu::max_size() const
 {
-  const size_t LAST_HEADER_BLOCK_SYMBOL = 156;
-  return LAST_HEADER_BLOCK_SYMBOL;
+  const size_t HEADER_BLOCK_SIZE = 312;
+
+  // ToDo: how do we get header fields when block is not yet complete?
+
+  return HEADER_BLOCK_SIZE;
 }
 
-size_t
-pdu::decode_body(const_bit_vector& frame_body, size_t msg_sz, uint8_t *msg, imbe_decoder& imbe, float_queue& audio)
+void
+pdu::correct_errors(bit_vector& frame_body)
 {
-   return 7 + max_size() / 8;
 }

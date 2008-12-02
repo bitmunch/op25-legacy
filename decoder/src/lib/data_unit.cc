@@ -29,29 +29,30 @@
 #include <tdu.h>
 
 data_unit_sptr
-data_unit::make_data_unit(frame_sync& fs, network_id& nid)
+data_unit::make_data_unit(const_bit_vector& frame_body)
 {
+   // ToDo: check frame_body length is at least 64 bits long!
    data_unit_sptr d;
-   std::bitset<4> duid(extract<4>(nid,12));
-   switch(duid.to_ulong()) {
+   uint8_t duid = extract(frame_body, 60, 64);
+   switch(duid) {
    case 0x0:
-      d = data_unit_sptr(new hdu(fs, nid));
+      d = data_unit_sptr(new hdu(frame_body));
       break;
    case 0x3:
-      d = data_unit_sptr(new tdu(fs, nid, false));
+      d = data_unit_sptr(new tdu(frame_body, false));
       break;
    case 0x5:
-      d = data_unit_sptr(new ldu1(fs, nid));
+      d = data_unit_sptr(new ldu1(frame_body));
       break;
    case 0xa:
-      d = data_unit_sptr(new ldu2(fs, nid));
+      d = data_unit_sptr(new ldu2(frame_body));
       break;
    case 0x9: // VSELP "voice PDU"
    case 0xc:
-      d = data_unit_sptr(new pdu(fs, nid));
+      d = data_unit_sptr(new pdu(frame_body));
       break;
    case 0xf:
-      d = data_unit_sptr(new tdu(fs, nid, true));
+      d = data_unit_sptr(new tdu(frame_body, true));
       break;
    };
    return d;

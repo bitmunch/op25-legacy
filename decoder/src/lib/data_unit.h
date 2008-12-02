@@ -36,10 +36,6 @@ typedef uint8_t dibit;
 
 typedef std::deque<float> float_queue;
 
-typedef std::bitset<48> frame_sync;
-
-typedef std::bitset<64> network_id;
-
 typedef boost::shared_ptr<class data_unit> data_unit_sptr;
 
 /**
@@ -51,14 +47,12 @@ public:
 
    /**
     * data_unit (virtual) constructor. Returns a pointer to an
-    * appropriate data_unit instance given the initial frame_sync and
-    * network_id.
-    *
+    * appropriate data_unit instance given the initial frame_body.
     * \param fs The frame sync value for this data_unit.
     * \param nid The network ID for this data_unit.
     * \return A (possibly null-valued) pointer to the data_unit.
     */
-   static data_unit_sptr make_data_unit(frame_sync& fs, network_id& nid);
+   static data_unit_sptr make_data_unit(const_bit_vector& frame_body);
 
    /**
     * data_unit (virtual) destructor.
@@ -68,7 +62,7 @@ public:
    /**
     * Returns the actual size of this data_unit in bits.
     *
-    * \return The size (in dibits) of this data_unit.
+    * \return The size (in bits) of this data_unit.
     */
    virtual uint16_t size() const = 0;
 
@@ -113,4 +107,3 @@ protected:
 };
 
 #endif /* INCLUDED_DATA_UNIT_H */
-        
