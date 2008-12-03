@@ -24,6 +24,7 @@
 #include <abstract_data_unit.h>
 
 #include <algorithm>
+#include <cstring>
 #include <stdexcept>
 
 using namespace std;
@@ -41,7 +42,7 @@ abstract_data_unit::size() const
 void
 abstract_data_unit::extend(dibit d)
 {
-   // ToDo if(too big) throw range_error();
+   // ToDo: check we have enough room!
    d_frame_body.push_back(d & 0x2);
    d_frame_body.push_back(d & 0x1);
 }
@@ -68,9 +69,13 @@ abstract_data_unit::correct_errors(bit_vector& frame_body)
 size_t
 abstract_data_unit::decode_body(const_bit_vector& frame_body, size_t msg_sz, uint8_t *msg)
 {
-   // ToDo: default implementation - marshall bits from frame into msg
-
-   return 0;
+   // ToDo: ensure frame_body.size() / 8 <= msg_sz
+   memset(msg, 0x00, msg_sz);
+   const size_t nof_bits = frame_body.size();
+   for(size_t i = 0; i < nof_bits; i += 8) {
+      *msg++ = extract(frame_body, i, i + 8);
+   }
+   return nof_bits;
 }
 
 size_t
