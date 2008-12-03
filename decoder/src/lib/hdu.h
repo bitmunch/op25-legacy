@@ -65,6 +65,23 @@ protected:
     */
    virtual void correct_errors(bit_vector& frame_body);
 
+   /**
+    * Apply Golay error correction code to the specified bit_vector.
+    *
+    * \param frame_body The bit vector to decode.
+    * \return 
+    */
+   virtual void apply_golay_correction(bit_vector& frame_body);
+
+   /**
+    * Apply Reed-Solomon error correction code to the specified
+    * bit_vector.
+    *
+    * \param frame_body The bit vector to decode.
+    * \return 
+    */
+   virtual void apply_rs_correction(bit_vector& frame_body);
+
 };
 
 #endif /* INCLUDED_HDU_H */

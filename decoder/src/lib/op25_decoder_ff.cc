@@ -89,6 +89,9 @@ op25_decoder_ff::op25_decoder_ff(gr_msg_queue_sptr msgq) :
 {
 }
 
+#include <iostream>
+using namespace std;
+
 bool
 op25_decoder_ff::correlates(dibit d)
 {
@@ -115,16 +118,19 @@ op25_decoder_ff::receive_symbol(dibit d)
       d_frame_hdr[2 * d_symbol] = d & 2;
       d_frame_hdr[2 * d_symbol + 1] = d & 1;
       if(56 == d_symbol) {
+
          static itpp::BCH bch(63, 16, 11,"6 3 3 1 1 4 1 3 6 7 2 3 5 4 5 3", true);
          itpp::bvec b(63);
          swab(d_frame_hdr,  63, 47, b,  0);
          swab(d_frame_hdr, 112, 71, b, 16);
          swab(d_frame_hdr,  69, 63, b, 57);
-         bch.decode(b);
+         itpp::bvec bd = bch.decode(b);
+         itpp::bvec be = bch.encode(bd);
          // ToDo compute/check parity bit?
-         swab(b, 57, d_frame_hdr,  69, 63);
-         swab(b, 16, d_frame_hdr, 112, 71);
-         swab(b,  0, d_frame_hdr,  63, 47);
+         swab(be, 57, d_frame_hdr,  69, 63);
+         swab(be, 16, d_frame_hdr, 112, 71);
+         swab(be,  0, d_frame_hdr,  63, 47);
+
          d_data_unit = data_unit::make_data_unit(d_frame_hdr);
          if(d_data_unit) {
             d_state = READING;
