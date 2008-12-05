@@ -67,10 +67,10 @@ _op25_la_SOURCES = \
 	pdu.cc \
 	tdu.cc \
 	imbe_decoder.cc \
-	imbe_error_corrector.cc \
 	dummy_imbe_decoder.cc \
 	op25.cc \
-	op25_decoder_ff.cc
+	op25_decoder_ff.cc 
+
 
 # magic flags
 _op25_la_LDFLAGS = $(NO_UNDEFINED) -module -avoid-version

@@ -57,7 +57,9 @@ public:
 protected:
 
    /**
-    * Applies error correction code to the specified bit_vector.
+    * Applies error correction code to the specified bit_vector. Not
+    * that this function removes the PN sequences from the source
+    * frame.
     *
     * \param frame_body The bit vector to decode.
     * \return 
@@ -75,6 +77,12 @@ protected:
     */
    virtual size_t decode_audio(const_bit_vector& frame_body, imbe_decoder& imbe, float_queue& audio);
 
+private:
+
+   /**
+    * Compute the PN sequence for this voice
+    */
+   void remove_pn_sequence(compressed_voice_sample u0);
 
 };
 
