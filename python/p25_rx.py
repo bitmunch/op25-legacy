@@ -53,6 +53,8 @@ class P25Receiver (stdgui2.std_top_block):
         parser.add_option("-f", "--frequency", type="eng_float", default=0.0, help="set center frequency", metavar="Hz")
         parser.add_option("-b", "--bandwidth", type="eng_float", default=12.5e3, help="set bandwidth")
         parser.add_option("-s", "--channel-decim", type="int", default=1, help="channel decimation")
+        # and either can use this...
+        parser.add_option("-t", "--test", action="store_true", default= False, help="Use the Radio Rausch decoder")
 
         (options, args) = parser.parse_args()
         if len(args) != 0:
@@ -61,14 +63,16 @@ class P25Receiver (stdgui2.std_top_block):
 
         menubar = frame.GetMenuBar()
         file_menu = menubar.GetMenu(0)
-        file_open = file_menu.Insert(0, 201, u'&Open\u2026\tCtrl-O', 'Open file', wx.ITEM_NORMAL)
+        file_open = file_menu.Insert(0, 201, u'&Open...\tCtrl-O', 'Open file', wx.ITEM_NORMAL)
         frame.Bind(wx.EVT_MENU, self.on_file_open, file_open)
-        file_capture = file_menu.Insert(1, 202, u'&Capture\u2026\tCtrl-C', 'Capture from radio', wx.ITEM_NORMAL)
+        file_capture = file_menu.Insert(1, 202, u'&Capture...\tCtrl-C', 'Capture from radio', wx.ITEM_NORMAL)
         file_menu.InsertSeparator(2)
         file_save = file_menu.Insert(3, 203, u'Save\tCtrl-S', 'Save file.', wx.ITEM_NORMAL)
         file_save_as = file_menu.Insert(4, 204, u'Save &As\tShift-Ctrl-S', 'Save file', wx.ITEM_NORMAL)
         file_menu.InsertSeparator(5)
-        file_close = file_menu.Insert(6, 202, u'Close\tCtrl-W', 'Capture', wx.ITEM_NORMAL)
+        file_save = file_menu.Insert(6, 203, u'Properties...\tAlt-Enter', 'File properties.', wx.ITEM_NORMAL)
+        file_menu.InsertSeparator(7)
+        file_close = file_menu.Insert(8, 202, u'Close\tCtrl-W', 'Capture', wx.ITEM_NORMAL)
 
 #         toolbar = wx.ToolBar(frame, -1, style = wx.TB_DOCKABLE | wx.TB_HORIZONTAL)
 #         open_img = wx.Bitmap(u'images/open.png', wx.BITMAP_TYPE_PNG)
@@ -151,17 +155,12 @@ class P25Receiver (stdgui2.std_top_block):
             self.connect(self.demod_fsk4, self.symbol_scope)
             self.symbol_scope.win.set_format_plus()
 
-        msgq = gr.msg_queue(2)
-        self.decode_watcher = DecodeWatcher(msgq)
-        self.p25_decoder = op25.decoder_ff(msgq)
+        self.p25_decoder = op25.decoder_ff()
         self.connect(self.demod_fsk4, self.p25_decoder)
+        self.frame.SetStatusText(self.p25_decoder.device_name())
 
-        if True:
-            self.traffic = wx.StaticText(self.notebook, -1, "This is where the messages will be displayed!")
-            self.notebook.AddPage(self.traffic, "Traffic")
-
-        self.sink = gr.null_sink(gr.sizeof_float)
-        self.connect(self.p25_decoder, self.sink)
+#       self.sink = gr.null_sink(gr.sizeof_float)
+#       self.connect(self.p25_decoder, self.sink)
 
     def set_channel_offset(self, offset_hz, scale, units):
         self.channel_offset = -offset_hz
@@ -191,7 +190,7 @@ class P25Receiver (stdgui2.std_top_block):
         x += chan_width / 2
         x  = (x // chan_width) * chan_width
         self.set_channel_offset(x, scale_factor, self.spectrum.win._units)
-        # set squelch level
+        # set squelch threshold
         ymin, ymax = self.spectrum_plotter.GetYCurrentRange()
         y = min(y, ymax)
         y = max(y, ymin)
@@ -202,8 +201,8 @@ class P25Receiver (stdgui2.std_top_block):
         if dialog.ShowModal() == wx.ID_OK:
             file = dialog.GetPath()
             dialog.Destroy()
-            # extract the decimation factor from the filename
-            # Now set up the file source, stop and change the flow graph
+            # ToDo: extract the decimation factor
+            # ToDo: stop and change the flow graph
 
     def dump(self, object):
         print object.__class__.__name__
@@ -229,20 +228,6 @@ class DemodWatcher(threading.Thread):
             msg = self.msgq.delete_head()
             frequency_correction = msg.arg1() 
             self.callback(frequency_correction)
-
-class DecodeWatcher(threading.Thread):
-
-    def __init__(self, msgq, **kwds):
-        threading.Thread.__init__ (self, **kwds)
-        self.setDaemon(1)
-        self.msgq = msgq
-        self.keep_running = True
-        self.start()
-
-    def run(self):
-        while(self.keep_running):
-            msg = self.msgq.delete_head()
-            # ToDo: display msg in "traffic" tab and push to WireShark using scapy
 
 if '__main__' == __name__:
     app = stdgui2.stdapp(P25Receiver, "APCO P25 Receiver", 3)
