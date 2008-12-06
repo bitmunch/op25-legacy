@@ -30,16 +30,24 @@
 #include <gr_io_signature.h>
 #include <gr_message.h>
 #include <itpp/comm/bch.h>
+#include <net/if.h>
+#include <linux/if_tun.h>
 #include <op25_decoder_ff.h>
+#include <sys/ioctl.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 op25_decoder_ff_sptr
-op25_make_decoder_ff(gr_msg_queue_sptr msgq)
+op25_make_decoder_ff()
 {
-   return op25_decoder_ff_sptr(new op25_decoder_ff(msgq));
+   return op25_decoder_ff_sptr(new op25_decoder_ff);
 }
 
 op25_decoder_ff::~op25_decoder_ff()
 {
+   if(-1 != d_tap) {
+      close(d_tap);
+   }
 }
 
 void
@@ -75,7 +83,13 @@ op25_decoder_ff::general_work(int nof_output_items, gr_vector_int& nof_input_ite
    return nof_output_items;
 }
 
-op25_decoder_ff::op25_decoder_ff(gr_msg_queue_sptr msgq) :
+const char*
+op25_decoder_ff::device_name() const
+{
+   return d_tap_device.c_str();
+}
+
+op25_decoder_ff::op25_decoder_ff() :
    gr_block("decoder_ff", gr_make_io_signature(1, 1, sizeof(float)), gr_make_io_signature(0, 1, sizeof(float))),
    d_state(SYNCHRONIZING),
    d_data_unit(),
@@ -83,14 +97,26 @@ op25_decoder_ff::op25_decoder_ff(gr_msg_queue_sptr msgq) :
    d_frame_hdr(114),
    d_fs(0),
    d_imbe(imbe_decoder::make_imbe_decoder()),
-   d_msgq(msgq),
    d_symbol(0),
+   d_tap(-1),
+   d_tap_device("TUN/TAP not available"),
    d_unrecognized(0)
 {
+   d_tap = open("/dev/net/tun", O_RDWR);
+   if(-1 != d_tap) {
+      struct ifreq ifr;
+      memset(&ifr, 0, sizeof(ifr));
+      ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
+      strncpy(ifr.ifr_name, "p25-%d", IFNAMSIZ);
+      if(0 <= ioctl(d_tap, TUNSETIFF, &ifr)) {
+         d_tap_device = std::string(ifr.ifr_name);
+      } else {
+         perror("ioctl(d_tap, TUNSETIFF, &ifr)");
+         close(d_tap);
+         d_tap = -1;
+      }
+   }
 }
-
-#include <iostream>
-using namespace std;
 
 bool
 op25_decoder_ff::correlates(dibit d)
@@ -143,13 +169,18 @@ op25_decoder_ff::receive_symbol(dibit d)
    case READING:
       d_data_unit->extend(d);
       if(d_data_unit->size() == d_data_unit->max_size()) {
-         size_t msg_sz = (7 + d_data_unit->size()) >> 3;
-         gr_message_sptr msg = gr_make_message(/*type*/0, /*arg1*/++d_data_units, /*arg2*/0, msg_sz);
-         uint8_t *msg_data = static_cast<uint8_t*>(msg->msg());
-         if((msg_sz = d_data_unit->decode(msg_sz, msg_data, *d_imbe, d_audio))) {
-            d_msgq->handle(msg);
+         const size_t msg_hdr_sz = 14;
+         const size_t msg_sz = (7 + d_data_unit->size()) >> 3;
+         const size_t total_msg_sz = msg_hdr_sz + msg_sz;
+         uint8_t msg_data[total_msg_sz];
+         if((d_data_unit->decode(msg_sz, msg_data + msg_hdr_sz, *d_imbe, d_audio)) && (-1 != d_tap)) {
+            memset(&msg_data[0], 0xff, 6);
+            memset(&msg_data[6], 0x00, 6);
+            memset(&msg_data[12], 0xff, 2);
+            write(d_tap, msg_data, total_msg_sz);
          }
          data_unit_sptr null;
+
          d_data_unit = null;
          d_state = SYNCHRONIZING;
       }

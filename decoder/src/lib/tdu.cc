@@ -61,8 +61,8 @@ tdu::apply_golay_correction(bit_vector& frame)
 void
 tdu::apply_rs_correction(bit_vector& frame)
 {
+#if 0
    static itpp::Reed_Solomon rs(63, 17, true);
-
    itpp::bvec b(70);
    swab(frame, 114, 122, b,  0);
    swab(frame, 122, 126, b,  8);
@@ -74,10 +74,10 @@ tdu::apply_rs_correction(bit_vector& frame)
    swab(frame, 216, 226, b, 50);
    swab(frame, 238, 250, b, 60);
    itpp::bvec bd(rs.decode(b));
+#endif
 }
 
 #if 0
-
 void
 tdu::encode()
 {
@@ -92,5 +92,4 @@ tdu::encode()
    swab(be,  8, frame, 122, 126);
    swab(be,  0, frame, 114, 122);
 }
-
 #endif

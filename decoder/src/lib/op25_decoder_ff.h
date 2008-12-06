@@ -27,20 +27,20 @@
 #include <bitset>
 #include <data_unit.h>
 #include <gr_block.h>
-#include <gr_msg_queue.h>
 #include <imbe_decoder.h>
+#include <string>
 
 typedef boost::shared_ptr<class op25_decoder_ff> op25_decoder_ff_sptr;
 
-op25_decoder_ff_sptr op25_make_decoder_ff(gr_msg_queue_sptr msgq);
+op25_decoder_ff_sptr op25_make_decoder_ff();
 
 typedef std::bitset<48> frame_sync;
 
 /**
  * op25_decoder_ff is a GNU Radio block for decoding APCO P25
  * signals. This class expects its input to be a stream of dibit
- * symbols from the demodulator and produces an 48KS/s mono audio
- * stream. Frame contents are sent to the message queue.
+ * symbols from the demodulator and produces a mono audio
+ * stream.
  */
 class op25_decoder_ff : public gr_block
 {
@@ -61,23 +61,27 @@ public:
     */
    virtual int general_work(int nof_output_items, gr_vector_int& nof_input_items, gr_vector_const_void_star& input_items, gr_vector_void_star& output_items);
 
+   /**
+    * Return a pointer to a string naming the device to which packets
+    * are forwarded.
+    *
+    * \return A pointer to a NUL-terminated character string.
+    */
+   const char *device_name() const;
+
 private:
 
    /**
     * Expose class to public ctor. Create a new instance of
     * op25_decoder_ff and wrap it in a shared_ptr. This is effectively
     * the public constructor.
-    *
-    * \param msgq The queue on which to write the decoded messages.
     */
-   friend op25_decoder_ff_sptr op25_make_decoder_ff(gr_msg_queue_sptr msgq);
+   friend op25_decoder_ff_sptr op25_make_decoder_ff();
 
    /**
     * op25_decoder_ff protected constructor.
-    *
-    * \param msgq A pointer to the msgq.
     */
-   op25_decoder_ff(gr_msg_queue_sptr msgq);
+   op25_decoder_ff();
 
    /**
     * Tests whether the received dibit symbol completes a frame sync
@@ -105,9 +109,11 @@ private:
    bit_vector d_frame_hdr;
    frame_sync d_fs;
    imbe_decoder_sptr d_imbe;
-   gr_msg_queue_sptr d_msgq;
    uint32_t d_symbol;
+   int32_t d_tap;
+   std::string d_tap_device;
    uint32_t d_unrecognized;
+
 };
 
 #endif /* INCLUDED_OP25_DECODER_FF_H */
