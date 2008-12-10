@@ -48,7 +48,7 @@ size_t
 ldu1::decode_audio(const_bit_vector& frame_body, imbe_decoder& imbe, float_queue& audio)
 {
    static const size_t nof_voice_codewords = 9;
-   static const size_t voice_codewords[nof_voice_codewords][144] = {
+   static const size_t bit_schedule[nof_voice_codewords][144] = {
 
       { 114, 121, 126, 133, 138, 147, 152, 159, 164, 171, 176, 183,
         188, 195, 200, 207, 212, 221, 226, 233, 238, 245, 250, 257,

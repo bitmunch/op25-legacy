@@ -39,12 +39,10 @@ class qa_op25(gr_unittest.TestCase):
     def test_constructor(self):
         framing_sequence = (3, 3, 3, 3, 3, -3, 3, 3, -3, -3, 3, 3, -3, -3, -3, -3, 3, -3, 3, -3, -3, -3, -3, -3)
         src = gr.vector_source_f(framing_sequence, False)
-        msgq = gr.msg_queue()
-        p25 = op25.decoder_ff(msgq)
+        p25 = op25.decoder_ff()
         self.fg.connect(src, p25)
-        bit_bucket = gr.null_sink(gr.sizeof_float)
-        self.fg.connect(p25, bit_bucket)
-        self.fg.run()
+
+    # ToDo: add test cases!
         
 if __name__ == '__main__':
     gr_unittest.main ()
