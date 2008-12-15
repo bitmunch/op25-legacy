@@ -69,7 +69,8 @@ _op25_la_SOURCES = \
 	imbe_decoder.cc \
 	dummy_imbe_decoder.cc \
 	op25.cc \
-	op25_decoder_ff.cc 
+	op25_decoder_ff.cc \
+	vc55_imbe_decoder.cc 
 
 
 # magic flags

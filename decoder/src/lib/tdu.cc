@@ -37,12 +37,6 @@ tdu::~tdu()
 {
 }
 
-uint16_t
-tdu::max_size() const
-{
-   return d_has_link_control ? 432 : 144;
-}
-
 void
 tdu::correct_errors(bit_vector& frame)
 {
@@ -77,19 +71,8 @@ tdu::apply_rs_correction(bit_vector& frame)
 #endif
 }
 
-#if 0
-void
-tdu::encode()
+uint16_t
+tdu::frame_size_encoded() const
 {
-   itpp::bvec be(rs.encode(bd));
-   swab(be, 60, frame, 238, 250);
-   swab(be, 50, frame, 216, 226);
-   swab(be, 48, frame, 212, 213);
-   swab(be, 36, frame, 188, 200);
-   swab(be, 24, frame, 164, 176);
-   swab(be, 16, frame, 144, 152);
-   swab(be, 12, frame, 138, 142);
-   swab(be,  8, frame, 122, 126);
-   swab(be,  0, frame, 114, 122);
+   return d_has_link_control ? 432 : 144;
 }
-#endif

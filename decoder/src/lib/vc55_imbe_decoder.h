@@ -21,31 +21,30 @@
  * 02110-1301, USA.
  */
 
-#ifndef INCLUDED_DUMMY_IMBE_DECODER_H 
-#define INCLUDED_DUMMY_IMBE_DECODER_H 
+#ifndef INCLUDED_VC55_IMBE_DECODER_H 
+#define INCLUDED_VC55_IMBE_DECODER_H 
 
 #include <imbe_decoder.h>
 
 /**
- * dummy_imbe_decoder produces white noise in response to voice
- * frames. It is the imbe_decoder of last resort.
+ * vc55_imbe_decoder uses the VC55PR vocoder to decode voice.
+ * 
  */
-class dummy_imbe_decoder : public imbe_decoder {
+class vc55_imbe_decoder : public imbe_decoder {
 public:
 
    /**
-    * dummy_imbe_decoder default constructor.
+    * vc55_imbe_decoder default constructor.
     */
-   dummy_imbe_decoder();
+   vc55_imbe_decoder();
 
    /**
-    * dummy_imbe_decoder (virtual) destructor.
+    * vc55_imbe_decoder (virtual) destructor.
     */
-   virtual ~dummy_imbe_decoder();
+   virtual ~vc55_imbe_decoder();
 
    /**
-    * Ignores in_out and generates white noise in response to all
-    * compressed voice samples.
+    * Passess the voice_codeword in_out to the VC55PR device
     *
     * \param in_out IMBE codewords and parity.
     * \param in Queue of audio samples to which output is written.
@@ -53,6 +52,13 @@ public:
     */
    virtual size_t decode(voice_codeword& in_out, audio_output& out);
 
+private:
+
+   /**
+    * File descriptor for the actual terminal device.
+    */
+   int32_t d_fd;
+
 };
 
-#endif /* INCLUDED_DUMMY_IMBE_DECODER_H */
+#endif /* INCLUDED_VC55_IMBE_DECODER_H */

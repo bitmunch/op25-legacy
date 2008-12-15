@@ -32,12 +32,6 @@ ldu2::~ldu2()
 {
 }
 
-uint16_t
-ldu2::max_size() const
-{
-   return 1728;
-}
-
 void
 ldu2::correct_errors(bit_vector& frame_body)
 {
@@ -46,8 +40,8 @@ ldu2::correct_errors(bit_vector& frame_body)
 size_t
 ldu2::decode_audio(const_bit_vector& frame_body, imbe_decoder& imbe, float_queue& audio)
 {
-   static const size_t nof_voice_codewords = 9;
-   static const size_t voice_codewords[nof_voice_codewords][144] = {
+   static const size_t nof_voice_codewords = 9, voice_codeword_sz = 144;
+   static const size_t voice_codeword_bits[nof_voice_codewords][voice_codeword_sz] = {
 
       { 114, 121, 126, 133, 138, 147, 152, 159, 164, 171, 176, 183,
         188, 195, 200, 207, 212, 221, 226, 233, 238, 245, 250, 257,
@@ -168,5 +162,19 @@ ldu2::decode_audio(const_bit_vector& frame_body, imbe_decoder& imbe, float_queue
 
    };
 
-   return 0;
+   size_t nof_samples = 0;
+   for(size_t i = 0; i < nof_voice_codewords; ++i) {
+      voice_codeword cw;
+      for(size_t j = 0; j < voice_codeword_sz; ++j) {
+         cw[j] = frame_body[voice_codeword_bits[i][j]];
+      }
+      nof_samples += imbe.decode(cw, audio);
+   }
+   return nof_samples;
+}
+
+uint16_t
+ldu2::frame_size_encoded() const
+{
+   return 1728;
 }

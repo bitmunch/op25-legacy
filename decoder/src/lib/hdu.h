@@ -46,15 +46,6 @@ public:
     */
    virtual ~hdu();
 
-   /**
-    * Returns the expected size of this data_unit in bits. For
-    * variable-length data this should return UINT16_MAX until the
-    * actual length of this frame is known.
-    *
-    * \return The expected size (in bits) of this data_unit.
-    */
-   virtual uint16_t max_size() const;
-
 protected:
 
    /**
@@ -81,6 +72,15 @@ protected:
     * \return 
     */
    virtual void apply_rs_correction(bit_vector& frame_body);
+
+   /**
+    * Returns the expected size (in bits) of this data unit in
+    * bits. For variable-length data this should return UINT16_MAX
+    * until the actual length of this frame is known.
+    *
+    * \return The expected size (in bits) of this data_unit when encoded.
+    */
+   virtual uint16_t frame_size_encoded() const;
 
 };
 

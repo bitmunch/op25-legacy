@@ -32,7 +32,7 @@ dummy_imbe_decoder::~dummy_imbe_decoder()
 }
 
 size_t
-dummy_imbe_decoder::decode(compressed_voice_sample& in_out, audio_output& out)
+dummy_imbe_decoder::decode(voice_codeword& in_out, audio_output& out)
 {
    // ToDo: implement me!
    return 0;

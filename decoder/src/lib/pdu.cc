@@ -31,17 +31,17 @@ pdu::~pdu()
 {
 }
 
-uint16_t
-pdu::max_size() const
-{
-  const size_t HEADER_BLOCK_SIZE = 312;
-
-  // ToDo: how do we get header fields when block is not yet complete?
-
-  return HEADER_BLOCK_SIZE;
-}
-
 void
 pdu::correct_errors(bit_vector& frame_body)
 {
+}
+
+uint16_t
+pdu::frame_size_encoded() const
+{
+  const size_t HEADER_BLOCK_SIZE = 312;
+
+  // ToDo: decide how do to get header fields when block is not yet complete
+
+  return HEADER_BLOCK_SIZE;
 }

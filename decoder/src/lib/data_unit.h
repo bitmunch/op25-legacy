@@ -24,7 +24,6 @@
 #ifndef INCLUDED_DATA_UNIT_H
 #define INCLUDED_DATA_UNIT_H
 
-#include <bitset>
 #include <boost/shared_ptr.hpp>
 #include <boost/noncopyable.hpp>
 #include <deque>
@@ -60,20 +59,25 @@ public:
    virtual ~data_unit();
 
    /**
-    * Returns the actual size of this data_unit in bits.
-    *
-    * \return The size (in bits) of this data_unit.
-    */
-   virtual uint16_t size() const = 0;
-
-   /**
-    * Returns the expected size of this data unit in bits. For
-    * variable-length data this should return UINT16_MAX until the
-    * actual length of this frame is known.
+    * Returns the size (in octets) of the error-corrected and
+    * de-interleaved data_unit.
     *
     * \return The expected size (in bits) of this data_unit.
     */
-   virtual uint16_t max_size() const = 0;
+   virtual uint16_t data_size() const = 0;
+
+   /**
+    * Decode, apply error correction and write the decoded frame
+    * contents to msg. For voice frames decoding causes the compressed
+    * audio to be decoded using the supplied imbe_decoder.
+    *
+    * \param msg_sz The size of the message buffer.
+    * \param msg A pointer to the message buffer.
+    * \param imbe The imbe_decoder to use to generate audio.
+    * \param audio A float_queue to which the audio (if any) is written.
+    * \return The number of octets written to msg.
+    */
+   virtual size_t decode(size_t msg_sz, uint8_t *msg, imbe_decoder& imbe, float_queue& audio) = 0;
 
    /**
     * Extends this data_unit with the specified dibit. If this
@@ -86,17 +90,12 @@ public:
    virtual void extend(dibit d) = 0;
 
    /**
-    * Decode, error correction and write the decoded frame contents to
-    * msg. If the frame contains compressed audio then decode it using
-    * the supplied imbe_decoder and write it to audio.
+    * Tests whether this data unit has enough data to begin decoding.
     *
-    * \param msg_sz The size of the message buffer.
-    * \param msg A pointer to where the data unit content will be written.
-    * \param imbe The imbe_decoder to use to generate audio.
-    * \param audio A float_queue to which the audio (if any) is written.
-    * \return The number of octets written to msg.
+    * \return true when this data_unit is complete; otherwise returns
+    * false.
     */
-   virtual size_t decode(size_t msg_sz, uint8_t *msg, imbe_decoder& imbe, float_queue& audio) = 0;
+   virtual bool is_complete() const = 0;
 
 protected:
 

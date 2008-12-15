@@ -32,23 +32,16 @@ ldu1::~ldu1()
 {
 }
 
-uint16_t
-ldu1::max_size() const
-{
-   return 1728;
-}
-
 void
 ldu1::correct_errors(bit_vector& frame_body)
 {
-   // ToDo: implement me!
 }
 
 size_t
 ldu1::decode_audio(const_bit_vector& frame_body, imbe_decoder& imbe, float_queue& audio)
 {
-   static const size_t nof_voice_codewords = 9;
-   static const size_t bit_schedule[nof_voice_codewords][144] = {
+   static const size_t nof_voice_codewords = 9, voice_codeword_sz = 144;
+   static const size_t voice_codeword_bits[nof_voice_codewords][voice_codeword_sz] = {
 
       { 114, 121, 126, 133, 138, 147, 152, 159, 164, 171, 176, 183,
         188, 195, 200, 207, 212, 221, 226, 233, 238, 245, 250, 257,
@@ -166,7 +159,22 @@ ldu1::decode_audio(const_bit_vector& frame_body, imbe_decoder& imbe, float_queue
         1658, 1665, 1670, 1677, 1682, 1689, 1694, 1701, 1706, 1713, 1718, 1725,
         1585, 1590, 1597, 1602, 1609, 1614, 1621, 1626, 1633, 1638, 1645, 1650,
         1659, 1664, 1671, 1676, 1683, 1688, 1695, 1700, 1707, 1712, 1719, 1724 },
+
    };
 
-   return 0;
+   size_t nof_samples = 0;
+   for(size_t i = 0; i < nof_voice_codewords; ++i) {
+      voice_codeword cw;
+      for(size_t j = 0; j < voice_codeword_sz; ++j) {
+         cw[j] = frame_body[voice_codeword_bits[i][j]];
+      }
+      nof_samples += imbe.decode(cw, audio);
+   }
+   return nof_samples;
+}
+
+uint16_t
+ldu1::frame_size_encoded() const
+{
+   return 1728;
 }

@@ -28,6 +28,7 @@
 #include <data_unit.h>
 #include <gr_block.h>
 #include <imbe_decoder.h>
+#include <itpp/comm/bch.h>
 #include <string>
 
 typedef boost::shared_ptr<class op25_decoder_ff> op25_decoder_ff_sptr;
@@ -104,6 +105,7 @@ private:
  
    enum { SYNCHRONIZING, IDENTIFYING, READING } d_state;
    float_queue d_audio;
+   itpp::BCH d_bch;
    data_unit_sptr d_data_unit;
    uint32_t d_data_units;
    bit_vector d_frame_hdr;

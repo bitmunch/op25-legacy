@@ -29,7 +29,7 @@
 #include <boost/shared_ptr.hpp>
 #include <deque>
 
-typedef std::bitset<144> compressed_voice_sample;
+typedef std::bitset<144> voice_codeword;
 typedef std::deque<float> audio_output;
 
 typedef boost::shared_ptr<class imbe_decoder> imbe_decoder_sptr;
@@ -55,14 +55,14 @@ public:
    virtual ~imbe_decoder();
 
    /**
-    * Apply error correction to the compressed_voice_sample in_out,
+    * Apply error correction to the voice_codeword in_out,
     * decode the audio and write it to the audio_output.
     *
     * \param in_out IMBE codewords and parity.
     * \param in Queue of audio samples to which output is written.
     * \return The number of samples written to out.
     */
-   virtual size_t decode(compressed_voice_sample& in_out, audio_output& out) = 0;
+   virtual size_t decode(voice_codeword& in_out, audio_output& out) = 0;
 
 protected:
 

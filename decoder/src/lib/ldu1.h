@@ -45,15 +45,6 @@ public:
     */
    virtual ~ldu1();
 
-   /**
-    * Returns the expected size of this data_unit in bits. For
-    * variable-length data this should return UINT16_MAX until the
-    * actual length of this frame is known.
-    *
-    * \return The expected size (in bits) of this data_unit.
-    */
-   virtual uint16_t max_size() const;
-
 protected:
 
    /**
@@ -77,12 +68,14 @@ protected:
     */
    virtual size_t decode_audio(const_bit_vector& frame_body, imbe_decoder& imbe, float_queue& audio);
 
-private:
-
    /**
-    * Compute the PN sequence for this voice
+    * Returns the expected size (in bits) of this data_unit. For
+    * variable-length data this should return UINT16_MAX until the
+    * actual length of this frame is known.
+    *
+    * \return The expected size (in bits) of this data_unit when encoded.
     */
-   void remove_pn_sequence(compressed_voice_sample u0);
+   virtual uint16_t frame_size_encoded() const;
 
 };
 

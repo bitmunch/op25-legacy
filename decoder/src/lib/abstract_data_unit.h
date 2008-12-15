@@ -41,11 +41,12 @@ public:
    virtual ~abstract_data_unit();
 
    /**
-    * Returns the actual size of this data_unit in bits.
+    * Returns the size (in octets) of the error-corrected and
+    * de-interleaved data_unit.
     *
-    * \return The size (in bits) of this data_unit.
+    * \return The expected size (in bits) of this data_unit.
     */
-   virtual uint16_t size() const;
+   virtual uint16_t data_size() const;
 
    /**
     * Extends this data_unit with the specified dibit. If this
@@ -58,18 +59,25 @@ public:
    virtual void extend(dibit d);
 
    /**
-    * Apply error correction and write the decoded frame contents to
-    * msg. If the frame contains compressed audio then the audio
-    * should be decoded using the supplied imbe_decoder and written
-    * to audio.
+    * Decode, apply error correction and write the decoded frame
+    * contents to msg. For voice frames decoding causes the compressed
+    * audio to be decoded using the supplied imbe_decoder.
     *
     * \param msg_sz The size of the message buffer.
-    * \param msg A pointer to where the data unit content will be written.
+    * \param msg A pointer to the message buffer.
     * \param imbe The imbe_decoder to use to generate the audio.
-    * \param audio A deque<float> to which the audio (if any) is appended.
+    * \param audio A float_queue to which the audio (if any) is written.
     * \return The number of octets written to msg.
     */
    virtual size_t decode(size_t msg_sz, uint8_t *msg, imbe_decoder& imbe, float_queue& audio);
+
+   /**
+    * Tests whether this data unit has enough data to begin decoding.
+    *
+    * \return true when this data_unit is complete; otherwise returns
+    * false.
+    */
+   virtual bool is_complete() const;
 
 protected:
 
@@ -88,6 +96,17 @@ protected:
    virtual void correct_errors(bit_vector& frame_body);
 
    /**
+    * Decode compressed audio using the supplied imbe_decoder and
+    * writes output to audio.
+    *
+    * \param frame_body The const_bit_vector to decode.
+    * \param imbe The imbe_decoder to use to generate the audio.
+    * \param audio A deque<float> to which the audio (if any) is appended.
+    * \return The number of samples written to audio.
+    */
+   virtual size_t decode_audio(const_bit_vector& frame_body, imbe_decoder& imbe, float_queue& audio);
+
+   /**
     * Decode frame_body and write the decoded frame contents to msg.
     *
     * \param frame_body The bit vector to decode.
@@ -98,15 +117,40 @@ protected:
    virtual size_t decode_body(const_bit_vector& frame_body, size_t msg_sz, uint8_t *msg);
 
    /**
-    * Decode compressed audio using the supplied imbe_decoder and
-    * writes output to audio.
+    * Returns the expected size (in bits) of the de-interleaved and
+    * error-corrected data unit. For variable-length data this
+    * should return UINT16_MAX until the actual length of this frame
+    * is known.
     *
-    * \param frame_body The const_bit_vector to decode.
-    * \param imbe The imbe_decoder to use to generate the audio.
-    * \param audio A deque<float> to which the audio (if any) is appended.
-    * \return The number of samples written to audio.
+    * \return The expected size (in bits) of this data_unit when decoded.
     */
-   virtual size_t decode_audio(const_bit_vector& frame_body, imbe_decoder& imbe, float_queue& audio);
+   virtual uint16_t frame_size_decoded() const;
+
+   /**
+    * Returns the expected size (in bits) of this data_unit. For
+    * variable-length data this should return UINT16_MAX until the
+    * actual length of this frame is known.
+    *
+    * \return The expected size (in bits) of this data_unit when encoded.
+    */
+   virtual uint16_t frame_size_encoded() const = 0;
+
+   /**
+    * Returns the current size (in bits) of this data_unit.
+    *
+    * \return The current size (in bits) of this data_unit.
+    */
+   virtual uint16_t frame_size_now() const;
+
+   /**
+    * Return the interleaving vector (an array of frame_size_encoded()
+    * elements). The vector specifies where each bit of a decoded bit
+    * frame resides in an encoded frame.
+    *
+    * \return A (possibly NULL) pointer to the bit de-interleaving
+    * vector.
+    */
+   virtual const uint16_t *interleaving() const;
 
 private:
 
