@@ -38,7 +38,8 @@ vc55_imbe_decoder::vc55_imbe_decoder()
 {
    const char *dev = getenv("IMBE_DEV");
    const char *default_dev = "/dev/ttyS0";
-   d_fd = open(dev ? dev : default_dev, O_WRONLY | O_NOCTTY);
+   dev = dev ? dev : default_dev;
+   d_fd = open(dev, O_WRONLY | O_NOCTTY);
    if(-1 != d_fd) {
       struct termios options;
       if(-1 != tcgetattr(d_fd, &options)) {
@@ -55,7 +56,7 @@ vc55_imbe_decoder::vc55_imbe_decoder()
          }
       }
    } else {
-      // we're writing to file
+      perror("open(dev, O_WRONLY | O_NOCTTY)");
    }
 }
 
@@ -75,12 +76,9 @@ vc55_imbe_decoder::decode(voice_codeword& in_out, audio_output& out)
       packet[1] = 0xf0;
       swab(in_out, 0, 144, packet, 2);
       if(-1 == write(d_fd, packet, sizeof(packet))) {
-         ostringstream msg;
-         msg << "write(d_fd, packet, sizeof(packet): " << strerror(errno) << endl;
-         msg << "func: " << __PRETTY_FUNCTION__ << endl;
-         msg << "file: " << __FILE__ << endl;
-         msg << "line: " << __LINE__ << endl;
-         throw runtime_error(msg.str());
+         perror("write(d_fd, packet, sizeof(packet))");
+         close(d_fd);
+         d_fd = -1;
       }
    }
    return 0;
