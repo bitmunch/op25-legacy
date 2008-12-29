@@ -35,7 +35,7 @@ typedef boost::shared_ptr<class op25_decoder_ff> op25_decoder_ff_sptr;
 
 op25_decoder_ff_sptr op25_make_decoder_ff();
 
-typedef std::bitset<48> frame_sync;
+typedef uint64_t frame_sync;
 
 /**
  * op25_decoder_ff is a GNU Radio block for decoding APCO P25

@@ -155,11 +155,21 @@ op25_decoder_ff::op25_decoder_ff() :
 bool
 op25_decoder_ff::correlates(dibit d)
 {
-   d_fs <<= 2;
-   d_fs |= d;
-   static const frame_sync FS(0x5575f5ff77ffLL);
-   const frame_sync diff(FS ^ d_fs);
-   return diff.count() < 4;
+   size_t errs = 0;
+   const size_t ERR_THRESHOLD = 4;
+   const size_t NOF_FS_BITS = 48;
+   const frame_sync FS = 0x5575f5ff77ffLL;
+   const frame_sync FS_MASK = 0xffffffffffffLL;
+   d_frame_sync = (d_frame_sync << 2) | d;
+   d_frame_sync &= FS_MASK;
+   size_t diff = FS ^ d_frame_sync;
+   for(size_t i = 0; i < NOF_FS_BITS; ++i) {
+      if(diff & 0x1) {
+         ++errs;
+      }
+      diff >>= 1;
+   }
+   return errs < ERR_THRESHOLD;
 }
 
 void
