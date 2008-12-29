@@ -32,11 +32,13 @@ from math import pi
 from optparse import OptionParser
 from usrpm import usrp_dbid
 
-class P25Receiver (stdgui2.std_top_block):
+class p25_rx_block (stdgui2.std_top_block):
 
     def __init__(self, frame, panel, vbox, argv):
         stdgui2.std_top_block.__init__(self, frame, panel, vbox, argv)
 
+        # Create the GUI components
+        # 
         self.frame = frame
         self.frame.CreateStatusBar()
         self.frame.SetStatusText("")
@@ -44,6 +46,31 @@ class P25Receiver (stdgui2.std_top_block):
         self.notebook = wx.Notebook(self.panel)
         vbox.Add(self.notebook, 1, wx.EXPAND)       
 
+        menubar = frame.GetMenuBar()
+        file_menu = menubar.GetMenu(0)
+        file_open = file_menu.Insert(0, 201, u'&Open...\tCtrl-O', 'Open file', wx.ITEM_NORMAL)
+        frame.Bind(wx.EVT_MENU, self.on_file_open, file_open)
+        file_capture = file_menu.Insert(1, 202, u'&Capture...\tCtrl-C', 'Capture from radio', wx.ITEM_NORMAL)
+        frame.Bind(wx.EVT_MENU, self.on_file_capture, file_capture)
+        file_menu.InsertSeparator(2)
+        file_save = file_menu.Insert(3, 203, u'Save\tCtrl-S', 'Save file.', wx.ITEM_NORMAL)
+        frame.Bind(wx.EVT_MENU, self.on_file_save, file_save)
+        file_save_as = file_menu.Insert(4, 204, u'Save &As\tShift-Ctrl-S', 'Save file', wx.ITEM_NORMAL)
+        frame.Bind(wx.EVT_MENU, self.on_file_save_as, file_save_as)
+        file_menu.InsertSeparator(5)
+        file_properties = file_menu.Insert(6, 203, u'Properties...\tAlt-Enter', 'File properties.', wx.ITEM_NORMAL)
+        frame.Bind(wx.EVT_MENU, self.on_file_properties, file_properties)
+        file_menu.InsertSeparator(7)
+        file_close = file_menu.Insert(8, 202, u'Close\tCtrl-W', 'Close file', wx.ITEM_NORMAL)
+        frame.Bind(wx.EVT_MENU, self.on_file_close, file_close)
+
+#         toolbar = wx.ToolBar(frame, -1, style = wx.TB_DOCKABLE | wx.TB_HORIZONTAL)
+#         open_img = wx.Bitmap(u'images/open.png', wx.BITMAP_TYPE_PNG)
+#         toolbar.AddTool(201, u"Open", open_img)
+#         frame.SetToolBar(toolbar)
+
+        # Any command line args (avoid entering STOPPED state)
+        #
         parser = OptionParser(option_class=eng_option)
         # either these
         parser.add_option("-i", "--input", default=None, help="set input file")
@@ -53,32 +80,15 @@ class P25Receiver (stdgui2.std_top_block):
         parser.add_option("-f", "--frequency", type="eng_float", default=0.0, help="set center frequency", metavar="Hz")
         parser.add_option("-b", "--bandwidth", type="eng_float", default=12.5e3, help="set bandwidth")
         parser.add_option("-s", "--channel-decim", type="int", default=1, help="channel decimation")
-        # and either can use this...
-        parser.add_option("-t", "--test", action="store_true", default= False, help="Use the Radio Rausch decoder")
-
+        # go parse
         (options, args) = parser.parse_args()
         if len(args) != 0:
             parser.print_help()
             sys.exit(1)
 
-        menubar = frame.GetMenuBar()
-        file_menu = menubar.GetMenu(0)
-        file_open = file_menu.Insert(0, 201, u'&Open...\tCtrl-O', 'Open file', wx.ITEM_NORMAL)
-        frame.Bind(wx.EVT_MENU, self.on_file_open, file_open)
-        file_capture = file_menu.Insert(1, 202, u'&Capture...\tCtrl-C', 'Capture from radio', wx.ITEM_NORMAL)
-        file_menu.InsertSeparator(2)
-        file_save = file_menu.Insert(3, 203, u'Save\tCtrl-S', 'Save file.', wx.ITEM_NORMAL)
-        file_save_as = file_menu.Insert(4, 204, u'Save &As\tShift-Ctrl-S', 'Save file', wx.ITEM_NORMAL)
-        file_menu.InsertSeparator(5)
-        file_save = file_menu.Insert(6, 203, u'Properties...\tAlt-Enter', 'File properties.', wx.ITEM_NORMAL)
-        file_menu.InsertSeparator(7)
-        file_close = file_menu.Insert(8, 202, u'Close\tCtrl-W', 'Capture', wx.ITEM_NORMAL)
 
-#         toolbar = wx.ToolBar(frame, -1, style = wx.TB_DOCKABLE | wx.TB_HORIZONTAL)
-#         open_img = wx.Bitmap(u'images/open.png', wx.BITMAP_TYPE_PNG)
-#         toolbar.AddTool(201, u"Open", open_img)
-#         frame.SetToolBar(toolbar)
-
+        # Build flow graph
+        #
         usrp_rate = 64000000
         source_rate = usrp_rate // options.decim
 
@@ -101,6 +111,10 @@ class P25Receiver (stdgui2.std_top_block):
         else:
             print "no input specified!"
             exit(1)
+
+
+        # Create the flow graph
+        #
 
         self.spectrum = fftsink2.fft_sink_c(self.notebook, fft_size=512, sample_rate=source_rate, average=True, peak_hold=True)
         self.spectrum_plotter = self.spectrum.win.plot
@@ -145,7 +159,7 @@ class P25Receiver (stdgui2.std_top_block):
             self.connect(self.symbol_filter, self.signal_scope)
 
         autotuneq = gr.msg_queue(2)
-        self.demod_watcher = DemodWatcher(autotuneq, self.adjust_channel_offset)
+        self.demod_watcher = demod_watcher(autotuneq, self.adjust_channel_offset)
         self.demod_fsk4 = fsk4.demod_ff(autotuneq, self.channel_rate, self.symbol_rate)
         self.connect(self.symbol_filter, self.demod_fsk4)
 
@@ -162,21 +176,12 @@ class P25Receiver (stdgui2.std_top_block):
 #       self.sink = gr.null_sink(gr.sizeof_float)
 #       self.connect(self.p25_decoder, self.sink)
 
-    def set_channel_offset(self, offset_hz, scale, units):
-        self.channel_offset = -offset_hz
-        self.channel_filter.set_center_freq(self.channel_offset)
-        self.frame.SetStatusText("Channel offset: " + str(offset_hz * scale) + units, 1)
-
     def adjust_channel_offset(self, delta_hz):
         max_delta_hz = 6000.0
         delta_hz *= self.symbol_deviation      
         delta_hz = max(delta_hz, -max_delta_hz)
         delta_hz = min(delta_hz, max_delta_hz)
-        self.channel_filter.set_center_freq(self.channel_offset + delta_hz)
-
-    def set_squelch_threshold(self, squelch_db):
-        self.squelch.set_threshold(squelch_db)
-        self.frame.SetStatusText("Squelch: " + str(squelch_db) + "dB", 2)
+        self.channel_filter.set_center_freq(self.channel_offset - delta_hz)
 
     def on_spectrum_left_click(self, event):
         # set frequency
@@ -197,12 +202,48 @@ class P25Receiver (stdgui2.std_top_block):
         self.set_squelch_threshold(int(y))
 
     def on_file_open(self, event):
-        dialog = wx.FileDialog(self.frame, "Choose a sample file:", wildcard="*.dat", style=wx.OPEN)
+        dialog = wx.FileDialog(self.frame, "Choose a capture file:", wildcard="*.dat", style=wx.OPEN)
         if dialog.ShowModal() == wx.ID_OK:
             file = dialog.GetPath()
             dialog.Destroy()
             # ToDo: extract the decimation factor
             # ToDo: stop and change the flow graph
+
+    def on_file_capture(self, event):
+        todo = True
+        # ToDo: start the capture druid
+        # ToDo: stop and change the flow graph
+
+    def on_file_save(self, event):
+        todo = True
+        # ToDo: stop the flow graph
+        # ToDo: decide if we need to show file save dialog
+        # ToDo: rename the file
+
+    def on_file_save_as(self, event):
+        todo = True
+        # ToDo: stop the flow graph
+        # ToDo: decide if we need to show file save dialog
+        # ToDo: rename the file
+
+    def on_file_properties(self, event):
+        todo = True
+        # ToDo: show what data we have about the file (name, source, decimation factor, date(?), size(?),)
+
+    def on_file_close(self, event):
+        todo = True
+        # ToDo: stop the flow graph
+        # ToDo: decide if we need to save
+        # ToDo: ask "are you sure?"
+
+    def set_channel_offset(self, offset_hz, scale, units):
+        self.channel_offset = -offset_hz
+        self.channel_filter.set_center_freq(self.channel_offset)
+        self.frame.SetStatusText("Channel offset: " + str(offset_hz * scale) + units, 1)
+
+    def set_squelch_threshold(self, squelch_db):
+        self.squelch.set_threshold(squelch_db)
+        self.frame.SetStatusText("Squelch: " + str(squelch_db) + "dB", 2)
 
     def dump(self, object):
         print object.__class__.__name__
@@ -213,7 +254,7 @@ class P25Receiver (stdgui2.std_top_block):
                           processFunc(str(getattr(object, method).__doc__)))
                          for method in methodList])
 
-class DemodWatcher(threading.Thread):
+class demod_watcher(threading.Thread):
 
     def __init__(self, msgq,  callback, **kwds):
         threading.Thread.__init__ (self, **kwds)
@@ -226,9 +267,9 @@ class DemodWatcher(threading.Thread):
     def run(self):
         while(self.keep_running):
             msg = self.msgq.delete_head()
-            frequency_correction = msg.arg1() 
+            frequency_correction = msg.arg1()
             self.callback(frequency_correction)
 
 if '__main__' == __name__:
-    app = stdgui2.stdapp(P25Receiver, "APCO P25 Receiver", 3)
+    app = stdgui2.stdapp(p25_rx_block, "APCO P25 Receiver", 3)
     app.MainLoop()
