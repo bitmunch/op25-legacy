@@ -22,10 +22,9 @@
 import sys
 import threading
 import wx
+import wx.wizard
 
-from gnuradio import gr, gru, optfir, fsk4
-from gnuradio import eng_notation
-from gnuradio import op25
+from gnuradio import audio, eng_notation, fsk4, gr, gru, op25
 from gnuradio.eng_option import eng_option
 from gnuradio.wxgui import stdgui2, fftsink2, scopesink2
 from math import pi
@@ -48,21 +47,25 @@ class p25_rx_block (stdgui2.std_top_block):
 
         menubar = frame.GetMenuBar()
         file_menu = menubar.GetMenu(0)
-        file_open = file_menu.Insert(0, 201, u'&Open...\tCtrl-O', 'Open file', wx.ITEM_NORMAL)
-        frame.Bind(wx.EVT_MENU, self.on_file_open, file_open)
-        file_capture = file_menu.Insert(1, 202, u'&Capture...\tCtrl-C', 'Capture from radio', wx.ITEM_NORMAL)
-        frame.Bind(wx.EVT_MENU, self.on_file_capture, file_capture)
+        self.file_open = file_menu.Insert(0, 201, u'&Open...\tCtrl-O', 'Open file', wx.ITEM_NORMAL)
+        frame.Bind(wx.EVT_MENU, self.on_file_open, self.file_open)
+        self.file_capture = file_menu.Insert(1, 202, u'&Capture...\tCtrl-C', 'Capture from radio', wx.ITEM_NORMAL)
+        frame.Bind(wx.EVT_MENU, self.on_file_capture, self.file_capture)
         file_menu.InsertSeparator(2)
-        file_save = file_menu.Insert(3, 203, u'Save\tCtrl-S', 'Save file.', wx.ITEM_NORMAL)
-        frame.Bind(wx.EVT_MENU, self.on_file_save, file_save)
-        file_save_as = file_menu.Insert(4, 204, u'Save &As\tShift-Ctrl-S', 'Save file', wx.ITEM_NORMAL)
-        frame.Bind(wx.EVT_MENU, self.on_file_save_as, file_save_as)
+        self.file_save = file_menu.Insert(3, 203, u'Save\tCtrl-S', 'Save file.', wx.ITEM_NORMAL)
+        self.file_save.Enable(False)
+        frame.Bind(wx.EVT_MENU, self.on_file_save, self.file_save)
+        self.file_save_as = file_menu.Insert(4, 204, u'Save &As\tShift-Ctrl-S', 'Save file', wx.ITEM_NORMAL)
+        self.file_save_as.Enable(False)
+        frame.Bind(wx.EVT_MENU, self.on_file_save_as, self.file_save_as)
         file_menu.InsertSeparator(5)
-        file_properties = file_menu.Insert(6, 203, u'Properties...\tAlt-Enter', 'File properties.', wx.ITEM_NORMAL)
-        frame.Bind(wx.EVT_MENU, self.on_file_properties, file_properties)
+        self.file_properties = file_menu.Insert(6, 203, u'Properties...\tAlt-Enter', 'File properties.', wx.ITEM_NORMAL)
+        self.file_properties.Enable(False)
+        frame.Bind(wx.EVT_MENU, self.on_file_properties, self.file_properties)
         file_menu.InsertSeparator(7)
-        file_close = file_menu.Insert(8, 202, u'Close\tCtrl-W', 'Close file', wx.ITEM_NORMAL)
-        frame.Bind(wx.EVT_MENU, self.on_file_close, file_close)
+        self.file_close = file_menu.Insert(8, 202, u'Close\tCtrl-W', 'Close file', wx.ITEM_NORMAL)
+        self.file_close.Enable(False)
+        frame.Bind(wx.EVT_MENU, self.on_file_close, self.file_close)
 
 #         toolbar = wx.ToolBar(frame, -1, style = wx.TB_DOCKABLE | wx.TB_HORIZONTAL)
 #         open_img = wx.Bitmap(u'images/open.png', wx.BITMAP_TYPE_PNG)
@@ -78,14 +81,15 @@ class p25_rx_block (stdgui2.std_top_block):
         parser.add_option("-l", "--loop", action="store_true", default=False, help="loop input file")
         # or these
         parser.add_option("-f", "--frequency", type="eng_float", default=0.0, help="set center frequency", metavar="Hz")
-        parser.add_option("-b", "--bandwidth", type="eng_float", default=12.5e3, help="set bandwidth")
-        parser.add_option("-s", "--channel-decim", type="int", default=1, help="channel decimation")
+        parser.add_option("-c", "--channel-decim", type="int", default=1, help="channel decimation")
+        # or these
+        parser.add_option("-s", "--sound-card", type="string", default=None, help="device name (e.g. hw:0,0 or /dev/dsp)")
+        parser.add_option("-r", "--sample-rate", type="int", default=48000, help="sound card input sample rate")
         # go parse
         (options, args) = parser.parse_args()
         if len(args) != 0:
             parser.print_help()
             sys.exit(1)
-
 
         # Build flow graph
         #
@@ -97,6 +101,12 @@ class p25_rx_block (stdgui2.std_top_block):
             throttle = gr.throttle(gr.sizeof_gr_complex, source_rate);
             self.connect(file, throttle)
             self.source = throttle
+        elif options.sound_card:
+            soundcard = audio.source(options.sample_rate, options.sound_card)
+            # 
+            complex_conv = gr.float_to_complex()
+            self.connect(soundcard, complex_conv)
+            self.source = complex_conv
         elif options.frequency:
             usrp = usrp.source_c(0)
             subdev = usrp.pick_subdev(usrp, (usrp_dbid.TV_RX, usrp_dbid.TV_RX_REV_2, udrp.dbid.TV_RX_REV_3))
@@ -108,6 +118,7 @@ class p25_rx_block (stdgui2.std_top_block):
 #             self._subdev.set_gain(gain)
             usrp.tune(options.frequency)
             junk = usrp.tune(usrp, 0, subdev, frequency)
+            self.source = usrp
         else:
             print "no input specified!"
             exit(1)
@@ -115,7 +126,6 @@ class p25_rx_block (stdgui2.std_top_block):
 
         # Create the flow graph
         #
-
         self.spectrum = fftsink2.fft_sink_c(self.notebook, fft_size=512, sample_rate=source_rate, average=True, peak_hold=True)
         self.spectrum_plotter = self.spectrum.win.plot
         self.notebook.AddPage(self.spectrum.win, "RF Spectrum")
@@ -171,7 +181,7 @@ class p25_rx_block (stdgui2.std_top_block):
 
         self.p25_decoder = op25.decoder_ff()
         self.connect(self.demod_fsk4, self.p25_decoder)
-        self.frame.SetStatusText(self.p25_decoder.device_name())
+        self.frame.SetStatusText("TUN/TAP: " + self.p25_decoder.device_name())
 
 #       self.sink = gr.null_sink(gr.sizeof_float)
 #       self.connect(self.p25_decoder, self.sink)
@@ -244,6 +254,24 @@ class p25_rx_block (stdgui2.std_top_block):
     def set_squelch_threshold(self, squelch_db):
         self.squelch.set_threshold(squelch_db)
         self.frame.SetStatusText("Squelch: " + str(squelch_db) + "dB", 2)
+
+    def set_state(self, new_state):
+        self.state = new_state
+        if self.state == STOPPED:
+            self.file_save.Enable(False)
+            self.file_save_as.Enable(False)
+            self.file_properties.Enable(False)
+            self.file_close.Enable(False)
+        elif self.state == RUNNING:
+            self.file_save.Enable(False)
+            self.file_save_as.Enable(False)
+            self.file_properties.Enable(True)
+            self.file_close.Enable(True)
+        elif self.state == CAPTURING:
+            self.file_save.Enable(True)
+            self.file_save_as.Enable(True)
+            self.file_properties.Enable(True)
+            self.file_close.Enable(True)
 
     def dump(self, object):
         print object.__class__.__name__
