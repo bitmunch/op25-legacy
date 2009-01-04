@@ -186,18 +186,18 @@ op25_decoder_ff::receive_symbol(dibit d)
    case IDENTIFYING:
       ++d_symbol;
       d_frame_hdr[2 * d_symbol] = d & 2;
-      d_frame_hdr[2 * d_symbol + 1] = d & 1;
+      d_frame_hdr[(2 * d_symbol) + 1] = d & 1;
       if(56 == d_symbol) {
-
          itpp::bvec b(63);
          swab(d_frame_hdr,  63, 47, b,  0);
          swab(d_frame_hdr, 112, 71, b, 16);
          swab(d_frame_hdr,  69, 63, b, 57);
          b = d_bch.decode(b);
+         /**
          swab(b, 57, d_frame_hdr,  69, 63);
          swab(b, 16, d_frame_hdr, 112, 71);
          swab(b,  0, d_frame_hdr,  63, 47);
-
+         **/
          d_data_unit = data_unit::make_data_unit(d_frame_hdr);
          if(d_data_unit) {
             d_state = READING;
