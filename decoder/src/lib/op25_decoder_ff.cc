@@ -112,7 +112,7 @@ op25_decoder_ff::op25_decoder_ff() :
    d_imbe(imbe_decoder::make_imbe_decoder()),
    d_symbol(0),
    d_tap(-1),
-   d_tap_device("TUN/TAP not available"),
+   d_tap_device("not available"),
    d_unrecognized(0)
 {
    d_tap = open("/dev/net/tun", O_WRONLY);
@@ -127,7 +127,7 @@ op25_decoder_ff::op25_decoder_ff() :
             if(0 == ioctl(s, SIOCGIFFLAGS, &ifr)) {
                ifr.ifr_flags = IFF_UP;
                if(0 == ioctl(s, SIOCSIFFLAGS, &ifr)) {
-                  d_tap_device = std::string(ifr.ifr_name);
+                  d_tap_device = ifr.ifr_name;
                } else {
                   perror("ioctl(d_tap, SIOCSIFFLAGS, &ifr)");
                   close(d_tap);

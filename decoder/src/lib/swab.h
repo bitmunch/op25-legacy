@@ -62,10 +62,10 @@ swab(const_bit_vector& in, int begin, int end, itpp::bvec& out, int where)
 }
 
 /**
- * Swab bits from bitset in[begin,end) to octet vector out at position
- * where. Packing of out starts with the MSB.
+ * Swab bits from bit_vector in[begin,end) to octet vector out at
+ * position where. Packing of out starts with the MSB.
  *
- * \param in A const reference to the bitset.
+ * \param in A const reference to the bit_vector.
  * \param begin The offset of the first bit to copy.
  * \param end The offset of the end bit.
  * \param out Pointer to octet array into which bits are written.
@@ -80,9 +80,9 @@ swab(const_bit_vector& in, int begin, int end, uint8_t *out, int where)
 }
 
 /**
- * Swab bits from bit_vector in[begin,end) to bvec at position where.
+ * Swab bits to out[begin,end) from bvec at position where.
  *
- * \param in A const reference to the bitset.
+ * \param in A const reference to the bvec.
  * \param begin The offset of the first bit to copy.
  * \param end The offset of the end bit.
  * \param out A bvec into which bits are written.

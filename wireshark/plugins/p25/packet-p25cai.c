@@ -1795,12 +1795,11 @@ proto_reg_handoff_p25cai(void)
 
 		dissector_handle_t p25cai_handle;
 
-/*  Use new_create_dissector_handle() to indicate that dissect_p25cai()
- *  returns the number of bytes it dissected (or 0 if it thinks the packet
- *  does not belong to APCO Project 25 Common Air Interface).
- */
-		p25cai_handle = new_create_dissector_handle(dissect_p25cai,
-			proto_p25cai);
+		/*  Use new_create_dissector_handle() to indicate that dissect_p25cai()
+		 *  returns the number of bytes it dissected (or 0 if it thinks the packet
+		 *  does not belong to APCO Project 25 Common Air Interface).
+		 */
+		p25cai_handle = new_create_dissector_handle(dissect_p25cai,	proto_p25cai);
 		/* FIXME: Temporarily using a reserved ethertype!  This is a
 		 * development shortcut that should be corrected later.  Perhaps we
 		 * will apply for a libpcap data link type or use other mechanisms in
