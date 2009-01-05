@@ -175,7 +175,6 @@ class p25_rx_block (stdgui2.std_top_block):
     # setup to rx from file
     #
     def __set_rx_from_file(self, options):
-        print "set_rx"
         sample_rate = options.sample_rate
         # tell the scope the source rate
         self.spectrum.set_sample_rate(sample_rate)
@@ -334,13 +333,9 @@ class p25_rx_block (stdgui2.std_top_block):
     #
     def open_file(self, options):
         try:
-            print "try0"
 #            self.__read_file_properties(capture_file + ".info")
-            print "try1"
 #            capture_rate = self.info["capture-rate"]
-            print "try2"
             self.__set_rx_from_file(options)
-            print "try3"
 #            self._set_titlebar(capture_file)
             self._set_state("RUNNING")
         except:
