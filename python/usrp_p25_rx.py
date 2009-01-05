@@ -131,14 +131,14 @@ class p25_rx_block (stdgui2.std_top_block):
         self.frame.Bind(wx.EVT_MENU, self._on_file_close, self.file_close)
 
         # setup the toolbar
-        toolbar = wx.ToolBar(frame, -1, style = wx.TB_DOCKABLE | wx.TB_HORIZONTAL)
-        frame.SetToolBar(toolbar)
-        icon_size = wx.Size(24, 24)
-        new_icon = wx.ArtProvider.GetBitmap(wx.ART_NEW, wx.ART_TOOLBAR, icon_size)
-        self.toolbar_capture = toolbar.AddSimpleTool(wx.ID_NEW, new_icon, u"New Capture")
-        open_icon = wx.ArtProvider.GetBitmap(wx.ART_FILE_OPEN, wx.ART_TOOLBAR, icon_size)
-        self.toolbar_open = toolbar.AddSimpleTool(wx.ID_OPEN, open_icon, u"Open")
-        # ToDo: bind to file/open, enable disable along with it
+        if False:
+            toolbar = wx.ToolBar(frame, -1, style = wx.TB_DOCKABLE | wx.TB_HORIZONTAL)
+            frame.SetToolBar(toolbar)
+            icon_size = wx.Size(24, 24)
+            new_icon = wx.ArtProvider.GetBitmap(wx.ART_NEW, wx.ART_TOOLBAR, icon_size)
+            self.toolbar_capture = toolbar.AddSimpleTool(wx.ID_NEW, new_icon, u"New Capture")
+            open_icon = wx.ArtProvider.GetBitmap(wx.ART_FILE_OPEN, wx.ART_TOOLBAR, icon_size)
+            self.toolbar_open = toolbar.AddSimpleTool(wx.ID_OPEN, open_icon, u"Open")
 
         # setup the notebook
         self.notebook = wx.Notebook(self.panel)
@@ -172,11 +172,6 @@ class p25_rx_block (stdgui2.std_top_block):
     # setup to rx from file
     #
     def __set_rx_from_file(self, filename, capture_rate):
-        # ToDo:
-        # the file we've been passed is the descriptor
-        # it should specify the source device, sample rate and so on
-        # we use it to locate the actual data file to use
-
         # input file
         file = gr.file_source(gr.sizeof_gr_complex, filename, True)
         # throttle to source rate
@@ -221,31 +216,36 @@ class p25_rx_block (stdgui2.std_top_block):
         self.state = new_state
         if "STOPPED" == self.state:
             self.file_capture.Enable(True)
-            self.toolbar_capture.Enable(True)
+#            self.toolbar_capture.Enable(True)
             self.file_open.Enable(True)
-            self.toolbar_open.Enable(True)
+#            self.toolbar_open.Enable(True)
             self.file_properties.Enable(False)
             self.file_close.Enable(False)
             # Visually reflect "no file"
+            self.frame.SetStatusText("", 1)
+            self.frame.SetStatusText("", 2)
             self.spectrum_plotter.Clear()
             self.signal_plotter.Clear()
             self.symbol_plotter.Clear()
-            self.frame.SetStatusText("", 1)
-            self.frame.SetStatusText("", 2)
         elif "RUNNING" == self.state:
             self.file_capture.Enable(False)
-            self.toolbar_capture.Enable(False)
+#            self.toolbar_capture.Enable(False)
             self.file_open.Enable(False)
-            self.toolbar_open.Enable(False)
+#            self.toolbar_open.Enable(False)
             self.file_properties.Enable(True)
             self.file_close.Enable(True)
         elif "CAPTURING" == self.state:
             self.file_capture.Enable(False)
-            self.toolbar_capture.Enable(False)
+#            self.toolbar_capture.Enable(False)
             self.file_open.Enable(False)
-            self.toolbar_open.Enable(False)
+#            self.toolbar_open.Enable(False)
             self.file_properties.Enable(True)
             self.file_close.Enable(True)
+
+    # Append filename to default title bar
+    #
+    def _set_titlebar(self, filename):
+        ToDo = True
 
     # Write capture file properties
     #
@@ -277,7 +277,7 @@ class p25_rx_block (stdgui2.std_top_block):
         wx.wizard.WizardPageSimple_Chain(page3, page4)
         wizard.FitToPage(page1)
         if wizard.RunWizard(page1):
-            # ToDo: set "Unsaved capture file" in frame title bar
+            self._set_titlebar("Unsaved capture file")
             # ToDo: scrape data,
             # ToDo: __set_rx_from_usrp(scraped data)
             # self.start()
@@ -298,6 +298,7 @@ class p25_rx_block (stdgui2.std_top_block):
                     path = save_dialog.GetPath()
                     save_dialog.Destroy()
                     # ToDo move (link/unlink) the capture to path
+                    # ToDo write the info file
 
         self._set_state("STOPPED")
 
@@ -348,7 +349,7 @@ class p25_rx_block (stdgui2.std_top_block):
             self.__read_file_properties(capture_file + ".info")
             capture_rate = self.info["capture-rate"]
             self.__set_rx_from_file(capture_file, capture_rate)
-            # ToDo: set capture_file name in frame title bar
+            self._set_titlebar(capture_file)
             self._set_state("RUNNING")
         except:
             wx.MessageBox("Cannot open capture file.", "File Error", wx.CANCEL | wx.ICON_EXCLAMATION)
