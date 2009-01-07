@@ -197,16 +197,24 @@ static const value_string key_ids[] = {
 };
 
 static const value_string algorithm_ids[] = {
+	/* Type I */
 	{ 0x00, "ACCORDION 1.3" },
 	{ 0x01, "BATON (Auto Even)" },
 	{ 0x02, "FIREFLY Type 1" },
 	{ 0x03, "MAYFLY Type 1" },
 	{ 0x04, "SAVILLE" },
 	{ 0x41, "BATON (Auto Odd)" },
+	/* Type III */
 	{ 0x80, "Unencrypted message" },
-	{ 0x81, "DES" },
-	{ 0x83, "Triple DES" },
-	{ 0x84, "AES" },
+	{ 0x81, "DES-OFB" },
+	{ 0x82, "2 key Triple DES" },
+	{ 0x83, "3 key Triple DES" },
+	{ 0x84, "AES-256" },
+	/* Motorola proprietary */
+	/* FIXME maybe these should only be interpreted this way if mfid == 0x90 */
+	{ 0x9F, "DES-XL" },
+	{ 0xA0, "DVI-XL" },
+	{ 0xA1, "DVP-XL" },
 	{ 0, NULL }
 };
 
