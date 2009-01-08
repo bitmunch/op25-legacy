@@ -135,18 +135,24 @@ static const value_string network_access_codes[] = {
 };
 
 static const value_string manufacturer_ids[] = {
+	/* from http://ftp.tiaonline.org/TR-8/TR815/Public/MFID_Assignments_080723.doc */
 	{ 0x00, "Standard MFID (pre-2001)" },
 	{ 0x01, "Standard MFID (post-2001)" },
+	{ 0x09, "Aselsan Inc." },
 	{ 0x10, "Relm / BK Radio" },
+	{ 0x18, "EADS Public Safety Inc." },
 	{ 0x20, "Cycomm" },
 	{ 0x28, "Efratom Time and Frequency Products, Inc" },
 	{ 0x30, "Com-Net Ericsson" },
+	{ 0x34, "Etherstack" },
 	{ 0x38, "Datron" },
 	{ 0x40, "Icom" },
 	{ 0x48, "Garmin" },
 	{ 0x50, "GTE" },
 	{ 0x55, "IFR Systems" },
+	{ 0x5A, "INIT Innovations in Transportation, Inc" },
 	{ 0x60, "GEC-Marconi" },
+	{ 0x64, "Harris Corp." },
 	{ 0x68, "Kenwood Communications" },
 	{ 0x70, "Glenayre Electronics" },
 	{ 0x74, "Japan Radio Co." },
@@ -164,6 +170,8 @@ static const value_string manufacturer_ids[] = {
 	{ 0xD8, "Tait Electronics" },
 	{ 0xE0, "Teletec" },
 	{ 0xF0, "Transcrypt International" },
+	{ 0xF8, "Vertex Standard" },
+	{ 0xFC, "Zetron, Inc" },
 	{ 0, NULL }
 };
 
@@ -197,6 +205,7 @@ static const value_string key_ids[] = {
 };
 
 static const value_string algorithm_ids[] = {
+	/* mostly from http://ftp.tiaonline.org/TR-8/TR815/Public/ALGID_Guide_040528.doc */
 	/* Type I */
 	{ 0x00, "ACCORDION 1.3" },
 	{ 0x01, "BATON (Auto Even)" },
