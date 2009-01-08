@@ -175,12 +175,81 @@ static const value_string manufacturer_ids[] = {
 	{ 0, NULL }
 };
 
+/* TODO: use link_control_opcodes instead */
 static const value_string link_control_formats[] = {
 	{ 0x00, "Group Call Format" },
 	{ 0x03, "Individual Call Format" },
 	{ 0x80, "Encrypted Group Call Format" },
 	{ 0x83, "Encrypted Individual Call Format" },
-	/* TODO: see AABF for more */
+	{ 0, NULL }
+};
+
+static const value_string link_control_opcodes[] = {
+	/* from AABF */
+	{ 0x00, "Group Voice Channel User (LCGVR)" }, /* LC_GRP_V_CH_USR */
+	{ 0x01, "Reserved" },
+	{ 0x02, "Group Voice Channel Update (LCGVU)" }, /* LC_GRP_V_CH_UPDT */
+	{ 0x03, "Unit to Unit Voice Channel User (LCUVR)" }, /* LC_UU_V_CH_USR */
+	{ 0x04, "Group Voice Channel Update - Explicit (LCGVUX)" }, /* LC_GRP_CH_UPDT_EXP */
+	{ 0x05, "Unit to Unit Answer Request (LCUAQ)" }, /* LC_UU_ANS_REQ */
+	{ 0x06, "Telephone Interconnect Voice Channel User (LCTVR)" }, /* LC_TELE_INT_V_CH_USR */
+	{ 0x07, "Telephone Interconnect Answer Request (LCTAQ)" }, /* LC_TELE_INT_ANS_REQ */
+	{ 0x08, "Reserved" },
+	{ 0x09, "Reserved" },
+	{ 0x0A, "Reserved" },
+	{ 0x0B, "Reserved" },
+	{ 0x0C, "Reserved" },
+	{ 0x0D, "Reserved" },
+	{ 0x0E, "Reserved" },
+	{ 0x0F, "Call Termination/Cancellation (LCCT)" }, /* LC_CALL_TRM_CAN */
+	{ 0x10, "Group Affiliation Query (LCGAQ)" }, /* LC_GRP_AFF_Q */
+	{ 0x11, "Unit Registration Command (LCRC)" }, /* LC_U_REG_CMD */
+	{ 0x12, "Unit Authentication Command (LCAC)" }, /* LC_AUTH_CMD */
+	{ 0x13, "Status Query (LCSQ)" }, /* LC_STS_Q */
+	{ 0x14, "Status Update (LCSU)" }, /* LC_STA_UPDT */
+	{ 0x15, "Message Update (LCMU)" }, /* LC_MSG_UPDT */
+	{ 0x16, "Call Alert (LCCA)" }, /* LC_CALL_ALRT */
+	{ 0x17, "Extended Function Command (LCEFC)" }, /* LC_EXT_FNCT_CMD */
+	{ 0x18, "Channel Identifier Update (LCCIU)" }, /* LC_CH_ID_UPDT */
+	{ 0x19, "Channel Identifier Update - Explicit (LCCIUX)" }, /* LC_CH_ID_UPDT_EXP */
+	{ 0x1A, "Reserved" },
+	{ 0x1B, "Reserved" },
+	{ 0x1C, "Reserved" },
+	{ 0x1D, "Reserved" },
+	{ 0x1E, "Reserved" },
+	{ 0x1F, "Reserved" },
+	{ 0x20, "System Service Broadcast (LCSSB)" }, /* LC_SYS_SRV_BCST */
+	{ 0x21, "Secondary Control Channel Broadcast (LCSCB)" }, /* LC_SCCB */
+	{ 0x22, "Adjacent Site Status Broadcast (LCASB)" }, /* LC_ADJ_STS_BCST */
+	{ 0x23, "RFSS Status Broadcast (LCRSB)" }, /* LC_RFSS_STS_BCST */
+	{ 0x24, "Network Status Broadcast (LCNSB)" }, /* LC_NET_STS_BCST */
+	{ 0x25, "Protection Parameter Broadcast (LCPPB)" }, /* LC_P_PARM_BCST */
+	{ 0x26, "Secondary Control Channel Broadcast - Explicit (LCSCBX)" }, /* LC_SCCB_EXP */
+	{ 0x27, "Adjacent Site Status Broadcast - Explicit (LCASBX)" }, /* LC_ADJ_STS_BCST_EXP */
+	{ 0x28, "RFSS Status Broadcast - Explicit (LCRSBX)" }, /* LC_RFSS_STS_BCST_EXP */
+	{ 0x29, "Network Status Broadcast - Explicit (LCNSBX)" }, /* LC_NET_STS_BCST_EXP */
+	{ 0x2A, "Reserved" },
+	{ 0x2B, "Reserved" },
+	{ 0x2C, "Reserved" },
+	{ 0x2D, "Reserved" },
+	{ 0x2E, "Reserved" },
+	{ 0x2F, "Reserved" },
+	{ 0x30, "Reserved" },
+	{ 0x31, "Reserved" },
+	{ 0x32, "Reserved" },
+	{ 0x33, "Reserved" },
+	{ 0x34, "Reserved" },
+	{ 0x35, "Reserved" },
+	{ 0x36, "Reserved" },
+	{ 0x37, "Reserved" },
+	{ 0x38, "Reserved" },
+	{ 0x39, "Reserved" },
+	{ 0x3A, "Reserved" },
+	{ 0x3B, "Reserved" },
+	{ 0x3C, "Reserved" },
+	{ 0x3D, "Reserved" },
+	{ 0x3E, "Reserved" },
+	{ 0x3F, "Reserved" },
 	{ 0, NULL }
 };
 
