@@ -46,6 +46,9 @@ class p25_rx_block (stdgui2.std_top_block):
         self.symbol_rate = 4800
         self.symbol_deviation = 600.0
 
+        # keep track of flow graph connections
+        self.cnxns = []
+
         # initialize the UI
         # 
         self.__init_gui(frame, panel, vbox)
@@ -56,6 +59,8 @@ class p25_rx_block (stdgui2.std_top_block):
         parser.add_option("-i", "--input", default=None, help="input file name")
         parser.add_option("-f", "--frequency", type="eng_float", default=0.0, help="USRP center frequency", metavar="Hz")
         parser.add_option("-d", "--decim", type="int", default=256, help="source decimation factor")
+        parser.add_option("-R", "--rx-subdev-spec", type="subdev", default=(0, 0), help="select USRP Rx side A or B (default=A)")
+        parser.add_option("-g", "--gain", type="eng_float", default=None, help="set USRP gain in dB (default is midpoint)")
         (options, args) = parser.parse_args()
         if len(args) != 0:
             parser.print_help()
@@ -63,23 +68,12 @@ class p25_rx_block (stdgui2.std_top_block):
 
         # configure specified data source
         #
-        usrp_rate = 64000000
         if options.input:
             self.open_file(options.input)
         elif options.frequency:
+            from gnuradio import usrp
             self._set_state("CAPTURING")
-            usrp = usrp.source_c(0)
-            subdev = usrp.pick_subdev(usrp, (usrp_dbid.TV_RX, usrp_dbid.TV_RX_REV_2, usrp.dbid.TV_RX_REV_3))
-            usrp.set_mux(usrp.determine_rx_mux_value(usrp, subdev))
-            usrp.set_decim_rate(options.decim)
-#             if gain is None:
-#                 g = self._subdev.gain_range()
-#                 gain = (g[0]+g[1])/2.0
-#             self._subdev.set_gain(gain)
-            usrp.tune(options.frequency)
-            junk = usrp.tune(usrp, 0, subdev, frequency)
-            self.source = usrp
-            self.spectrum.set_sample_rate(capture_rate)
+            self.__set_rx_from_usrp(options.decim, options.subdev_spec, options.gain, options.frequency)
         else:
             self._set_state("STOPPED")
 
@@ -93,7 +87,7 @@ class p25_rx_block (stdgui2.std_top_block):
                 else:
                     self.connect(p, b)
                     p = b
-        self.cnxns = cnxns
+        self.cnxns.extend(cnxns)
 
     # Disconnect the flow graph
     #
@@ -105,7 +99,7 @@ class p25_rx_block (stdgui2.std_top_block):
                 else:
                     self.disconnect(p, b)
                     p = b
-        self.cnxns = None
+        self.cnxns = []
 
     # initialize the UI
     # 
@@ -169,6 +163,28 @@ class p25_rx_block (stdgui2.std_top_block):
         self.info = pickle.load(f)
         f.close()
 
+    # setup to rx from USRP
+    #
+    def __set_rx_from_usrp(self, decimation_rate, subdev_spec, gain, frequency):
+        # USRP
+        u = usrp.source_c(decim_rate=decimation_rate)
+        if subdev_spec is None:
+            subdev_spec = usrp.pick_rx_subdevice(u)
+        u.set_mux(usrp.determine_rx_mux_value(u, subdev_spec))
+        subdev = usrp.selected_subdev(u, subdev_spec)
+        #print "Using RX d'board %s" % (subdev.side_and_name(),)
+        capture_rate = u.adc_freq() / u.decim_rate()
+        #print "USB sample rate %s" % (eng_notation.num_to_str(capture_rate))
+        if gain is None:
+            # if no gain was specified, use the mid-point in dB
+            g = subdev.gain_range()
+            gain = float(g[0]+g[1])/2
+        subdev.set_gain(gain)
+        r = u.tune(0, subdev, frequency)
+        if not r:
+            raise SystemExit, "Failed to set USRP frequency"
+        self._build_graph(u, capture_rate)
+
     # setup to rx from file
     #
     def __set_rx_from_file(self, filename, capture_rate):
@@ -176,6 +192,12 @@ class p25_rx_block (stdgui2.std_top_block):
         file = gr.file_source(gr.sizeof_gr_complex, filename, True)
         # throttle to source rate
         throttle = gr.throttle(gr.sizeof_gr_complex, capture_rate)
+        self.__connect([[file, throttle]])
+        self._build_graph(throttle, capture_rate)
+
+    # setup common flow graph elements
+    #
+    def _build_graph(self, source, capture_rate):
         # tell the scope the source rate
         self.spectrum.set_sample_rate(capture_rate)
         # channel filter
@@ -205,8 +227,8 @@ class p25_rx_block (stdgui2.std_top_block):
         # for now no audio output
         sink = gr.null_sink(gr.sizeof_float)
         # connect it all up
-        self.__connect([[file, throttle, self.channel_filter, self.squelch, fm_demod, symbol_filter, demod_fsk4, self.p25_decoder, sink],
-                      [throttle, self.spectrum],
+        self.__connect([[source, self.channel_filter, self.squelch, fm_demod, symbol_filter, demod_fsk4, self.p25_decoder, sink],
+                      [source, self.spectrum],
                       [symbol_filter, self.signal_scope],
                       [demod_fsk4, self.symbol_scope]])
 
