@@ -75,7 +75,7 @@ protected:
     *
     * \return The expected size (in bits) of this data_unit when encoded.
     */
-   virtual uint16_t frame_size_encoded() const;
+   virtual uint16_t frame_size_max() const;
 
 };
 

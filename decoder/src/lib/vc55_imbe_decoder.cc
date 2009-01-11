@@ -56,7 +56,7 @@ vc55_imbe_decoder::vc55_imbe_decoder()
          }
       }
    } else {
-      perror("open(dev, O_WRONLY | O_NOCTTY)");
+      perror("open(dev, O_WRONLY | O_NOCTTY)"); // a warning, not an error
    }
 }
 
@@ -74,7 +74,8 @@ vc55_imbe_decoder::decode(voice_codeword& in_out, audio_output& out)
       uint8_t packet[20];
       packet[0] = 0x56;
       packet[1] = 0xf0;
-      swab(in_out, 0, 144, packet, 2);
+
+      swab(in_out, 0, 144, &packet[2]);
       if(-1 == write(d_fd, packet, sizeof(packet))) {
          perror("write(d_fd, packet, sizeof(packet))");
          close(d_fd);

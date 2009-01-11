@@ -174,7 +174,7 @@ ldu2::decode_audio(const_bit_vector& frame_body, imbe_decoder& imbe, float_queue
 }
 
 uint16_t
-ldu2::frame_size_encoded() const
+ldu2::frame_size_max() const
 {
    return 1728;
 }

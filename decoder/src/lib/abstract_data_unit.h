@@ -117,40 +117,20 @@ protected:
    virtual size_t decode_body(const_bit_vector& frame_body, size_t msg_sz, uint8_t *msg);
 
    /**
-    * Returns the expected size (in bits) of the de-interleaved and
-    * error-corrected data unit. For variable-length data this
-    * should return UINT16_MAX until the actual length of this frame
-    * is known.
-    *
-    * \return The expected size (in bits) of this data_unit when decoded.
-    */
-   virtual uint16_t frame_size_decoded() const;
-
-   /**
     * Returns the expected size (in bits) of this data_unit. For
     * variable-length data this should return UINT16_MAX until the
     * actual length of this frame is known.
     *
     * \return The expected size (in bits) of this data_unit when encoded.
     */
-   virtual uint16_t frame_size_encoded() const = 0;
+   virtual uint16_t frame_size_max() const = 0;
 
    /**
     * Returns the current size (in bits) of this data_unit.
     *
     * \return The current size (in bits) of this data_unit.
     */
-   virtual uint16_t frame_size_now() const;
-
-   /**
-    * Return the interleaving vector (an array of frame_size_encoded()
-    * elements). The vector specifies where each bit of a decoded bit
-    * frame resides in an encoded frame.
-    *
-    * \return A (possibly NULL) pointer to the bit de-interleaving
-    * vector.
-    */
-   virtual const uint16_t *interleaving() const;
+   virtual uint16_t frame_size() const;
 
 private:
 

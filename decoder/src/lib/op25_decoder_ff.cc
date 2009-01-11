@@ -79,7 +79,7 @@ op25_decoder_ff::general_work(int nof_output_items, gr_vector_int& nof_input_ite
          receive_symbol(d);
       }
       consume(0, nof_input_items[0]);
-   
+
       for(int i = 0; i < nof_output_items; ++i) {
          float *out = reinterpret_cast<float*>(&output_items[i]);
          std::fill(&out[0], &out[nof_output_items], 0.0); // audio silence - for now
@@ -193,11 +193,11 @@ op25_decoder_ff::receive_symbol(dibit d)
          swab(d_frame_hdr, 112, 71, b, 16);
          swab(d_frame_hdr,  69, 63, b, 57);
          b = d_bch.decode(b);
-         /**
-         swab(b, 57, d_frame_hdr,  69, 63);
-         swab(b, 16, d_frame_hdr, 112, 71);
-         swab(b,  0, d_frame_hdr,  63, 47);
-         **/
+#if __x86_64
+         unswab(b, 57, d_frame_hdr,  69, 63);
+         unswab(b, 16, d_frame_hdr, 112, 71);
+         unswab(b,  0, d_frame_hdr,  63, 47);
+#endif
          d_data_unit = data_unit::make_data_unit(d_frame_hdr);
          if(d_data_unit) {
             d_state = READING;

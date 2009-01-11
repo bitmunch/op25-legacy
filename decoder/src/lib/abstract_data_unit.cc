@@ -37,16 +37,16 @@ abstract_data_unit::~abstract_data_unit()
 uint16_t
 abstract_data_unit::data_size() const
 {
-   return (7 + frame_size_decoded()) >> 3;
+   return (7 + frame_size_max()) >> 3;
 }
 
 void
 abstract_data_unit::extend(dibit d)
 {
-   if(frame_size_encoded() <= frame_size_now()) {
+   if(frame_size_max() <= frame_size()) {
       ostringstream msg;
       msg << "cannot extend frame " << endl;
-      msg << "(size now: " << frame_size_now() << ", expected size: " << frame_size_encoded() << ")" << endl;
+      msg << "(size now: " << frame_size() << ", expected size: " << frame_size_max() << ")" << endl;
       msg << "func: " << __PRETTY_FUNCTION__ << endl;
       msg << "file: " << __FILE__ << endl;
       msg << "line: " << __LINE__ << endl;
@@ -62,7 +62,7 @@ abstract_data_unit::decode(size_t msg_sz, uint8_t *msg, imbe_decoder& imbe, floa
    if(!is_complete()) {
       ostringstream msg;
       msg << "cannot decode frame body - frame is not complete" << endl;
-      msg << "(size now: "  << frame_size_now() << ", expected size: " << frame_size_encoded() << ")" << endl;
+      msg << "(size now: "  << frame_size() << ", expected size: " << frame_size_max() << ")" << endl;
       msg << "func: " << __PRETTY_FUNCTION__ << endl;
       msg << "file: " << __FILE__ << endl;
       msg << "line: " << __LINE__ << endl;
@@ -85,7 +85,7 @@ abstract_data_unit::decode(size_t msg_sz, uint8_t *msg, imbe_decoder& imbe, floa
 bool
 abstract_data_unit::is_complete() const
 {
-   return d_frame_body.size() >= frame_size_encoded();
+   return d_frame_body.size() >= frame_size_max();
 }
 
 abstract_data_unit::abstract_data_unit(const_bit_vector& frame_body) :
@@ -107,34 +107,17 @@ abstract_data_unit::decode_audio(const_bit_vector& frame_body, imbe_decoder& imb
 size_t
 abstract_data_unit::decode_body(const_bit_vector& frame_body, size_t msg_sz, uint8_t *msg)
 {
-   memset(msg, 0x00, msg_sz);
-   const uint16_t *int_sched = interleaving();
-   if(int_sched) {
-      const uint16_t frame_encoded_sz = frame_size_encoded();
-      for(uint16_t i = 0; i < frame_encoded_sz; ++i) {
-         msg[i / 8] ^= (frame_body[int_sched[i]] ? 1 : 0) << (7 - (i % 8));
-      }
-   } else {
-      swab(frame_body, 0, frame_body.size(), msg, 0);
-   }
-   return msg_sz;
+   return swab(frame_body, 0, frame_body.size(), msg);
 }
 
 uint16_t 
-abstract_data_unit::frame_size_decoded() const
+abstract_data_unit::frame_size_max() const
 {
-   return frame_size_encoded();
+   return frame_size_max();
 }
 
 uint16_t 
-abstract_data_unit::frame_size_now() const
+abstract_data_unit::frame_size() const
 {
    return d_frame_body.size();
 }
-
-const uint16_t*
-abstract_data_unit::interleaving() const
-{
-   return NULL;
-}
-

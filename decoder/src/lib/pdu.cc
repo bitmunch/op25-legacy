@@ -37,7 +37,7 @@ pdu::correct_errors(bit_vector& frame_body)
 }
 
 uint16_t
-pdu::frame_size_encoded() const
+pdu::frame_size_max() const
 {
   const size_t HEADER_BLOCK_SIZE = 312;
 

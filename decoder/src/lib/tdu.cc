@@ -72,7 +72,7 @@ tdu::apply_rs_correction(bit_vector& frame)
 }
 
 uint16_t
-tdu::frame_size_encoded() const
+tdu::frame_size_max() const
 {
    return d_has_link_control ? 432 : 144;
 }
