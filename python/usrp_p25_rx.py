@@ -19,10 +19,12 @@
 # Software Foundation, Inc., 51 Franklin Street, Boston, MA
 # 02110-1301, USA.
 
+import os
 import pickle
 import sys
 import threading
 import wx
+import wx.html
 import wx.wizard
 
 from gnuradio import audio, eng_notation, fsk4, gr, gru, op25
@@ -39,7 +41,16 @@ class p25_rx_block (stdgui2.std_top_block):
     # Initialize the P25 receiver
     #
     def __init__(self, frame, panel, vbox, argv):
+
         stdgui2.std_top_block.__init__(self, frame, panel, vbox, argv)
+
+        # do we have a USRP?
+        try:
+            self.usrp = None
+            from gnuradio import usrp
+            self.usrp = usrp.source_c()
+        except Exception:
+            ignore = True
 
         # setup (read-only) attributes
         self.channel_rate = 125000
@@ -54,11 +65,11 @@ class p25_rx_block (stdgui2.std_top_block):
         self.__init_gui(frame, panel, vbox)
 
         # command line argument parsing
-        #
         parser = OptionParser(option_class=eng_option)
         parser.add_option("-i", "--input", default=None, help="input file name")
         parser.add_option("-f", "--frequency", type="eng_float", default=0.0, help="USRP center frequency", metavar="Hz")
         parser.add_option("-d", "--decim", type="int", default=256, help="source decimation factor")
+        parser.add_option("-w", "--wait", action="store_true", default=False, help="block on startup")
         parser.add_option("-R", "--rx-subdev-spec", type="subdev", default=(0, 0), help="select USRP Rx side A or B (default=A)")
         parser.add_option("-g", "--gain", type="eng_float", default=None, help="set USRP gain in dB (default is midpoint)")
         (options, args) = parser.parse_args()
@@ -66,138 +77,23 @@ class p25_rx_block (stdgui2.std_top_block):
             parser.print_help()
             sys.exit(1)
 
+        # wait for gdb
+        if options.wait:
+            print 'Ready for GDB to attach (pid = %d)' % (os.getpid(),)
+            raw_input("Press 'Enter' to continue...")
+
         # configure specified data source
-        #
         if options.input:
             self.open_file(options.input)
         elif options.frequency:
-            from gnuradio import usrp
             self._set_state("CAPTURING")
-            self.__set_rx_from_usrp(options.decim, options.subdev_spec, options.gain, options.frequency)
+            self.open_usrp(options.subdev_spec, options.decim, options.gain, options.frequency, True)
         else:
             self._set_state("STOPPED")
 
-    # Connect up the flow graph
-    #
-    def __connect(self, cnxns):
-        for l in cnxns:
-            for b in l:
-                if b == l[0]:
-                    p = l[0]
-                else:
-                    self.connect(p, b)
-                    p = b
-        self.cnxns.extend(cnxns)
-
-    # Disconnect the flow graph
-    #
-    def __disconnect(self):
-        for l in self.cnxns:
-            for b in l:
-                if b == l[0]:
-                    p = l[0]
-                else:
-                    self.disconnect(p, b)
-                    p = b
-        self.cnxns = []
-
-    # initialize the UI
-    # 
-    def __init_gui(self, frame, panel, vbox):
-        self.frame = frame
-        self.frame.CreateStatusBar()
-        self.panel = panel
-        self.vbox = vbox
-        
-        # setup the "File" menu
-        menubar = self.frame.GetMenuBar()
-        file_menu = menubar.GetMenu(0)
-        self.file_capture = file_menu.Insert(0, wx.ID_NEW, u'&New Capture...\tCtrl-C', 'Capture from USRP', wx.ITEM_NORMAL)
-        self.frame.Bind(wx.EVT_MENU, self._on_file_capture, self.file_capture)
-#        self.file_open = file_menu.Insert(1, wx.ID_OPEN, u'&Open...\tCtrl-O', 'Open file', wx.ITEM_NORMAL)
-        self.file_open = file_menu.Insert(1, wx.ID_OPEN)
-        self.frame.Bind(wx.EVT_MENU, self._on_file_open, self.file_open)
-        file_menu.InsertSeparator(2)
-        self.file_properties = file_menu.Insert(3, wx.ID_PROPERTIES, u'Properties...\tAlt-Enter', 'File properties.', wx.ITEM_NORMAL)
-        self.frame.Bind(wx.EVT_MENU, self._on_file_properties, self.file_properties)
-        file_menu.InsertSeparator(4)
-        self.file_close = file_menu.Insert(5, wx.ID_CLOSE, u'Close\tCtrl-W', 'Close file', wx.ITEM_NORMAL)
-        self.frame.Bind(wx.EVT_MENU, self._on_file_close, self.file_close)
-
-        # setup the toolbar
-        if False:
-            toolbar = wx.ToolBar(frame, -1, style = wx.TB_DOCKABLE | wx.TB_HORIZONTAL)
-            frame.SetToolBar(toolbar)
-            icon_size = wx.Size(24, 24)
-            new_icon = wx.ArtProvider.GetBitmap(wx.ART_NEW, wx.ART_TOOLBAR, icon_size)
-            self.toolbar_capture = toolbar.AddSimpleTool(wx.ID_NEW, new_icon, u"New Capture")
-            open_icon = wx.ArtProvider.GetBitmap(wx.ART_FILE_OPEN, wx.ART_TOOLBAR, icon_size)
-            self.toolbar_open = toolbar.AddSimpleTool(wx.ID_OPEN, open_icon, u"Open")
-
-        # setup the notebook
-        self.notebook = wx.Notebook(self.panel)
-        self.vbox.Add(self.notebook, 1, wx.EXPAND)       
-        # add spectrum scope
-        self.spectrum = fftsink2.fft_sink_c(self.notebook, fft_size=512, average=True, peak_hold=True)
-        self.spectrum_plotter = self.spectrum.win.plot
-        self.spectrum_plotter.Bind(wx.EVT_LEFT_DOWN, self._on_spectrum_left_click)
-        self.notebook.AddPage(self.spectrum.win, "RF Spectrum")
-        # add C4FM scope
-        self.signal_scope = scopesink2.scope_sink_f(self.notebook, sample_rate = self.channel_rate, v_scale=5, t_scale=0.001)
-        self.signal_plotter = self.signal_scope.win.graph
-        self.notebook.AddPage(self.signal_scope.win, "C4FM Signal")
-        # add symbol scope
-        self.symbol_scope = scopesink2.scope_sink_f(self.notebook, frame_decim=1, sample_rate=self.symbol_rate, v_scale=1, t_scale=0.05)
-        self.symbol_plotter = self.symbol_scope.win.graph
-        self.symbol_scope.win.set_format_plus()
-        self.notebook.AddPage(self.symbol_scope.win, "Demodulated Symbols")
-#         # ToDo: add info tab
-#         # Report the TUN/TAP device name
-        self.p25_decoder = op25.decoder_ff()
-        self.frame.SetStatusText("TUN/TAP: " + self.p25_decoder.device_name())
-
-    # read capture file properties (decimation etc.)
-    #
-    def __read_file_properties(self, filename):
-        f = open(filename, "r")
-        self.info = pickle.load(f)
-        f.close()
-
-    # setup to rx from USRP
-    #
-    def __set_rx_from_usrp(self, decimation_rate, subdev_spec, gain, frequency):
-        # USRP
-        u = usrp.source_c(decim_rate=decimation_rate)
-        if subdev_spec is None:
-            subdev_spec = usrp.pick_rx_subdevice(u)
-        u.set_mux(usrp.determine_rx_mux_value(u, subdev_spec))
-        subdev = usrp.selected_subdev(u, subdev_spec)
-        #print "Using RX d'board %s" % (subdev.side_and_name(),)
-        capture_rate = u.adc_freq() / u.decim_rate()
-        #print "USB sample rate %s" % (eng_notation.num_to_str(capture_rate))
-        if gain is None:
-            # if no gain was specified, use the mid-point in dB
-            g = subdev.gain_range()
-            gain = float(g[0]+g[1])/2
-        subdev.set_gain(gain)
-        r = u.tune(0, subdev, frequency)
-        if not r:
-            raise SystemExit, "Failed to set USRP frequency"
-        self._build_graph(u, capture_rate)
-
-    # setup to rx from file
-    #
-    def __set_rx_from_file(self, filename, capture_rate):
-        # input file
-        file = gr.file_source(gr.sizeof_gr_complex, filename, True)
-        # throttle to source rate
-        throttle = gr.throttle(gr.sizeof_gr_complex, capture_rate)
-        self.__connect([[file, throttle]])
-        self._build_graph(throttle, capture_rate)
-
     # setup common flow graph elements
     #
-    def _build_graph(self, source, capture_rate):
+    def __build_graph(self, source, capture_rate):
         # tell the scope the source rate
         self.spectrum.set_sample_rate(capture_rate)
         # channel filter
@@ -228,21 +124,160 @@ class p25_rx_block (stdgui2.std_top_block):
         sink = gr.null_sink(gr.sizeof_float)
         # connect it all up
         self.__connect([[source, self.channel_filter, self.squelch, fm_demod, symbol_filter, demod_fsk4, self.p25_decoder, sink],
-                      [source, self.spectrum],
-                      [symbol_filter, self.signal_scope],
-                      [demod_fsk4, self.symbol_scope]])
+                        [source, self.spectrum],
+                        [symbol_filter, self.signal_scope],
+                        [demod_fsk4, self.symbol_scope]])
+
+    # Connect up the flow graph
+    #
+    def __connect(self, cnxns):
+        for l in cnxns:
+            for b in l:
+                if b == l[0]:
+                    p = l[0]
+                else:
+                    self.connect(p, b)
+                    p = b
+        self.cnxns.extend(cnxns)
+
+    # Disconnect the flow graph
+    #
+    def __disconnect(self):
+
+        print "connection list: "
+        print self.cnxns
+
+        for l in self.cnxns:
+            for b in l:
+                if b == l[0]:
+                    p = l[0]
+                else:
+                    self.disconnect(p, b)
+                    p = b
+        self.cnxns = []
+
+    # initialize the UI
+    # 
+    def __init_gui(self, frame, panel, vbox):
+        self.frame = frame
+        self.frame.CreateStatusBar()
+        self.panel = panel
+        self.vbox = vbox
+        
+        # setup the "File" menu
+        menubar = self.frame.GetMenuBar()
+        file_menu = menubar.GetMenu(0)
+        self.file_new = file_menu.Insert(0, wx.ID_NEW)
+        self.frame.Bind(wx.EVT_MENU, self._on_file_new, self.file_new)
+        self.file_open = file_menu.Insert(1, wx.ID_OPEN)
+        self.frame.Bind(wx.EVT_MENU, self._on_file_open, self.file_open)
+        file_menu.InsertSeparator(2)
+        self.file_properties = file_menu.Insert(3, wx.ID_PROPERTIES)
+        self.frame.Bind(wx.EVT_MENU, self._on_file_properties, self.file_properties)
+        file_menu.InsertSeparator(4)
+        self.file_close = file_menu.Insert(5, wx.ID_CLOSE)
+        self.frame.Bind(wx.EVT_MENU, self._on_file_close, self.file_close)
+
+        # setup the toolbar
+        if True:
+            self.toolbar = wx.ToolBar(frame, -1, style = wx.TB_DOCKABLE | wx.TB_HORIZONTAL)
+            frame.SetToolBar(self.toolbar)
+            icon_size = wx.Size(24, 24)
+            new_icon = wx.ArtProvider.GetBitmap(wx.ART_NEW, wx.ART_TOOLBAR, icon_size)
+            toolbar_new = self.toolbar.AddSimpleTool(wx.ID_NEW, new_icon, u"New Capture")
+            open_icon = wx.ArtProvider.GetBitmap(wx.ART_FILE_OPEN, wx.ART_TOOLBAR, icon_size)
+            toolbar_open = self.toolbar.AddSimpleTool(wx.ID_OPEN, open_icon, u"Open")
+            self.toolbar.Realize()
+        else:
+            self.toolbar = None
+
+        # setup the notebook
+        self.notebook = wx.Notebook(self.panel)
+        self.vbox.Add(self.notebook, 1, wx.EXPAND)       
+        # add spectrum scope
+        self.spectrum = fftsink2.fft_sink_c(self.notebook, fft_size=512, average=True, peak_hold=True)
+        self.spectrum_plotter = self.spectrum.win.plot
+        self.spectrum_plotter.Bind(wx.EVT_LEFT_DOWN, self._on_spectrum_left_click)
+        self.notebook.AddPage(self.spectrum.win, "RF Spectrum")
+        # add C4FM scope
+        self.signal_scope = scopesink2.scope_sink_f(self.notebook, sample_rate = self.channel_rate, v_scale=5, t_scale=0.001)
+        self.signal_plotter = self.signal_scope.win.graph
+        self.notebook.AddPage(self.signal_scope.win, "C4FM Signal")
+        # add symbol scope
+        self.symbol_scope = scopesink2.scope_sink_f(self.notebook, frame_decim=1, sample_rate=self.symbol_rate, v_scale=1, t_scale=0.05)
+        self.symbol_plotter = self.symbol_scope.win.graph
+        self.symbol_scope.win.set_format_plus()
+        self.notebook.AddPage(self.symbol_scope.win, "Demodulated Symbols")
+        # Traffic snapshot
+        self.traffic = TrafficPane(self.notebook)
+        self.notebook.AddPage(self.traffic, "Traffic")
+        # The P25 decoder
+        self.p25_decoder = op25.decoder_ff()
+        self.frame.SetStatusText("TUN/TAP: " + self.p25_decoder.device_name())
+
+    # read capture file properties (decimation etc.)
+    #
+    def __read_file_properties(self, filename):
+        f = open(filename, "r")
+        self.info = pickle.load(f)
+        ToDo = True
+        f.close()
+
+    # setup to rx from file
+    #
+    def __set_rx_from_file(self, filename, capture_rate):
+        file = gr.file_source(gr.sizeof_gr_complex, filename, True)
+        throttle = gr.throttle(gr.sizeof_gr_complex, capture_rate)
+        self.__connect([[file, throttle]])
+        self.__build_graph(throttle, capture_rate)
+
+    # setup to rx from USRP
+    #
+    def __set_rx_from_usrp(self, subdev_spec, decimation_rate, gain, frequency, preserve):
+        from gnuradio import usrp
+        # setup USRP
+        self.usrp.set_decim_rate(decimation_rate)
+        if subdev_spec is None:
+            subdev_spec = usrp.pick_rx_subdevice(self.usrp)
+        self.usrp.set_mux(usrp.determine_rx_mux_value(self.usrp, subdev_spec))
+        subdev = usrp.selected_subdev(self.usrp, subdev_spec)
+        capture_rate = self.usrp.adc_freq() / self.usrp.decim_rate()
+        self.info["capture-rate"] = capture_rate
+        if gain is None:
+            g = subdev.gain_range()
+            gain = float(g[0]+g[1])/2
+        subdev.set_gain(gain)
+        r = self.usrp.tune(0, subdev, frequency)
+        if not r:
+            raise RuntimeError("failed to set USRP frequency")
+        # capture file
+        if preserve:
+            try:
+                self.capture_filename = os.tmpnam()
+            except RuntimeWarning:
+                ignore = True
+            capture_file = gr.file_sink(gr.sizeof_gr_complex, self.capture_filename)
+            self.__connect([[self.usrp, capture_file]])
+        else:
+            self.capture_filename = None
+        # everything else
+        self.__build_graph(self.usrp, capture_rate)
 
     # Change the UI state
     #
     def _set_state(self, new_state):
         self.state = new_state
         if "STOPPED" == self.state:
-            self.file_capture.Enable(True)
-#            self.toolbar_capture.Enable(True)
+            # menu items
+            can_capture = self.usrp is not None
+            self.file_new.Enable(can_capture)
             self.file_open.Enable(True)
-#            self.toolbar_open.Enable(True)
             self.file_properties.Enable(False)
             self.file_close.Enable(False)
+            # toolbar
+            if self.toolbar:
+                self.toolbar.EnableTool(wx.ID_NEW, can_capture)
+                self.toolbar.EnableTool(wx.ID_OPEN, True)
             # Visually reflect "no file"
             self.frame.SetStatusText("", 1)
             self.frame.SetStatusText("", 2)
@@ -250,19 +285,26 @@ class p25_rx_block (stdgui2.std_top_block):
             self.signal_plotter.Clear()
             self.symbol_plotter.Clear()
         elif "RUNNING" == self.state:
-            self.file_capture.Enable(False)
-#            self.toolbar_capture.Enable(False)
+            # menu items
+            self.file_new.Enable(False)
             self.file_open.Enable(False)
-#            self.toolbar_open.Enable(False)
             self.file_properties.Enable(True)
             self.file_close.Enable(True)
+            # toolbar
+            if self.toolbar:
+                self.toolbar.EnableTool(wx.ID_NEW, False)
+                self.toolbar.EnableTool(wx.ID_OPEN, False)
         elif "CAPTURING" == self.state:
-            self.file_capture.Enable(False)
-#            self.toolbar_capture.Enable(False)
+            # menu items
+            self.file_new.Enable(False)
             self.file_open.Enable(False)
-#            self.toolbar_open.Enable(False)
             self.file_properties.Enable(True)
             self.file_close.Enable(True)
+            # toolbar
+            if self.toolbar:
+                self.toolbar.EnableTool(wx.ID_NEW, False)
+                self.toolbar.EnableTool(wx.ID_OPEN, False)
+
 
     # Append filename to default title bar
     #
@@ -276,7 +318,7 @@ class p25_rx_block (stdgui2.std_top_block):
         pickle.dump(self.info, f)
         f.close()
 
-    # Coarse frequency tracker
+    # Adjust the channel offset
     #
     def adjust_channel_offset(self, delta_hz):
         max_delta_hz = 12000.0
@@ -285,44 +327,44 @@ class p25_rx_block (stdgui2.std_top_block):
         delta_hz = min(delta_hz, max_delta_hz)
         self.channel_filter.set_center_freq(self.channel_offset - delta_hz)
 
-    # New capture from USRP 
-    #
-    def _on_file_capture(self, event):
-        wizard = wx.wizard.Wizard(None, -1, "New Capture from USRP")
-        # ToDo: set up proper wizard pages
-        page1 = wx.wizard.WizardPageSimple(wizard) # Intro - "please ensure you have plugged it in etc.", link to webpage
-        page2 = wx.wizard.WizardPageSimple(wizard) # Device/Card/Rate (implies decim) - all comboboxes 
-        page3 = wx.wizard.WizardPageSimple(wizard) # Capture data to disk? Explain why decision needed now.
-        page4 = wx.wizard.WizardPageSimple(wizard) # You are good to go...
-        wx.wizard.WizardPageSimple_Chain(page1, page2)
-        wx.wizard.WizardPageSimple_Chain(page2, page3)
-        wx.wizard.WizardPageSimple_Chain(page3, page4)
-        wizard.FitToPage(page1)
-        if wizard.RunWizard(page1):
-            self._set_titlebar("Unsaved capture file")
-            # ToDo: scrape data,
-            # ToDo: __set_rx_from_usrp(scraped data)
-            # self.start()
-            self._set_state("CAPTURING")
-
     # Close an open file
     #
     def _on_file_close(self, event):
         self.stop()
         self.wait()
         self.__disconnect()
-        # ToDo: check if capture has been logged to disk
-        if "CAPTURING" == self.state:
+        if "CAPTURING" == self.state and self.capture_filename:
             dialog = wx.MessageDialog(self.frame, "Save capture file before closing?", style=wx.YES_NO | wx.YES_DEFAULT | wx.ICON_QUESTION)
             if wx.ID_YES == dialog.ShowModal():
                 save_dialog = wx.FileDialog(self.frame, "Save capture file as:", wildcard="*.dat", style=wx.SAVE|wx.OVERWRITE_PROMPT)
                 if save_dialog.ShowModal() == wx.ID_OK:
-                    path = save_dialog.GetPath()
+                    path = str(save_dialog.GetPath())
                     save_dialog.Destroy()
-                    # ToDo move (link/unlink) the capture to path
-                    # ToDo write the info file
-
+                    os.rename(self.capture_filename, path)
+                    self.__write_file_properties(path + ".info")
+            else:
+                os.remove(self.capture_filename)
+        self.capture_filename = None
         self._set_state("STOPPED")
+
+    # New capture from USRP 
+    #
+    def _on_file_new(self, event):
+#         wizard = wx.wizard.Wizard(self.frame, -1, "New Capture from USRP")
+#         page1 = wizard_intro_page(wizard)
+#         page2 = wizard_details_page(wizard)
+#         page3 = wizard_preserve_page(wizard)
+#         page4 = wizard_finish_page(wizard)
+#         wx.wizard.WizardPageSimple_Chain(page1, page2)
+#         wx.wizard.WizardPageSimple_Chain(page2, page3)
+#         wx.wizard.WizardPageSimple_Chain(page3, page4)
+#         wizard.FitToPage(page1)
+#         if wizard.RunWizard(page1):
+        self.stop()
+        self.wait()
+        # ToDo: get open_usrp() arguments from wizard
+        self.open_usrp((1,0), 128, None, 468.0e06, True)
+        self.start()
 
     # Open an existing capture
     #
@@ -373,8 +415,23 @@ class p25_rx_block (stdgui2.std_top_block):
             self.__set_rx_from_file(capture_file, capture_rate)
             self._set_titlebar(capture_file)
             self._set_state("RUNNING")
-        except:
-            wx.MessageBox("Cannot open capture file.", "File Error", wx.CANCEL | wx.ICON_EXCLAMATION)
+        except Exception, x:
+            wx.MessageBox("Cannot open capture file: " + x.message, "File Error", wx.CANCEL | wx.ICON_EXCLAMATION)
+
+    # Open the USRP
+    #
+    def open_usrp(self, subdev_spec, decim, gain, frequency, preserve):
+        try:
+            self.info = {
+                "capture-rate": "unknown",
+                "center-freq": frequency,
+                "source-dev": "USRP",
+                "source-decim": decim }
+            self.__set_rx_from_usrp(subdev_spec, decim, gain, frequency, preserve)
+            self._set_titlebar("Capturing")
+            self._set_state("CAPTURING")
+        except Exception, x:
+            wx.MessageBox("Cannot open USRP: " + x.message, "USRP Error", wx.CANCEL | wx.ICON_EXCLAMATION)
 
     # Set the channel offset
     #
@@ -388,6 +445,140 @@ class p25_rx_block (stdgui2.std_top_block):
     def set_squelch_threshold(self, squelch_db):
         self.squelch.set_threshold(squelch_db)
         self.frame.SetStatusText("Squelch: " + str(squelch_db) + "dB", 2)
+
+
+# A snapshot of important fields in current traffic
+#
+class TrafficPane(wx.Panel):
+
+    # Initializer
+    #
+    def __init__(self, parent):
+
+        wx.Panel.__init__(self, parent)
+        sizer = wx.GridBagSizer(hgap=10, vgap=10)
+        self.fields = {}
+
+        label = wx.StaticText(self, -1, "DUID:")
+        sizer.Add(label, pos=(1,1))
+        field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
+        sizer.Add(field, pos=(1,2))
+        self.fields["duid"] = field;
+
+        label = wx.StaticText(self, -1, "Source:")
+        sizer.Add(label, pos=(2,1))
+        field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
+        sizer.Add(field, pos=(2,2))
+        self.fields["source"] = field;
+
+        label = wx.StaticText(self, -1, "Destination:")
+        sizer.Add(label, pos=(3,1))
+        field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
+        sizer.Add(field, pos=(3,2))
+        self.fields["dest"] = field;
+
+        label = wx.StaticText(self, -1, "NID:")
+        sizer.Add(label, pos=(4,1))
+        field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
+        sizer.Add(field, pos=(4,2))
+        self.fields["nid"] = field;
+
+        label = wx.StaticText(self, -1, "NAC:")
+        sizer.Add(label, pos=(5,1))
+        field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
+        sizer.Add(field, pos=(5,2))
+        self.fields["nac"] = field;
+
+        label = wx.StaticText(self, -1, "MFID:")
+        sizer.Add(label, pos=(1,4))
+        field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
+        sizer.Add(field, pos=(1,5))
+        self.fields["mfid"] = field;
+
+        label = wx.StaticText(self, -1, "ALGID:")
+        sizer.Add(label, pos=(2,4))
+        field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
+        sizer.Add(field, pos=(2,5))
+        self.fields["algid"] = field;
+
+        label = wx.StaticText(self, -1, "KID:")
+        sizer.Add(label, pos=(3,4))
+        field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
+        sizer.Add(field, pos=(3,5))
+        self.fields["kid"] = field;
+
+        label = wx.StaticText(self, -1, "MI:")
+        sizer.Add(label, pos=(4,4))
+        field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
+        sizer.Add(field, pos=(4,5))
+        self.fields["mi"] = field;
+
+        label = wx.StaticText(self, -1, "TGID:")
+        sizer.Add(label, pos=(5,4))
+        field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
+        sizer.Add(field, pos=(5,5))
+        self.fields["tgid"] = field;
+
+        self.SetSizer(sizer)
+        self.Fit()
+
+    # Clear the field values
+    #
+    def clear(self):
+        for v in self.fields.values():
+            v.Clear()
+
+    # Update the field values
+    #
+    def update(self, field_values):
+        for k,v in self.fields.items():
+            f = field_values.get(k, None)
+            if f:
+                v.SetValue(f)
+            else:
+                v.SetValue("")
+
+
+# Introduction page for USRP capture wizard
+#
+class wizard_intro_page(wx.wizard.WizardPageSimple):
+
+    # Initializer
+    #
+    def __init__(self, parent):
+        wx.wizard.WizardPageSimple.__init__(self, parent)
+        html = wx.html.HtmlWindow(self)
+        html.SetPage('''
+	<html>
+	 <body>
+         <h1>Capture from USRP</h1>
+	 <p>
+	  We will guide you through the process of capturing a sample from the USRP.
+	  Please ensure that the USRP is switched on and connected to this computer.
+	 </p>
+	 </body>
+	</html>
+	''')
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        self.SetSizer(sizer)
+        sizer.Add(html, 1, wx.ALIGN_CENTER | wx.EXPAND | wx.FIXED_MINSIZE)
+
+
+# USRP wizard details page
+#
+class wizard_details_page(wx.wizard.WizardPageSimple):
+
+    # Initializer
+    #
+    def __init__(self, parent):
+        wx.wizard.WizardPageSimple.__init__(self, parent)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        self.SetSizer(sizer)
+
+    # Return a tuple containing the subdev_spec, gain, frequency, decimation factor
+    #
+    def get_details(self):
+        ToDo = True
 
 
 # Frequency tracker
@@ -406,6 +597,25 @@ class demod_watcher(threading.Thread):
         while(self.keep_running):
             msg = self.msgq.delete_head()
             frequency_correction = msg.arg1()
+            self.callback(frequency_correction)
+
+
+# Decoder watcher
+#
+class decode_watcher(threading.Thread):
+
+    def __init__(self, msgq,  traffic_pane, **kwds):
+        threading.Thread.__init__ (self, **kwds)
+        self.setDaemon(1)
+        self.msgq = msgq
+        self.traffic_pane = traffic_pane
+        self.keep_running = True
+        self.start()
+
+    def run(self):
+        while(self.keep_running):
+            msg = self.msgq.delete_head()
+            # pickle_dict = msg.arg1()
             self.callback(frequency_correction)
 
 

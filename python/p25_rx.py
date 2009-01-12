@@ -157,8 +157,7 @@ class p25_rx_block (stdgui2.std_top_block):
         self.symbol_plotter = self.symbol_scope.win.graph
         self.symbol_scope.win.set_format_plus()
         self.notebook.AddPage(self.symbol_scope.win, "Demodulated Symbols")
-#         # ToDo: add info tab
-#         # Report the TUN/TAP device name
+        #         # Report the TUN/TAP device name
         self.p25_decoder = op25.decoder_ff()
         self.frame.SetStatusText("TUN/TAP: " + self.p25_decoder.device_name())
 
