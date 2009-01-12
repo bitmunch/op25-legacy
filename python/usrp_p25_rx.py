@@ -143,10 +143,6 @@ class p25_rx_block (stdgui2.std_top_block):
     # Disconnect the flow graph
     #
     def __disconnect(self):
-
-        print "connection list: "
-        print self.cnxns
-
         for l in self.cnxns:
             for b in l:
                 if b == l[0]:
