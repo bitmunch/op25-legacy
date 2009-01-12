@@ -114,7 +114,10 @@ class p25_rx_block (stdgui2.std_top_block):
         fm_demod = gr.quadrature_demod_cf(fm_demod_gain)
         # symbol filter        
         symbol_decim = 1
-        symbol_coeffs = gr.firdes.root_raised_cosine(1.0, channel_rate, self.symbol_rate, 0.2, 500)
+        #symbol_coeffs = gr.firdes.root_raised_cosine(1.0, channel_rate, self.symbol_rate, 0.2, 500)
+        # boxcar coefficients for "integrate and dump" filter
+        samples_per_symbol = channel_rate // self.symbol_rate
+        symbol_coeffs = (1.0/samples_per_symbol,)*samples_per_symbol
         symbol_filter = gr.fir_filter_fff(symbol_decim, symbol_coeffs)
         # C4FM demodulator
         autotuneq = gr.msg_queue(2)
