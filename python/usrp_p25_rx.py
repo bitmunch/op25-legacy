@@ -87,7 +87,7 @@ class p25_rx_block (stdgui2.std_top_block):
             self.open_file(options.input)
         elif options.frequency:
             self._set_state("CAPTURING")
-            self.open_usrp(options.subdev_spec, options.decim, options.gain, options.frequency, True)
+            self.open_usrp(options.rx_subdev_spec, options.decim, options.gain, options.frequency, True)
         else:
             self._set_state("STOPPED")
 
