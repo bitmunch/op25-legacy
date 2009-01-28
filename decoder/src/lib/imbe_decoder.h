@@ -24,13 +24,13 @@
 #ifndef INCLUDED_IMBE_DECODER_H 
 #define INCLUDED_IMBE_DECODER_H 
 
-#include <bitset>
 #include <boost/noncopyable.hpp>
 #include <boost/shared_ptr.hpp>
 #include <deque>
+#include <vector>
 
-typedef std::bitset<144> voice_codeword;
 typedef std::deque<float> audio_output;
+typedef std::vector<bool> voice_codeword;
 
 typedef boost::shared_ptr<class imbe_decoder> imbe_decoder_sptr;
 

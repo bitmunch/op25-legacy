@@ -24,18 +24,16 @@
 #ifndef INCLUDED_OP25_DECODER_FF_H
 #define INCLUDED_OP25_DECODER_FF_H
 
-#include <bitset>
 #include <data_unit.h>
 #include <gr_block.h>
+#include <gr_msg_queue.h>
 #include <imbe_decoder.h>
 #include <itpp/comm/bch.h>
 #include <string>
 
 typedef boost::shared_ptr<class op25_decoder_ff> op25_decoder_ff_sptr;
 
-op25_decoder_ff_sptr op25_make_decoder_ff();
-
-typedef uint64_t frame_sync;
+op25_decoder_ff_sptr op25_make_decoder_ff(gr_msg_queue_sptr msgq);
 
 /**
  * op25_decoder_ff is a GNU Radio block for decoding APCO P25
@@ -77,41 +75,60 @@ private:
     * op25_decoder_ff and wrap it in a shared_ptr. This is effectively
     * the public constructor.
     */
-   friend op25_decoder_ff_sptr op25_make_decoder_ff();
+   friend op25_decoder_ff_sptr op25_make_decoder_ff(gr_msg_queue_sptr msgq);
 
    /**
     * op25_decoder_ff protected constructor.
     */
-   op25_decoder_ff();
+   op25_decoder_ff(gr_msg_queue_sptr msgq);
 
    /**
-    * Tests whether the received dibit symbol completes a frame sync
-    * sequence. Returns true when d completes a frame sync bit string
-    * otherwise returns false. When found d_fs contains the frame sync
-    * value.
+    * Tests whether d_frame_header correlates with the APCO P25 frame
+    * sync sequence. This method must only be called when the frame
+    * header is larger than 48 bits in length (the minimum size for
+    * the FS).
     *
-    * \param d The symbol to process.
+    * \return true if the frame header correlates; otherwise false.
     */
-   bool correlates(dibit d);
+   bool correlated();
 
    /**
-    * Process a received symbol.
+    * Tests whether d_frame_header identifies a known data unit and if
+    * so sets d_data_unit to point to an appropriate instance. This
+    * method must only be called when the frame header is larger than
+    * 114 bits in length (the minimum size for a frame containing a
+    * NID).
+    *
+    * \return true if the frame header identifies a known data unit;
+    * otherwise false.
+    */
+   bool identified();
+
+   /**
+    * Process the completed data_unit (pointed at by
+    * d_data_unit). This decodes the data_unit and then sends the
+    * result to wireshark. Attempts to snapshot the data_unit and, if
+    * successfull, it passes the result to the user interface.
+    */
+   void process_data_unit();
+
+   /**
+    * Handle a received symbol.
     *
     * \param d The symbol to process.
     */
    void receive_symbol(dibit d);
 
 private:
- 
+   gr_msg_queue_sptr d_msgq;
    enum { SYNCHRONIZING, IDENTIFYING, READING } d_state;
    float_queue d_audio;
+   uint32_t d_bad_NIDs;
    itpp::BCH d_bch;
    data_unit_sptr d_data_unit;
    uint32_t d_data_units;
-   bit_vector d_frame_hdr;
-   frame_sync d_fs;
+   bit_queue d_frame_hdr;
    imbe_decoder_sptr d_imbe;
-   uint32_t d_symbol;
    int32_t d_tap;
    std::string d_tap_device;
    uint32_t d_unrecognized;

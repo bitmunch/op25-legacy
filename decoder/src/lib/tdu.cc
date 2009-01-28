@@ -27,7 +27,9 @@
 #include <swab.h>
 #include <tdu.h>
 
-tdu::tdu(const_bit_vector& frame_body, bool has_link_control) :
+using std::string;
+
+tdu::tdu(const_bit_queue& frame_body, bool has_link_control) :
    abstract_data_unit(frame_body),
    d_has_link_control(has_link_control)
 {
@@ -35,6 +37,12 @@ tdu::tdu(const_bit_vector& frame_body, bool has_link_control) :
 
 tdu::~tdu()
 {
+}
+
+string
+tdu::duid_str() const
+{
+   return string("TDU");
 }
 
 void

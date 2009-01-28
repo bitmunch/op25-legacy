@@ -23,12 +23,20 @@
 
 #include <pdu.h>
 
-pdu::pdu(const_bit_vector& frame_body) :
+using std::string;
+
+pdu::pdu(const_bit_queue& frame_body) :
    abstract_data_unit(frame_body)
 {
 }
 pdu::~pdu()
 {
+}
+
+string
+pdu::duid_str() const
+{
+   return string("PDU");
 }
 
 void

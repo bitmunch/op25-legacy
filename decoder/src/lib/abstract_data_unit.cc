@@ -25,8 +25,10 @@
 
 #include <algorithm>
 #include <cstring>
+#include <functional>
 #include <stdexcept>
 #include <sstream>
+#include <utility>
 
 using namespace std;
 
@@ -88,9 +90,17 @@ abstract_data_unit::is_complete() const
    return d_frame_body.size() >= frame_size_max();
 }
 
-abstract_data_unit::abstract_data_unit(const_bit_vector& frame_body) :
-   d_frame_body(frame_body)
+std::string
+abstract_data_unit::snapshot() const
 {
+   string empty;
+   return empty;
+}
+
+abstract_data_unit::abstract_data_unit(const_bit_queue& frame_body) :
+   d_frame_body(frame_body.size())
+{
+   copy(frame_body.begin(), frame_body.end(), d_frame_body.begin());
 }
 
 void
@@ -107,7 +117,7 @@ abstract_data_unit::decode_audio(const_bit_vector& frame_body, imbe_decoder& imb
 size_t
 abstract_data_unit::decode_body(const_bit_vector& frame_body, size_t msg_sz, uint8_t *msg)
 {
-   return swab(frame_body, 0, frame_body.size(), msg);
+   return extract(frame_body, 0, frame_body.size(), msg);
 }
 
 uint16_t 

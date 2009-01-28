@@ -25,6 +25,7 @@
 #define INCLUDED_ABSTRACT_DATA_UNIT_H
 
 #include <data_unit.h>
+#include <string>
 #include <vector>
 
 /**
@@ -79,14 +80,23 @@ public:
     */
    virtual bool is_complete() const;
 
+   /**
+    * Return a snapshot of the key fields from this frame in a manner
+    * suitable for display by the UI. The string is encoded as a
+    * pickled Python dictionary.
+    * 
+    * \return A string containing the fields to display.
+    */
+   virtual std::string snapshot() const;
+
 protected:
 
    /**
     * abstract_data_unit constructor.
     *
-    * \param frame_body A const_bit_vector representing the frame body.
+    * \param frame_body A const_bit_queue representing the frame body.
     */
-   abstract_data_unit(const_bit_vector& frame_body);
+   abstract_data_unit(const_bit_queue& frame_body);
 
    /**
     * Applies error correction code to the specified bit_vector.
@@ -115,6 +125,13 @@ protected:
     * \return The number of octets written to msg.
     */
    virtual size_t decode_body(const_bit_vector& frame_body, size_t msg_sz, uint8_t *msg);
+
+   /**
+    * Returns a string describing the Data Unit ID (DUID).
+    *
+    * \return A string identifying the DUID.
+    */
+   virtual std::string duid_str() const = 0;
 
    /**
     * Returns the expected size (in bits) of this data_unit. For

@@ -3,48 +3,47 @@
 
 #include <bitset>
 #include <itpp/base/vec.h>
-#include <stdexcept>
 #include <vector>
 
 typedef std::vector<bool> bit_vector;
 typedef const std::vector<bool> const_bit_vector;
 
 /**
- * Swab bits from in[begin, end) to out[where,...).
+ * Swab in[bits[0..nof_bits)) to out[where..where+nof_bits).
  *
- * \param in A uint64_t representing a set of bits.
- * \param begin The offset of the first bit to copy.
- * \param end The offset of the end bit (this bit is not copied).
- * \param out The bit_vector into which bits are copied.
- * \param where The starting point for writing bits.
+ * \param in A const reference to the source.
+ * \param bits An array specifying the ordinals of the bits to copy.
+ * \param bits_sz The size of the bits array.
+ * \param out A reference to the destination.
+ * \param where The offset of the first bit to write.
  */
-inline void
-swab(uint64_t in, int begin, int end, bit_vector& out, int where)
+template <class X, class Y>
+void swab(const X& in, const size_t bits[], size_t bits_sz, Y& out, size_t where)
 {
-   for(int i = begin; i != end; (begin < end ? ++i : --i)) {
-      out[where++] = (in & (1 << i) ? 1 : 0);
+   for(size_t i = 0; i < bits_sz; ++i) {
+      out[where+i] = in[bits[i]];
    }
 }
 
 /**
- * Swab bits from in[begin, end) to out[where,...).
+ * Swab from in[0..nof_bits) to out[bits[0..nof_bits)).
  *
- * \param in A const_bit_vector reference to the source.
- * \param begin The offset of the first bit to copy.
- * \param end The offset of the end bit (this bit is not copied).
- * \param out A bvec into which bits are copied.
- * \param where The starting point for writing bits.
+ * \param in A const bvec reference to the source.
+ * \param where The offset of the first bit to read.
+ * \param out A bit_vector reference to the destination.
+ * \param bits An array specifying the ordinals of the bits to copy.
+ * \param bits_sz The size of the bits array.
  */
-inline void
-swab(const_bit_vector& in, int begin, int end, itpp::bvec& out, int where)
+template <class X, class Y>
+void unswab(const X& in, size_t where, Y& out, const size_t bits[], size_t bits_sz)
 {
-   for(int i = begin; i != end; (begin < end ? ++i : --i)) {
-      out[where++] = in[i];
+   for(size_t i = 0; i < bits_sz; ++i) {
+      out[bits[i]] = in[where+i];
    }
 }
 
 /**
- * Swabs a bit_vector in[begin,end) to an octet buffer.
+ * Extract a bit_vector in[begin,end) to an octet buffer.
  *
  * \param in A const reference to the bit_vector.
  * \param begin The offset of the first bit to copy.
@@ -52,51 +51,15 @@ swab(const_bit_vector& in, int begin, int end, itpp::bvec& out, int where)
  * \param out Address of the octet buffer to write into.
  * \return The number of octers written.
  */
-inline size_t
-swab(const_bit_vector& in, int begin, int end, uint8_t *out)
+template<class X>
+size_t extract(const X& in, int begin, int end, uint8_t *out)
 {
    const size_t out_sz = (7 + abs(end - begin)) / 8;
    memset(out, 0, out_sz);
-   for(int i = begin, j = 0; i != end; (begin < end ? ++i : --i), ++j) {
+   for(int i = begin, j = 0; i < end; ++i, ++j) {
       out[j / 8] ^= in[i] << (7 - (j % 8));
    }
    return out_sz;
-}
-/**
- * Swabs a bitset<N> in[begin,end) to an octet buffer.
- *
- * \param in A const reference to the bitset.
- * \param begin The offset of the first bit to copy.
- * \param end The offset of the end bit (this bit is not copied).
- * \param out Address of the octet buffer to write into.
- * \return The number of octers written.
- */
-template <size_t N> size_t
-swab(const std::bitset<N>& in, int begin, int end, uint8_t *out)
-{
-   const size_t out_sz = (7 + abs(end - begin)) / 8;
-   memset(out, 0, out_sz);
-   for(int i = begin, j = 0; i != end; (begin < end ? ++i : --i), ++j) {
-      out[j / 8] ^= in[i] << (7 - (j % 8));
-   }
-   return out_sz;
-}
-
-/**
- * Swab bits from bvec in[where] in to out[begin,end).
- *
- * \param in A const reference to the bvec.
- * \param begin The offset of the first bit to copy.
- * \param end The offset of the end bit.
- * \param out A bvec into which bits are written.
- * \param where The starting point for writing bits.
- */
-inline void
-unswab(const itpp::bvec& in, int where, bit_vector& out, int begin, int end)
-{
-   for(int i = begin; i != end; (begin < end ? ++i : --i)) {
-      out[i] = in[where++];
-   }
 }
 
 /**
@@ -107,11 +70,11 @@ unswab(const itpp::bvec& in, int where, bit_vector& out, int begin, int end)
  * \param end The offset of the end bit.
  * \return A uint64_t containing the value
  */
-inline uint64_t
-extract(const_bit_vector& in, int begin, int end)
+template<class X>
+uint64_t extract(const X& in, int begin, int end)
 {
    uint64_t x = 0LL;
-   for(int i = begin; i != end; (begin < end ? ++i : --i)) {
+   for(int i = begin; i < end; ++i) {
       x =  (x << 1) | (in[i] ? 1 : 0);
    }
    return x;

@@ -37,14 +37,28 @@ public:
    /**
     * hdu constructor.
     *
-    * \param frame_body A const_bit_vector representing the frame body.
+    * \param frame_body A const_bit_queue representing the frame body.
     */
-   hdu(const bit_vector& frame_body);
+   hdu(const_bit_queue& frame_body);
 
    /**
     * hdu virtual destructor.
     */
    virtual ~hdu();
+
+   /**
+    * Returns a string describing the Data Unit ID (DUID).
+    */
+   std::string duid_str() const;
+
+   /**
+    * Return a snapshot of the key fields from this frame in a manner
+    * suitable for display by the UI. The string is encoded as a
+    * pickled Python dictionary.
+    * 
+    * \return A string containing the fields to display.
+    */
+   virtual std::string snapshot() const;
 
 protected:
 

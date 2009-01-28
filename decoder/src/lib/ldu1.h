@@ -24,58 +24,31 @@
 #ifndef INCLUDED_LDU1_H
 #define INCLUDED_LDU1_H
 
-#include <abstract_data_unit.h>
+#include <voice_data_unit.h>
 
 /**
- * P25 Logical Data Unit 1 (compressed IBME voice).
+ * P25 Logical Data Unit 1.
  */
-class ldu1 : public abstract_data_unit
+class ldu1 : public voice_data_unit
 {
 public:
 
    /**
     * ldu1 constuctor
     *
-    * \param frame_body A const_bit_vector representing the frame body.
+    * \param frame_body A const_bit_queue representing the frame body.
     */
-   ldu1(const_bit_vector& frame_body);
+   ldu1(const_bit_queue& frame_body);
 
    /**
     * ldu1 (virtual) destuctor
     */
    virtual ~ldu1();
 
-protected:
-
    /**
-    * Applies error correction code to the specified bit_vector. Not
-    * that this function removes the PN sequences from the source
-    * frame.
-    *
-    * \param frame_body The bit vector to decode.
-    * \return 
+    * Returns a string describing the Data Unit ID (DUID).
     */
-   virtual void correct_errors(bit_vector& frame_body);
-
-   /**
-    * Decode compressed audio using the supplied imbe_decoder and
-    * writes output to audio.
-    *
-    * \param frame_body The const_bit_vector to decode.
-    * \param imbe The imbe_decoder to use to generate the audio.
-    * \param audio A deque<float> to which the audio (if any) is appended.
-    * \return The number of samples written to audio.
-    */
-   virtual size_t decode_audio(const_bit_vector& frame_body, imbe_decoder& imbe, float_queue& audio);
-
-   /**
-    * Returns the expected size (in bits) of this data_unit. For
-    * variable-length data this should return UINT16_MAX until the
-    * actual length of this frame is known.
-    *
-    * \return The expected size (in bits) of this data_unit when encoded.
-    */
-   virtual uint16_t frame_size_max() const;
+   std::string duid_str() const;
 
 };
 

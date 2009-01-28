@@ -186,6 +186,12 @@ class p25_rx_block (stdgui2.std_top_block):
             toolbar_new = self.toolbar.AddSimpleTool(wx.ID_NEW, new_icon, u"New Capture")
             open_icon = wx.ArtProvider.GetBitmap(wx.ART_FILE_OPEN, wx.ART_TOOLBAR, icon_size)
             toolbar_open = self.toolbar.AddSimpleTool(wx.ID_OPEN, open_icon, u"Open")
+            #
+            # self.toolbar.AddSeparator()
+            # self.gain_control = wx.Slider(self.toolbar, 100, 50, 1, 100, style=wx.SL_HORIZONTAL)
+            # slider.SetTickFreq(5, 1)
+            # self.toolbar.AddControl(self.gain_control)
+            #
             self.toolbar.Realize()
         else:
             self.toolbar = None
@@ -210,8 +216,10 @@ class p25_rx_block (stdgui2.std_top_block):
         # Traffic snapshot
         self.traffic = TrafficPane(self.notebook)
         self.notebook.AddPage(self.traffic, "Traffic")
-        # The P25 decoder
-        self.p25_decoder = op25.decoder_ff()
+        # Setup the decoder and report the TUN/TAP device name
+        msgq = gr.msg_queue(2)
+        self.decode_watcher = decode_watcher(msgq, self.traffic)
+        self.p25_decoder = op25.decoder_ff(msgq)
         self.frame.SetStatusText("TUN/TAP: " + self.p25_decoder.device_name())
 
     # read capture file properties (decimation etc.)
@@ -283,6 +291,7 @@ class p25_rx_block (stdgui2.std_top_block):
             self.spectrum_plotter.Clear()
             self.signal_plotter.Clear()
             self.symbol_plotter.Clear()
+            self.traffic.clear()
         elif "RUNNING" == self.state:
             # menu items
             self.file_new.Enable(False)
@@ -362,7 +371,7 @@ class p25_rx_block (stdgui2.std_top_block):
         self.stop()
         self.wait()
         # ToDo: get open_usrp() arguments from wizard
-        self.open_usrp((1,0), 128, None, 468.0e06, True)
+        self.open_usrp((0,0), 256, None, 434.08e06, True)
         self.start()
 
     # Open an existing capture
@@ -460,33 +469,33 @@ class TrafficPane(wx.Panel):
 
         label = wx.StaticText(self, -1, "DUID:")
         sizer.Add(label, pos=(1,1))
-        field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
+        field = wx.TextCtrl(self, -1, "", size=(72, -1), style=wx.TE_READONLY)
         sizer.Add(field, pos=(1,2))
         self.fields["duid"] = field;
 
-        label = wx.StaticText(self, -1, "Source:")
+        label = wx.StaticText(self, -1, "NAC:")
         sizer.Add(label, pos=(2,1))
         field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
         sizer.Add(field, pos=(2,2))
-        self.fields["source"] = field;
+        self.fields["nac"] = field;
 
-        label = wx.StaticText(self, -1, "Destination:")
+        label = wx.StaticText(self, -1, "Source:")
         sizer.Add(label, pos=(3,1))
         field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
         sizer.Add(field, pos=(3,2))
-        self.fields["dest"] = field;
+        self.fields["source"] = field;
 
-        label = wx.StaticText(self, -1, "NID:")
+        label = wx.StaticText(self, -1, "Destination:")
         sizer.Add(label, pos=(4,1))
         field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
         sizer.Add(field, pos=(4,2))
-        self.fields["nid"] = field;
+        self.fields["dest"] = field;
 
-        label = wx.StaticText(self, -1, "NAC:")
+        label = wx.StaticText(self, -1, "NID:")
         sizer.Add(label, pos=(5,1))
         field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
         sizer.Add(field, pos=(5,2))
-        self.fields["nac"] = field;
+        self.fields["nid"] = field;
 
         label = wx.StaticText(self, -1, "MFID:")
         sizer.Add(label, pos=(1,4))
@@ -502,19 +511,19 @@ class TrafficPane(wx.Panel):
 
         label = wx.StaticText(self, -1, "KID:")
         sizer.Add(label, pos=(3,4))
-        field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
+        field = wx.TextCtrl(self, -1, "", size=(72, -1), style=wx.TE_READONLY)
         sizer.Add(field, pos=(3,5))
         self.fields["kid"] = field;
 
         label = wx.StaticText(self, -1, "MI:")
         sizer.Add(label, pos=(4,4))
-        field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
+        field = wx.TextCtrl(self, -1, "", size=(216, -1), style=wx.TE_READONLY)
         sizer.Add(field, pos=(4,5))
         self.fields["mi"] = field;
 
         label = wx.StaticText(self, -1, "TGID:")
         sizer.Add(label, pos=(5,4))
-        field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
+        field = wx.TextCtrl(self, -1, "", size=(72, -1), style=wx.TE_READONLY)
         sizer.Add(field, pos=(5,5))
         self.fields["tgid"] = field;
 
@@ -603,7 +612,7 @@ class demod_watcher(threading.Thread):
 #
 class decode_watcher(threading.Thread):
 
-    def __init__(self, msgq,  traffic_pane, **kwds):
+    def __init__(self, msgq, traffic_pane, **kwds):
         threading.Thread.__init__ (self, **kwds)
         self.setDaemon(1)
         self.msgq = msgq
@@ -614,8 +623,9 @@ class decode_watcher(threading.Thread):
     def run(self):
         while(self.keep_running):
             msg = self.msgq.delete_head()
-            # pickle_dict = msg.arg1()
-            self.callback(frequency_correction)
+            pickled_dict = msg.to_string()
+            attrs = pickle.loads(pickled_dict)
+            self.traffic_pane.update(attrs)
 
 
 # Start the receiver

@@ -31,6 +31,9 @@
 #include <stdint.h>
 #include <swab.h>
 
+typedef std::deque<bool> bit_queue;
+typedef const std::deque<bool> const_bit_queue;
+
 typedef uint8_t dibit;
 
 typedef std::deque<float> float_queue;
@@ -51,7 +54,7 @@ public:
     * \param nid The network ID for this data_unit.
     * \return A (possibly null-valued) pointer to the data_unit.
     */
-   static data_unit_sptr make_data_unit(const_bit_vector& frame_body);
+   static data_unit_sptr make_data_unit(const_bit_queue& frame_body);
 
    /**
     * data_unit (virtual) destructor.
@@ -96,6 +99,16 @@ public:
     * false.
     */
    virtual bool is_complete() const = 0;
+
+   /**
+    * Return a snapshot of the key fields from this frame in a manner
+    * suitable for display by the UI. The string is encoded using the
+    * Python pickle format allowing for different fields to be
+    * returned.
+    * 
+    * \return A string containing the fields to display.
+    */
+   virtual std::string snapshot() const = 0;
 
 protected:
 

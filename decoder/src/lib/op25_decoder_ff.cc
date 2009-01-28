@@ -26,7 +26,6 @@
 #endif
 
 #include <algorithm>
-#include <bitset>
 #include <gr_io_signature.h>
 #include <gr_message.h>
 #include <iostream>
@@ -40,9 +39,9 @@
 using namespace std;
 
 op25_decoder_ff_sptr
-op25_make_decoder_ff()
+op25_make_decoder_ff(gr_msg_queue_sptr msgq)
 {
-   return op25_decoder_ff_sptr(new op25_decoder_ff);
+   return op25_decoder_ff_sptr(new op25_decoder_ff(msgq));
 }
 
 op25_decoder_ff::~op25_decoder_ff()
@@ -56,7 +55,7 @@ void
 op25_decoder_ff::forecast(int nof_output_items, gr_vector_int &nof_input_items_reqd)
 {
    const size_t nof_inputs = nof_input_items_reqd.size();
-   std::fill(&nof_input_items_reqd[0], &nof_input_items_reqd[nof_inputs], nof_output_items);
+   fill(&nof_input_items_reqd[0], &nof_input_items_reqd[nof_inputs], nof_output_items);
 }
 
 int  
@@ -82,7 +81,7 @@ op25_decoder_ff::general_work(int nof_output_items, gr_vector_int& nof_input_ite
 
       for(int i = 0; i < nof_output_items; ++i) {
          float *out = reinterpret_cast<float*>(&output_items[i]);
-         std::fill(&out[0], &out[nof_output_items], 0.0); // audio silence - for now
+         fill(&out[0], &out[nof_output_items], 0.0); // audio silence - for now
       }
       return nof_output_items;
 
@@ -91,8 +90,7 @@ op25_decoder_ff::general_work(int nof_output_items, gr_vector_int& nof_input_ite
       exit(1);
    } catch(...) {
       cerr << "unhandled exception" << endl;
-      exit(2);
-   }
+      exit(2);   }
 }
 
 const char*
@@ -101,16 +99,16 @@ op25_decoder_ff::device_name() const
    return d_tap_device.c_str();
 }
 
-op25_decoder_ff::op25_decoder_ff() :
+op25_decoder_ff::op25_decoder_ff(gr_msg_queue_sptr msgq) :
    gr_block("decoder_ff", gr_make_io_signature(1, 1, sizeof(float)), gr_make_io_signature(0, 1, sizeof(float))),
+   d_msgq(msgq),
    d_state(SYNCHRONIZING),
+   d_bad_NIDs(0),
    d_bch(63, 16, 11,"6 3 3 1 1 4 1 3 6 7 2 3 5 4 5 3", true),
    d_data_unit(),
    d_data_units(0),
-   d_frame_hdr(114),
-   d_fs(0),
+   d_frame_hdr(),
    d_imbe(imbe_decoder::make_imbe_decoder()),
-   d_symbol(0),
    d_tap(-1),
    d_tap_device("not available"),
    d_unrecognized(0)
@@ -153,53 +151,112 @@ op25_decoder_ff::op25_decoder_ff() :
 }
 
 bool
-op25_decoder_ff::correlates(dibit d)
+op25_decoder_ff::correlated()
 {
-   size_t errs = 0;
-   const size_t ERR_THRESHOLD = 4;
-   const size_t NOF_FS_BITS = 48;
-   const frame_sync FS = 0x5575f5ff77ffLL;
-   const frame_sync FS_MASK = 0xffffffffffffLL;
-   d_fs = (d_fs << 2) | d;
-   d_fs &= FS_MASK;
-   size_t diff = FS ^ d_fs;
-   for(size_t i = 0; i < NOF_FS_BITS; ++i) {
-      if(diff & 0x1) {
+   static const bool FS[] = {
+      0, 1, 0, 1, 0, 1, 0, 1,
+      0, 1, 1, 1, 0, 1, 0, 1, 
+      1, 1, 1, 1, 0, 1, 0, 1,
+      1, 1, 1, 1, 1, 1, 1, 1, 
+      0, 1, 1, 1, 0, 1, 1, 1,
+      1, 1, 1, 1, 1, 1, 1, 1
+   };
+   static const size_t FS_SZ = sizeof(FS)/sizeof(FS[0]);
+
+   uint8_t errs = 0;
+   for(size_t i = 0; i < FS_SZ; ++i) {
+      if(d_frame_hdr[i] ^ FS[i]) {
          ++errs;
       }
-      diff >>= 1;
    }
-   return errs < ERR_THRESHOLD;
+   return (errs <= 6);
+}
+
+bool
+op25_decoder_ff::identified()
+{
+   static const size_t NID[] = {
+      63,  62,  61,  60,  59,  58,  57,  56,
+      55,  54,  53,  52,  51,  50,  49,  48,
+      112, 111, 110, 109, 108, 107, 106, 105,
+      104, 103, 102, 101, 100, 99,  98,  97,
+      96,  95,  94,  93,  92,  91,  90,  89,
+      88,  87,  86,  85,  84,  83,  82,  81,
+      80,  79,  78,  77,  76,  75,  74,  73,
+      72,  69,  68,  67,  66,  65,  64,
+   };
+   size_t NID_SZ = sizeof(NID) / sizeof(NID[0]);
+
+   itpp::bvec b(63), zeroes(16);
+   swab(d_frame_hdr,  NID, NID_SZ, b, 0);
+   b = d_bch.decode(b);
+   if(b != zeroes) {
+      b = d_bch.encode(b);
+      unswab(b,  0, d_frame_hdr, NID, NID_SZ);
+      d_data_unit = data_unit::make_data_unit(d_frame_hdr);
+   } else {
+
+      cout << __PRETTY_FUNCTION__ << ":" << __LINE__ << "NID decode error" << endl;
+      cout << "\tNID=";
+      for(int i = 0; i < b.size(); ++i) {
+         cout << b[i] << ",";
+      }
+      cout << endl;
+
+      ++d_bad_NIDs;
+      data_unit_sptr null;
+      d_data_unit = null;
+   }
+   return d_data_unit;
+}
+
+
+void
+op25_decoder_ff::process_data_unit()
+{
+   const size_t msg_hdr_sz = 14;
+   const size_t msg_sz = d_data_unit->data_size();
+   const size_t total_msg_sz = msg_hdr_sz + msg_sz;
+   uint8_t msg_data[total_msg_sz];
+   if(d_data_unit->decode(msg_sz, msg_data + msg_hdr_sz, *d_imbe, d_audio)) {
+      if(-1 != d_tap) {
+         memset(&msg_data[0], 0xff, 6);
+         memset(&msg_data[6], 0x00, 6);
+         memset(&msg_data[12], 0xff, 2);
+         write(d_tap, msg_data, total_msg_sz);
+      }
+      if(d_msgq) {
+         string snapshot(d_data_unit->snapshot());
+         if(snapshot.size() > 0) {
+            const size_t snapshot_sz = snapshot.size() + 1;
+            gr_message_sptr msg = gr_make_message(/*type*/0, /*arg1*/++d_data_units, /*arg2*/0, snapshot_sz);
+            char *snapshot_data = reinterpret_cast<char*>(msg->msg());
+            memcpy(snapshot_data, snapshot.c_str(), snapshot_sz);
+            d_msgq->handle(msg);
+         }
+      }
+   }
 }
 
 void
 op25_decoder_ff::receive_symbol(dibit d)
 {
+   d_frame_hdr.push_back(d & 0x2);
+   d_frame_hdr.push_back(d & 0x1);
+   const size_t frame_hdr_sz = d_frame_hdr.size();
+
    switch(d_state) {
    case SYNCHRONIZING:
-      if(correlates(d)) {
-         d_symbol = 23;
-         d_state = IDENTIFYING;
-         swab(d_fs, 47, -1, d_frame_hdr, 0);
+      if(48 <= frame_hdr_sz) {
+         d_frame_hdr.erase(d_frame_hdr.begin(), d_frame_hdr.begin() + (frame_hdr_sz - 48));
+         if(correlated()) {
+            d_state = IDENTIFYING;
+         }
       }
       break;
    case IDENTIFYING:
-      ++d_symbol;
-      d_frame_hdr[2 * d_symbol] = d & 2;
-      d_frame_hdr[(2 * d_symbol) + 1] = d & 1;
-      if(56 == d_symbol) {
-         itpp::bvec b(63);
-         swab(d_frame_hdr,  63, 47, b,  0);
-         swab(d_frame_hdr, 112, 71, b, 16);
-         swab(d_frame_hdr,  69, 63, b, 57);
-         b = d_bch.decode(b);
-#if __x86_64
-         unswab(b, 57, d_frame_hdr,  69, 63);
-         unswab(b, 16, d_frame_hdr, 112, 71);
-         unswab(b,  0, d_frame_hdr,  63, 47);
-#endif
-         d_data_unit = data_unit::make_data_unit(d_frame_hdr);
-         if(d_data_unit) {
+      if(114 <= frame_hdr_sz) {
+         if(identified()) {
             d_state = READING;
          } else {
             ++d_unrecognized;
@@ -210,16 +267,7 @@ op25_decoder_ff::receive_symbol(dibit d)
    case READING:
       d_data_unit->extend(d);
       if(d_data_unit->is_complete()) {
-         const size_t msg_hdr_sz = 14;
-         const size_t msg_sz = d_data_unit->data_size();
-         const size_t total_msg_sz = msg_hdr_sz + msg_sz;
-         uint8_t msg_data[total_msg_sz];
-         if(d_data_unit->decode(msg_sz, msg_data + msg_hdr_sz, *d_imbe, d_audio) && (-1 != d_tap)) {
-            memset(&msg_data[0], 0xff, 6);
-            memset(&msg_data[6], 0x00, 6);
-            memset(&msg_data[12], 0xff, 2);
-            write(d_tap, msg_data, total_msg_sz);
-         }
+         process_data_unit();
          data_unit_sptr null;
          d_data_unit = null;
          d_state = SYNCHRONIZING;

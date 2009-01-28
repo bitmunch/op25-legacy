@@ -36,14 +36,19 @@ public:
    /**
     * P25 packet data unit (PDU) constructor.
     *
-    * \param frame_body A const_bit_vector representing the frame body.
+    * \param frame_body A const_bit_queue representing the frame body.
     */
-   pdu(const_bit_vector& frame_body);
+   pdu(const_bit_queue& frame_body);
 
    /**
     * pdu (virtual) destructor.
     */
    virtual ~pdu();
+
+   /**
+    * Returns a string describing the Data Unit ID (DUID).
+    */
+   std::string duid_str() const;
 
 protected:
 

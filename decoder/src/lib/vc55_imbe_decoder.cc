@@ -25,6 +25,7 @@
 #include <cerrno>
 #include <sstream>
 #include <fcntl.h>
+#include <stdexcept>
 #include <stdint.h>
 #include <swab.h>
 #include <sys/types.h>
@@ -74,8 +75,7 @@ vc55_imbe_decoder::decode(voice_codeword& in_out, audio_output& out)
       uint8_t packet[20];
       packet[0] = 0x56;
       packet[1] = 0xf0;
-
-      swab(in_out, 0, 144, &packet[2]);
+      /* ToDo: extract(in_out, 0, 144, &packet[2]); */
       if(-1 == write(d_fd, packet, sizeof(packet))) {
          perror("write(d_fd, packet, sizeof(packet))");
          close(d_fd);

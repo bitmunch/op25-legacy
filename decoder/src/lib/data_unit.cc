@@ -26,12 +26,12 @@
 #include <ldu1.h>
 #include <ldu2.h>
 #include <pdu.h>
+#include <swab.h>
 #include <tdu.h>
 
 data_unit_sptr
-data_unit::make_data_unit(const_bit_vector& frame_body)
+data_unit::make_data_unit(const_bit_queue& frame_body)
 {
-   // ToDo: check frame_body length is at least 64 bits long!
    data_unit_sptr d;
    uint8_t duid = extract(frame_body, 60, 64);
    switch(duid) {

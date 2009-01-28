@@ -36,15 +36,20 @@ public:
    /**
     * tdu constructor.
     *
-    * \param frame_body A const_bit_vector representing the frame body.
+    * \param frame_body A const_bit_queue representing the frame body.
     * \param has_link_control true if frame has link control data, otherwise false.
     */
-   tdu(const_bit_vector& frame_body, bool has_link_control);
+   tdu(const_bit_queue& frame_body, bool has_link_control);
 
    /**
     * tdu constructor.
     */
    virtual ~tdu();
+
+   /**
+    * Returns a string describing the Data Unit ID (DUID).
+    */
+   std::string duid_str() const;
 
 protected:
 
