@@ -371,7 +371,9 @@ class p25_rx_block (stdgui2.std_top_block):
         self.stop()
         self.wait()
         # ToDo: get open_usrp() arguments from wizard
-        self.open_usrp((0,0), 256, None, 434.08e06, True)
+#        self.open_usrp((0,0), 256, None, 434.08e06, True)  # Test freq
+#        self.open_usrp((1,0), 256, None, 468.425e06, True) # QPS VK
+        self.open_usrp((1,0), 256, None, 464.4e06, True)  # SOCPOV
         self.start()
 
     # Open an existing capture
@@ -403,7 +405,7 @@ class p25_rx_block (stdgui2.std_top_block):
             x = min(x, xmax)
             x = max(x, xmin)
             scale_factor = self.spectrum.win._scale_factor
-            chan_width = 12.5e3
+            chan_width = 6.25e3
             x /= scale_factor
             x += chan_width / 2
             x  = (x // chan_width) * chan_width
@@ -624,8 +626,8 @@ class decode_watcher(threading.Thread):
         while(self.keep_running):
             msg = self.msgq.delete_head()
             pickled_dict = msg.to_string()
-            attrs = pickle.loads(pickled_dict)
-            self.traffic_pane.update(attrs)
+#            attrs = pickle.loads(pickled_dict)
+#            self.traffic_pane.update(attrs)
 
 
 # Start the receiver
