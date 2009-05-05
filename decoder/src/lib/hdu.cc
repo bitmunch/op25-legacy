@@ -22,10 +22,14 @@
  */
 
 #include <hdu.h>
+#include <iomanip>
 #include <itpp/comm/egolay.h>
 #include <itpp/comm/reedsolomon.h>
+#include <sstream>
+#include <swab.h>
+#include <value_string.h>
 
-using std::string;
+using namespace std;
 
 hdu::hdu(const_bit_queue& frame_body) :
    abstract_data_unit(frame_body)
@@ -45,8 +49,60 @@ hdu::duid_str() const
 std::string
 hdu::snapshot() const
 {
-   string empty;
-   return empty;
+   ostringstream os;
+   os << "(dp0"    << endl;
+   // DUID
+   os << "S'duid'" << endl;
+   os << "p1"       << endl;
+   os << "S'" << duid_str() << "'" << endl;
+   os << "p2"       << endl;
+   // NAC
+   os << "S'nac'" << endl;
+   os << "p3"       << endl;
+   os << "S'" << nac_str() << "'" << endl;
+   os << "p4"       << endl;
+   // Source
+   os << "S'source'" << endl;
+   os << "p5"       << endl;
+   os << "S''" << endl;
+   os << "p6"       << endl;
+   // Dest
+   os << "S'dest'" << endl;
+   os << "p7"       << endl;
+   os << "S''" << endl;
+   os << "p8"       << endl;
+   // NID
+   os << "S'nid'" << endl;
+   os << "p9"     << endl;
+   os << "S''" << endl;
+   os << "p10"    << endl;
+   // MFID
+   os << "S'mfid'" << endl;
+   os << "p11"     << endl;
+   os << "S'" << mfid_str() << "'" << endl;
+   os << "p12"       << endl;
+   // ALGID
+   os << "S'algid'" << endl;
+   os << "p13"      << endl;
+   os << "S'" << algid_str() << "'" << endl;
+   os << "p14"      << endl;
+   // KID
+   os << "S'kid'" << endl;
+   os << "p15"    << endl;
+   os << "S''" << endl;
+   os << "p16"    << endl;
+   // MI
+   os << "S'mi'"   << endl;
+   os << "p17"     << endl;
+   os << "S'" << mi_str() << "'" << endl;
+   os << "p18"     << endl;
+   // TGID
+   os << "S'tgid'" << endl;
+   os << "p19"     << endl;
+   os << "S''" << endl;
+   os << "p20"     << endl;
+   os << "s.";
+   return os.str();
 }
 
 void
@@ -59,9 +115,10 @@ hdu::correct_errors(bit_vector& frame)
 void
 hdu::apply_golay_correction(bit_vector& frame)
 {
+#if 0
    static itpp::Extended_Golay golay;
-   static const size_t nof_golay_codewords = 36, golay_codeword_sz = 18;
-   static const size_t golay_codewords[nof_golay_codewords][golay_codeword_sz] = {
+   static const size_t NOF_GOLAY_CODEWORDS = 36, GOLAY_CODEWORD_SZ = 18;
+   static const size_t GOLAY_CODEWORDS[nof_golay_codewords][golay_codeword_sz] = {
       { 119, 118, 117, 116, 115, 114, 131, 130, 129, 128, 127, 126, 125, 124, 123, 122, 121, 120 },
       { 137, 136, 135, 134, 133, 132, 151, 150, 149, 148, 147, 146, 145, 144, 141, 140, 139, 138 },
       { 157, 156, 155, 154, 153, 152, 169, 168, 167, 166, 165, 164, 163, 162, 161, 160, 159, 158 },
@@ -100,17 +157,18 @@ hdu::apply_golay_correction(bit_vector& frame)
       { 767, 766, 765, 764, 763, 762, 779, 778, 777, 776, 775, 774, 773, 772, 771, 770, 769, 768 }
    };
 
-   for(size_t i = 0; i < nof_golay_codewords; ++i) {
+   for(size_t i = 0; i < NOF_GOLAY_CODEWORDS; ++i) {
       // ToDo: 
    }
+#endif
 }
 
 void
 hdu::apply_rs_correction(bit_vector& frame)
 {
+#if 0
    static itpp::Reed_Solomon rs(6, 8, true);
 
-#if 0
    const size_t rs_codeword[][6] = {
    };
    const size_t nof_codeword_bits = sizeof(codeword_bits) / sizeof(codeword_bits[0]);
@@ -122,4 +180,63 @@ uint16_t
 hdu::frame_size_max() const
 {
    return 792;
+}
+
+string
+hdu::algid_str() const
+{
+   const size_t ALGID_BITS[] = {
+      356, 357, 360, 361, 374, 375, 376, 377
+   };
+   const size_t ALGID_BITS_SZ = sizeof(ALGID_BITS) / sizeof(ALGID_BITS[0]);
+   uint8_t algid = extract(frame_body(), ALGID_BITS, ALGID_BITS_SZ);
+   return lookup(algid, ALGIDS, ALGIDS_SZ);
+}
+
+std::string
+hdu::mi_str() const
+{
+   const size_t MI_BITS[] = {
+      114, 115, 116, 117, 118, 119, 132, 133,
+      134, 135, 136, 137, 152, 153, 154, 155,
+      156, 157, 170, 171, 172, 173, 174, 175,
+      188, 189, 190, 191, 192, 193, 206, 207,
+      208, 209, 210, 211, 226, 227, 228, 229,
+      230, 231, 244, 245, 246, 247, 248, 249,
+      262, 263, 264, 265, 266, 267, 280, 281,
+      282, 283, 284, 285, 300, 301, 302, 303,
+      304, 305, 318, 319, 320, 321, 322, 323,
+   };
+   const size_t MI_BITS_SZ = sizeof(MI_BITS) / sizeof(MI_BITS[0]);
+
+   uint8_t mi[9];
+   extract(frame_body(), MI_BITS, MI_BITS_SZ, mi);
+   ostringstream os;
+   for(size_t i = 0; i < (sizeof(mi) / sizeof(mi[0])); ++i) {
+      uint16_t octet = mi[i];
+      os << hex << setfill('0') << setw(2) << octet;
+   }
+   return os.str();
+}
+
+string
+hdu::mfid_str() const
+{
+   const size_t MFID_BITS[] = {
+      336, 337, 338, 339, 340, 341, 354, 355,
+   };
+   const size_t MFID_BITS_SZ = sizeof(MFID_BITS) / sizeof(MFID_BITS_SZ);
+   uint8_t mfid = extract(frame_body(), MFID_BITS, MFID_BITS_SZ);
+   return lookup(mfid, MFIDS, MFIDS_SZ);
+}
+
+string
+hdu::nac_str() const
+{
+   const size_t NAC_BITS[] = {
+      48,49,50,51,52,53,54,55,56,57,58,59
+   };
+   const size_t NAC_BITS_SZ = sizeof(NAC_BITS) / sizeof(NAC_BITS[0]);
+   uint32_t nac = extract(frame_body(), NAC_BITS, NAC_BITS_SZ);
+   return lookup(nac, NACS, NACS_SZ);
 }

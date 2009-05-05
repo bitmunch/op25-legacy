@@ -26,6 +26,8 @@
 #include <algorithm>
 #include <cstring>
 #include <functional>
+#include <iomanip>
+#include <iostream>
 #include <stdexcept>
 #include <sstream>
 #include <utility>
@@ -97,6 +99,17 @@ abstract_data_unit::snapshot() const
    return empty;
 }
 
+void
+abstract_data_unit::dump(ostream& os) const
+{
+   uint32_t nbits = d_frame_body.size();
+   os << setw(4) << nbits << " ";
+   for(size_t i = 48; i < nbits; ++i) {
+      os << (d_frame_body[i] ? "#" : "-");
+   }
+   os << endl;
+}
+
 abstract_data_unit::abstract_data_unit(const_bit_queue& frame_body) :
    d_frame_body(frame_body.size())
 {
@@ -117,7 +130,13 @@ abstract_data_unit::decode_audio(const_bit_vector& frame_body, imbe_decoder& imb
 size_t
 abstract_data_unit::decode_body(const_bit_vector& frame_body, size_t msg_sz, uint8_t *msg)
 {
-   return extract(frame_body, 0, frame_body.size(), msg);
+   return extract(frame_body, 0, static_cast<int>(frame_body.size()), msg);
+}
+
+const_bit_vector& 
+abstract_data_unit::frame_body() const
+{
+   return d_frame_body;
 }
 
 uint16_t 

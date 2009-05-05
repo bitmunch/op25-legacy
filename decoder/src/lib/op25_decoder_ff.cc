@@ -26,6 +26,7 @@
 #endif
 
 #include <algorithm>
+#include <fstream>
 #include <gr_io_signature.h>
 #include <gr_message.h>
 #include <iostream>
@@ -109,6 +110,7 @@ op25_decoder_ff::op25_decoder_ff(gr_msg_queue_sptr msgq) :
    d_data_units(0),
    d_frame_hdr(),
    d_imbe(imbe_decoder::make_imbe_decoder()),
+   d_logfile(new ofstream("P25DEMOD.OUT")),
    d_tap(-1),
    d_tap_device("not available"),
    d_unrecognized(0)
@@ -210,7 +212,6 @@ op25_decoder_ff::identified()
    return d_data_unit;
 }
 
-
 void
 op25_decoder_ff::process_data_unit()
 {
@@ -236,6 +237,7 @@ op25_decoder_ff::process_data_unit()
          }
       }
    }
+   d_data_unit->dump(*d_logfile);
 }
 
 void

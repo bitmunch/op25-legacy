@@ -89,6 +89,13 @@ public:
     */
    virtual std::string snapshot() const;
 
+   /**
+    * Dump this data unit in human readable format to stream s.
+    *
+    * \param s The stream to write on
+    */
+   virtual void dump(std::ostream& os) const;
+
 protected:
 
    /**
@@ -132,6 +139,11 @@ protected:
     * \return A string identifying the DUID.
     */
    virtual std::string duid_str() const = 0;
+
+   /**
+    * Return a reference to the frame body.
+    */
+   const_bit_vector& frame_body() const;
 
    /**
     * Returns the expected size (in bits) of this data_unit. For

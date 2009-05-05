@@ -96,6 +96,36 @@ protected:
     */
    virtual uint16_t frame_size_max() const;
 
+private:
+
+   /**
+    * Return a string describing the encryption algorithm ID (ALGID).
+    *
+    * \return A string identifying the ALGID.
+    */
+   std::string algid_str() const;
+
+   /**
+    * Returns a string describing the manufacturer ID (MFID).
+    *
+    * \return A string identifying the MFID
+    */
+   virtual std::string mfid_str() const;
+
+   /**
+    * Returns a string describing the message indicator (MI).
+    *
+    * \return A string identifying the MI
+    */
+   virtual std::string mi_str() const;
+
+   /**
+    * Returns a string describing the Network Access Code (NAC).
+    *
+    * \return A string identifying the NAC.
+    */
+   virtual std::string nac_str() const;
+
 };
 
 #endif /* INCLUDED_HDU_H */

@@ -9,7 +9,7 @@ typedef std::vector<bool> bit_vector;
 typedef const std::vector<bool> const_bit_vector;
 
 /**
- * Swab in[bits[0..nof_bits)) to out[where..where+nof_bits).
+ * Swab in[bits[0)..bits[bits_sz)) to out[where..where+bits_sz).
  *
  * \param in A const reference to the source.
  * \param bits An array specifying the ordinals of the bits to copy.
@@ -26,11 +26,11 @@ void swab(const X& in, const size_t bits[], size_t bits_sz, Y& out, size_t where
 }
 
 /**
- * Swab from in[0..nof_bits) to out[bits[0..nof_bits)).
+ * Swab from in[0..bits_sz) to out[bits[0)..bits[bits_sz)).
  *
- * \param in A const bvec reference to the source.
+ * \param in A const reference to the source.
  * \param where The offset of the first bit to read.
- * \param out A bit_vector reference to the destination.
+ * \param out A reference to the destination.
  * \param bits An array specifying the ordinals of the bits to copy.
  * \param bits_sz The size of the bits array.
  */
@@ -45,16 +45,16 @@ void unswab(const X& in, size_t where, Y& out, const size_t bits[], size_t bits_
 /**
  * Extract a bit_vector in[begin,end) to an octet buffer.
  *
- * \param in A const reference to the bit_vector.
- * \param begin The offset of the first bit to copy.
- * \param end The offset of the end bit (this bit is not copied).
+ * \param in A const reference to the source.
+ * \param begin The offset of the first bit to extract (the MSB).
+ * \param end The offset of the end bit.
  * \param out Address of the octet buffer to write into.
  * \return The number of octers written.
  */
 template<class X>
 size_t extract(const X& in, int begin, int end, uint8_t *out)
 {
-   const size_t out_sz = (7 + abs(end - begin)) / 8;
+   const size_t out_sz = (7 + end - begin) / 8;
    memset(out, 0, out_sz);
    for(int i = begin, j = 0; i < end; ++i, ++j) {
       out[j / 8] ^= in[i] << (7 - (j % 8));
@@ -63,7 +63,27 @@ size_t extract(const X& in, int begin, int end, uint8_t *out)
 }
 
 /**
- * Extract value of bits from in[begin,end).
+ * Extract a bit_vector in[bits[0)..bits[bits_sz)) to an octet buffer.
+ *
+ * \param in A const reference to the source.
+ * \param bits An array specifying the ordinals of the bits to extract.
+ * \param bits_sz The size of the bits array.
+ * \param out Address of the octet buffer to write into.
+ * \return The number of octers written.
+ */
+template<class X>
+size_t extract(const X& in, const size_t bits[], size_t bits_sz, uint8_t *out)
+{
+   const size_t out_sz = (7 + bits_sz) / 8;
+   memset(out, 0, out_sz);
+   for(size_t i = 0; i < bits_sz; ++i) {
+      out[i / 8] ^= in[bits[i]] << (7 - (i % 8));
+   }
+   return out_sz;
+}
+
+/**
+ * Extract value of bits from in[bits[0..bits_sz)).
  *
  * \param in The input const_bit_vector.
  * \param begin The offset of the first bit to extract (the MSB).
@@ -76,6 +96,24 @@ uint64_t extract(const X& in, int begin, int end)
    uint64_t x = 0LL;
    for(int i = begin; i < end; ++i) {
       x =  (x << 1) | (in[i] ? 1 : 0);
+   }
+   return x;
+}
+
+/**
+ * Extract value of bits from in[bits[0..bits_sz)).
+ *
+ * \param in A const reference to the source.
+ * \param bits An array specifying the ordinals of the bits to extract.
+ * \param bits_sz The size of the bits array.
+ * \return A uint64_t containing the value
+ */
+template<class X>
+uint64_t extract(const X& in, const size_t bits[], size_t bits_sz)
+{
+   uint64_t x = 0LL;
+   for(size_t i = 0; i < bits_sz; ++i) {
+      x =  (x << 1) | (in[bits[i]] ? 1 : 0);
    }
    return x;
 }

@@ -68,10 +68,12 @@ _op25_la_SOURCES = \
 	tdu.cc \
 	imbe_decoder.cc \
 	dummy_imbe_decoder.cc \
+	offline_imbe_decoder.cc \
 	voice_data_unit.cc \
 	op25.cc \
 	op25_decoder_ff.cc \
-	vc55_imbe_decoder.cc 
+	vc55_imbe_decoder.cc \
+	value_string.cc
 
 
 # magic flags

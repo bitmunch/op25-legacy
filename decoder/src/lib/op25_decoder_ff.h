@@ -24,10 +24,12 @@
 #ifndef INCLUDED_OP25_DECODER_FF_H
 #define INCLUDED_OP25_DECODER_FF_H
 
+#include <boost/scoped_ptr.hpp>
 #include <data_unit.h>
 #include <gr_block.h>
 #include <gr_msg_queue.h>
 #include <imbe_decoder.h>
+#include <iosfwd>
 #include <itpp/comm/bch.h>
 #include <string>
 
@@ -129,6 +131,7 @@ private:
    uint32_t d_data_units;
    bit_queue d_frame_hdr;
    imbe_decoder_sptr d_imbe;
+   boost::scoped_ptr<std::ostream> d_logfile;
    int32_t d_tap;
    std::string d_tap_device;
    uint32_t d_unrecognized;

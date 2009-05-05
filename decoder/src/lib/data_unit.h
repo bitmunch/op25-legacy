@@ -27,6 +27,7 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/noncopyable.hpp>
 #include <deque>
+#include <iosfwd>
 #include <imbe_decoder.h>
 #include <stdint.h>
 #include <swab.h>
@@ -109,6 +110,13 @@ public:
     * \return A string containing the fields to display.
     */
    virtual std::string snapshot() const = 0;
+
+   /**
+    * Dump this data unit in human readable format to stream s.
+    *
+    * \param s The stream to write on
+    */
+   virtual void dump(std::ostream& os) const = 0;
 
 protected:
 
