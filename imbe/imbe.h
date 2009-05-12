@@ -1,7 +1,7 @@
 /* -*- C++ -*- */
 
 /*
- * Copyright 2008-2009 Max H. Parke(KA1RBI) and Steve Glass(VK4SMG)
+ * Copyright 2008-2009 Steve Glass
  *
  * This file is part of OP25.
  *
