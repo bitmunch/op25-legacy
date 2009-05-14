@@ -1234,7 +1234,6 @@ op25_imbe::ReadNetID(unsigned int& NAC, unsigned int& DUID, char* RxFrame)
    }
    printf("\n");
    for(i=1; i<=31; i++) {
-      //j = VAL(MID$(RxFrame$, i, 1))
       j = RxFrame[i] - '0';
       RxData[p + 1] = j / 2;
       //printf("RxData[%d] = %d\n", p+1, RxData[p + 1]);
@@ -1245,11 +1244,6 @@ op25_imbe::ReadNetID(unsigned int& NAC, unsigned int& DUID, char* RxFrame)
    j = RxFrame[i] - '0';
    RxData[p + 1] = j / 2; // ParBit = j AND 1
 
-   //insert errors for testing bch decoder
-   //FOR i = 62 TO 0 STEP -1
-   //  IF RND(1) < .1 THEN RxData(i) = RxData(i) XOR 1
-   //  IF RxData(i) THEN PRINT "#";  ELSE PRINT "-";
-   //NEXT i: PRINT " Errors added"
    if(bchDec(RxData)) {
       ErFlag = -1; printf( "  *** BCH DECODE ERROR ***\n");
    }

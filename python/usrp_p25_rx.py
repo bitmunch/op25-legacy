@@ -183,9 +183,9 @@ class p25_rx_block (stdgui2.std_top_block):
             frame.SetToolBar(self.toolbar)
             icon_size = wx.Size(24, 24)
             new_icon = wx.ArtProvider.GetBitmap(wx.ART_NEW, wx.ART_TOOLBAR, icon_size)
-            toolbar_new = self.toolbar.AddSimpleTool(wx.ID_NEW, new_icon, u"New Capture")
+            toolbar_new = self.toolbar.AddSimpleTool(wx.ID_NEW, new_icon, "New Capture")
             open_icon = wx.ArtProvider.GetBitmap(wx.ART_FILE_OPEN, wx.ART_TOOLBAR, icon_size)
-            toolbar_open = self.toolbar.AddSimpleTool(wx.ID_OPEN, open_icon, u"Open")
+            toolbar_open = self.toolbar.AddSimpleTool(wx.ID_OPEN, open_icon, "Open")
             #
             # self.toolbar.AddSeparator()
             # self.gain_control = wx.Slider(self.toolbar, 100, 50, 1, 100, style=wx.SL_HORIZONTAL)
