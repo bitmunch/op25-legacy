@@ -79,11 +79,8 @@ op25_decoder_ff::general_work(int nof_output_items, gr_vector_int& nof_input_ite
          receive_symbol(d);
       }
       consume(0, nof_input_items[0]);
-
-      for(int i = 0; i < nof_output_items; ++i) {
-         float *out = reinterpret_cast<float*>(&output_items[i]);
-         fill(&out[0], &out[nof_output_items], 0.0); // audio silence - for now
-      }
+      float *out = reinterpret_cast<float*>(output_items[0]);
+      fill(out, out + nof_output_items, 0.0); // audio silence - for now
       return nof_output_items;
 
    } catch(const std::exception& x) {
