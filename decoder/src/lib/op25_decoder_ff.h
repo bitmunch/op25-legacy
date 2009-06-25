@@ -26,12 +26,10 @@
 
 #include <boost/scoped_ptr.hpp>
 #include <data_unit.h>
+#include <data_unit_handler.h>
 #include <gr_block.h>
 #include <gr_msg_queue.h>
-#include <imbe_decoder.h>
-#include <iosfwd>
-#include <itpp/comm/bch.h>
-#include <string>
+#include <sniffer_du_handler.h>
 
 typedef boost::shared_ptr<class op25_decoder_ff> op25_decoder_ff_sptr;
 
@@ -107,14 +105,6 @@ private:
    bool identified();
 
    /**
-    * Process the completed data_unit (pointed at by
-    * d_data_unit). This decodes the data_unit and then sends the
-    * result to wireshark. Attempts to snapshot the data_unit and, if
-    * successfull, it passes the result to the user interface.
-    */
-   void process_data_unit();
-
-   /**
     * Handle a received symbol.
     *
     * \param d The symbol to process.
@@ -122,19 +112,36 @@ private:
    void receive_symbol(dibit d);
 
 private:
-   gr_msg_queue_sptr d_msgq;
-   enum { SYNCHRONIZING, IDENTIFYING, READING } d_state;
-   float_queue d_audio;
-   uint32_t d_bad_NIDs;
-   itpp::BCH d_bch;
+
+   /**
+    * When d_state == READING the current data unit, otherwise null.
+    */
    data_unit_sptr d_data_unit;
-   uint32_t d_data_units;
+
+   /**
+    * The head of a chain of data_unit_handler instances.
+    */
+   data_unit_handler_sptr d_data_unit_handler;
+
+   /**
+    * A bit_queue used to correlate the FS.
+    */
    bit_queue d_frame_hdr;
-   imbe_decoder_sptr d_imbe;
-   boost::scoped_ptr<std::ostream> d_logfile;
-   int32_t d_tap;
-   std::string d_tap_device;
-   uint32_t d_unrecognized;
+
+   /**
+    * The message queue used to send snapshots to the UI.
+    */
+   gr_msg_queue_sptr d_msgq;
+
+   /**
+    * Valid states for the decoder state model.
+    */
+   enum { SYNCHRONIZING, IDENTIFYING, READING } d_state;
+
+   /**
+    * The sniffer (TUN/TAP) data unit handler.
+    */
+   sniffer_du_handler *d_sniffer_du_handler;
 
 };
 

@@ -50,17 +50,31 @@ std::string
 hdu::snapshot() const
 {
    ostringstream os;
-   os << "(dp0"    << endl;
+
    // DUID
+   os << "(dp0" << endl;
    os << "S'duid'" << endl;
-   os << "p1"       << endl;
-   os << "S'" << duid_str() << "'" << endl;
-   os << "p2"       << endl;
+   os << "p1" << endl;
+   os << "S'" << duid_str() << "'"  << endl;
+
    // NAC
-   os << "S'nac'" << endl;
-   os << "p3"       << endl;
+   os << "p2" << endl;
+   os << "sS'nac'" << endl;
+   os << "p3" << endl;
    os << "S'" << nac_str() << "'" << endl;
-   os << "p4"       << endl;
+
+#if 0
+   // MI
+   os << "p4" << endl;
+   os << "sS'mi'" << endl;
+   os << "p5" << endl;
+   os << "S'" << mi_str() << "'" << endl;
+#endif
+
+   os << "p4" << endl;
+   os << "s." << endl;
+
+#if 0
    // Source
    os << "S'source'" << endl;
    os << "p5"       << endl;
@@ -82,26 +96,22 @@ hdu::snapshot() const
    os << "S'" << mfid_str() << "'" << endl;
    os << "p12"       << endl;
    // ALGID
+   os << "p3"      << endl;
    os << "S'algid'" << endl;
-   os << "p13"      << endl;
-   os << "S'" << algid_str() << "'" << endl;
-   os << "p14"      << endl;
+   os << "p4"      << endl;
+   os << "sS'" << algid_str() << "'" << endl;
    // KID
    os << "S'kid'" << endl;
    os << "p15"    << endl;
    os << "S''" << endl;
    os << "p16"    << endl;
-   // MI
-   os << "S'mi'"   << endl;
-   os << "p17"     << endl;
-   os << "S'" << mi_str() << "'" << endl;
-   os << "p18"     << endl;
+
    // TGID
    os << "S'tgid'" << endl;
    os << "p19"     << endl;
    os << "S''" << endl;
-   os << "p20"     << endl;
-   os << "s.";
+#endif
+
    return os.str();
 }
 

@@ -63,30 +63,45 @@ public:
    virtual ~data_unit();
 
    /**
-    * Returns the size (in octets) of the error-corrected and
-    * de-interleaved data_unit.
+    * Apply error correction to this data_unit.
     *
-    * \return The expected size (in bits) of this data_unit.
+    * \precondition is_complete() == true.
     */
-   virtual uint16_t data_size() const = 0;
+   virtual void correct_errors() = 0;
 
    /**
-    * Decode, apply error correction and write the decoded frame
-    * contents to msg. For voice frames decoding causes the compressed
-    * audio to be decoded using the supplied imbe_decoder.
+    * Decode compressed audio using the supplied imbe_decoder and
+    * writes output to audio.
     *
+    * \precondition is_complete() == true.
+    * \param imbe The imbe_decoder to use to generate the audio.
+    * \param audio A deque<float> to which the audio (if any) is appended.
+    * \return The number of samples written to audio.
+    */
+   virtual size_t decode_audio(imbe_decoder& imbe, float_queue& audio) = 0;
+
+   /**
+    * Decode the frame into an octet vector.
+    *
+    * \precondition is_complete() == true.
     * \param msg_sz The size of the message buffer.
     * \param msg A pointer to the message buffer.
-    * \param imbe The imbe_decoder to use to generate audio.
-    * \param audio A float_queue to which the audio (if any) is written.
     * \return The number of octets written to msg.
     */
-   virtual size_t decode(size_t msg_sz, uint8_t *msg, imbe_decoder& imbe, float_queue& audio) = 0;
+   virtual size_t decode_frame(size_t msg_sz, uint8_t *msg) = 0;
+
+   /**
+    * Dump this data unit in human readable format to stream s.
+    *
+    * \param s The stream to write on
+    */
+   virtual void dump(std::ostream& os) const = 0;
 
    /**
     * Extends this data_unit with the specified dibit. If this
     * data_unit is already complete a range_error is thrown.
     *
+    * \precondition is_complete() == false.
     * \param d The dibit to extend the frame with.
     * \throws range_error When the frame already is at its maximum size.
     * \return true when the frame is complete otherwise false.
@@ -94,12 +109,20 @@ public:
    virtual void extend(dibit d) = 0;
 
    /**
-    * Tests whether this data unit has enough data to begin decoding.
+    * Tests whether this data unit is complete. 
     *
     * \return true when this data_unit is complete; otherwise returns
     * false.
+    * \ see extend()
     */
    virtual bool is_complete() const = 0;
+
+   /**
+    * Returns the size (in octets) of the data_unit.
+    *
+    * \return The actual size (in octets) of this data_unit.
+    */
+   virtual uint16_t size() const = 0;
 
    /**
     * Return a snapshot of the key fields from this frame in a manner
@@ -110,13 +133,6 @@ public:
     * \return A string containing the fields to display.
     */
    virtual std::string snapshot() const = 0;
-
-   /**
-    * Dump this data unit in human readable format to stream s.
-    *
-    * \param s The stream to write on
-    */
-   virtual void dump(std::ostream& os) const = 0;
 
 protected:
 

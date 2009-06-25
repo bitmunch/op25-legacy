@@ -66,6 +66,10 @@ _op25_la_SOURCES = \
 	ldu2.cc \
 	pdu.cc \
 	tdu.cc \
+	data_unit_handler.cc \
+	logfile_du_handler.cc \
+	snapshot_du_handler.cc \
+	sniffer_du_handler.cc \
 	imbe_decoder.cc \
 	dummy_imbe_decoder.cc \
 	offline_imbe_decoder.cc \

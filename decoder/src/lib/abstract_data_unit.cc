@@ -38,16 +38,29 @@ abstract_data_unit::~abstract_data_unit()
 {
 }
 
-uint16_t
-abstract_data_unit::data_size() const
+void
+abstract_data_unit::correct_errors()
 {
-   return (7 + frame_size_max()) >> 3;
+   if(is_complete()) {
+      correct_errors(d_frame_body);
+   } else {
+      ostringstream msg;
+      msg << "cannot correct errors - frame is not complete" << endl;
+      msg << "(size now: "  << frame_size() << ", expected size: " << frame_size_max() << ")" << endl;
+      msg << "func: " << __PRETTY_FUNCTION__ << endl;
+      msg << "file: " << __FILE__ << endl;
+      msg << "line: " << __LINE__ << endl;
+      throw logic_error(msg.str());
+   }
 }
 
 void
 abstract_data_unit::extend(dibit d)
 {
-   if(frame_size_max() <= frame_size()) {
+   if(frame_size() < frame_size_max()) {
+      d_frame_body.push_back(d & 0x2);
+      d_frame_body.push_back(d & 0x1);
+   } else {
       ostringstream msg;
       msg << "cannot extend frame " << endl;
       msg << "(size now: " << frame_size() << ", expected size: " << frame_size_max() << ")" << endl;
@@ -56,40 +69,71 @@ abstract_data_unit::extend(dibit d)
       msg << "line: " << __LINE__ << endl;
       throw length_error(msg.str());
    }
-   d_frame_body.push_back(d & 0x2);
-   d_frame_body.push_back(d & 0x1);
 }
 
 size_t
-abstract_data_unit::decode(size_t msg_sz, uint8_t *msg, imbe_decoder& imbe, float_queue& audio)
+abstract_data_unit::decode_audio(imbe_decoder& imbe, float_queue& audio)
 {
-   if(!is_complete()) {
+   size_t n = 0;
+   if(is_complete()) {
+      n = decode_audio(d_frame_body, imbe, audio);
+   } else {
       ostringstream msg;
-      msg << "cannot decode frame body - frame is not complete" << endl;
+      msg << "cannot decode audio - frame is not complete" << endl;
       msg << "(size now: "  << frame_size() << ", expected size: " << frame_size_max() << ")" << endl;
       msg << "func: " << __PRETTY_FUNCTION__ << endl;
       msg << "file: " << __FILE__ << endl;
       msg << "line: " << __LINE__ << endl;
       throw logic_error(msg.str());
    }
-   if(msg_sz != data_size()) {
+   return n;
+}
+
+size_t
+abstract_data_unit::decode_frame(size_t msg_sz, uint8_t *msg)
+{
+   return decode_frame(d_frame_body, msg_sz, msg);
+}
+
+size_t
+abstract_data_unit::decode_frame(const_bit_vector& frame_body, size_t msg_sz, uint8_t *msg)
+{
+   size_t n = 0;
+   if(is_complete()) {
+      if(size() <= msg_sz) {
+         n = extract(frame_body, 0, static_cast<int>(frame_body.size()), msg);
+      } else {
+         ostringstream msg;
+         msg << "cannot decode frame body ";
+         msg << "(msg size: "  << msg_sz << ", actual size: " << size() << ")" << endl;
+         msg << "func: " << __PRETTY_FUNCTION__ << endl;
+         msg << "file: " << __FILE__ << endl;
+         msg << "line: " << __LINE__ << endl;
+         throw length_error(msg.str());
+      }
+   } else {
       ostringstream msg;
-      msg << "cannot decode frame body ";
-      msg << "(msg size: "  << msg_sz << ", expected size: " << data_size() << ")" << endl;
+      msg << "cannot decode frame - frame is not complete" << endl;
+      msg << "(size now: "  << frame_size() << ", expected size: " << frame_size_max() << ")" << endl;
       msg << "func: " << __PRETTY_FUNCTION__ << endl;
       msg << "file: " << __FILE__ << endl;
       msg << "line: " << __LINE__ << endl;
-      throw length_error(msg.str());
+      throw logic_error(msg.str());
    }
-   correct_errors(d_frame_body);
-   decode_audio(d_frame_body, imbe, audio);
-   return decode_body(d_frame_body, msg_sz, msg);
+   return n;
+
 }
 
 bool
 abstract_data_unit::is_complete() const
 {
-   return d_frame_body.size() >= frame_size_max();
+   return frame_size() >= frame_size_max();
+}
+
+uint16_t
+abstract_data_unit::size() const
+{
+   return (7 + frame_size_max()) >> 3;
 }
 
 std::string
@@ -127,22 +171,10 @@ abstract_data_unit::decode_audio(const_bit_vector& frame_body, imbe_decoder& imb
    return 0;
 }
 
-size_t
-abstract_data_unit::decode_body(const_bit_vector& frame_body, size_t msg_sz, uint8_t *msg)
-{
-   return extract(frame_body, 0, static_cast<int>(frame_body.size()), msg);
-}
-
 const_bit_vector& 
 abstract_data_unit::frame_body() const
 {
    return d_frame_body;
-}
-
-uint16_t 
-abstract_data_unit::frame_size_max() const
-{
-   return frame_size_max();
 }
 
 uint16_t 
