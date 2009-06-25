@@ -119,6 +119,7 @@ class p25_rx_block (stdgui2.std_top_block):
         samples_per_symbol = channel_rate // self.symbol_rate
         symbol_coeffs = (1.0/samples_per_symbol,)*samples_per_symbol
         symbol_filter = gr.fir_filter_fff(symbol_decim, symbol_coeffs)
+
         # C4FM demodulator
         autotuneq = gr.msg_queue(2)
         self.demod_watcher = demod_watcher(autotuneq, self.adjust_channel_offset)
@@ -200,7 +201,7 @@ class p25_rx_block (stdgui2.std_top_block):
         self.notebook = wx.Notebook(self.panel)
         self.vbox.Add(self.notebook, 1, wx.EXPAND)       
         # add spectrum scope
-        self.spectrum = fftsink2.fft_sink_c(self.notebook, fft_size=512, average=True, peak_hold=True)
+        self.spectrum = fftsink2.fft_sink_c(self.notebook, fft_size=512, fft_rate=2, average=True, peak_hold=True)
         self.spectrum_plotter = self.spectrum.win.plot
         self.spectrum_plotter.Bind(wx.EVT_LEFT_DOWN, self._on_spectrum_left_click)
         self.notebook.AddPage(self.spectrum.win, "RF Spectrum")
@@ -371,9 +372,7 @@ class p25_rx_block (stdgui2.std_top_block):
         self.stop()
         self.wait()
         # ToDo: get open_usrp() arguments from wizard
-#        self.open_usrp((0,0), 256, None, 434.08e06, True)  # Test freq
-#        self.open_usrp((1,0), 256, None, 468.425e06, True) # QPS VK
-        self.open_usrp((1,0), 256, None, 464.4e06, True)  # SOCPOV
+        self.open_usrp((0,0), 256, None, 434.08e06, True)  # Test freq
         self.start()
 
     # Open an existing capture
@@ -626,8 +625,8 @@ class decode_watcher(threading.Thread):
         while(self.keep_running):
             msg = self.msgq.delete_head()
             pickled_dict = msg.to_string()
-#            attrs = pickle.loads(pickled_dict)
-#            self.traffic_pane.update(attrs)
+            attrs = pickle.loads(pickled_dict)
+            self.traffic_pane.update(attrs)
 
 
 # Start the receiver
