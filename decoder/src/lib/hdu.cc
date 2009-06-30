@@ -29,6 +29,7 @@
 #include <swab.h>
 #include <value_string.h>
 
+#include <iostream>
 using namespace std;
 
 hdu::hdu(const_bit_queue& frame_body) :
@@ -49,68 +50,71 @@ hdu::duid_str() const
 std::string
 hdu::snapshot() const
 {
+   size_t n = 0;
    ostringstream os;
 
+   // Begin
+   os << "(d";
+   os << "p" << n++ << endl;
+
+   // NID = NAC+DUID
+
    // DUID
-   os << "(dp0" << endl;
    os << "S'duid'" << endl;
-   os << "p1" << endl;
+   os << "p" << n++ << endl;
    os << "S'" << duid_str() << "'"  << endl;
 
    // NAC
-   os << "p2" << endl;
+   os << "p" << n++ << endl;
    os << "sS'nac'" << endl;
-   os << "p3" << endl;
+   os << "p" << n++ << endl;
    os << "S'" << nac_str() << "'" << endl;
 
-#if 0
-   // MI
-   os << "p4" << endl;
-   os << "sS'mi'" << endl;
-   os << "p5" << endl;
-   os << "S'" << mi_str() << "'" << endl;
-#endif
-
-   os << "p4" << endl;
-   os << "s." << endl;
-
-#if 0
    // Source
-   os << "S'source'" << endl;
-   os << "p5"       << endl;
-   os << "S''" << endl;
-   os << "p6"       << endl;
+   os << "p" << n++ << endl;
+   os << "sS'source'" << endl;
+   os << "p" << n++ << endl;
+   os << "S'" << src_str() << "'" << endl;
+
    // Dest
-   os << "S'dest'" << endl;
-   os << "p7"       << endl;
-   os << "S''" << endl;
-   os << "p8"       << endl;
-   // NID
-   os << "S'nid'" << endl;
-   os << "p9"     << endl;
-   os << "S''" << endl;
-   os << "p10"    << endl;
+   os << "p" << n++ << endl;
+   os << "sS'dest'" << endl;
+   os << "p" << n++ << endl;
+   os << "S'" << dest_str() << "'" << endl;
+
    // MFID
-   os << "S'mfid'" << endl;
-   os << "p11"     << endl;
+   os << "p" << n++ << endl;
+   os << "sS'mfid'" << endl;
+   os << "p" << n++ << endl;
    os << "S'" << mfid_str() << "'" << endl;
-   os << "p12"       << endl;
+
    // ALGID
-   os << "p3"      << endl;
-   os << "S'algid'" << endl;
-   os << "p4"      << endl;
-   os << "sS'" << algid_str() << "'" << endl;
+   os << "p" << n++ << endl;
+   os << "sS'algid'" << endl;
+   os << "p" << n++ << endl;
+   os << "S'" << algid_str() << "'" << endl;
+
    // KID
-   os << "S'kid'" << endl;
-   os << "p15"    << endl;
-   os << "S''" << endl;
-   os << "p16"    << endl;
+   os << "p" << n++ << endl;
+   os << "sS'kid'" << endl;
+   os << "p" << n++ << endl;
+   os << "S'" << kid_str() << "'" << endl;
+
+   // MI
+   os << "p" << n++ << endl;
+   os << "sS'mi'" << endl;
+   os << "p" << n++ << endl;
+   os << "S'" << mi_str() << "'" << endl;
 
    // TGID
-   os << "S'tgid'" << endl;
-   os << "p19"     << endl;
-   os << "S''" << endl;
-#endif
+   os << "p" << n++ << endl;
+   os << "sS'tgid'" << endl;
+   os << "p" << n++ << endl;
+   os << "S'" << tgid_str() << "'" << endl;
+
+   // End
+   os << "p" << n++ << endl;
+   os << "s." << endl;
 
    return os.str();
 }
@@ -203,6 +207,18 @@ hdu::algid_str() const
    return lookup(algid, ALGIDS, ALGIDS_SZ);
 }
 
+string
+hdu::dest_str() const
+{
+   return "ToDo";
+}
+
+string
+hdu::kid_str() const
+{
+   return "ToDo";
+}
+
 std::string
 hdu::mi_str() const
 {
@@ -226,6 +242,9 @@ hdu::mi_str() const
       uint16_t octet = mi[i];
       os << hex << setfill('0') << setw(2) << octet;
    }
+
+   clog << os.str() << endl;
+
    return os.str();
 }
 
@@ -249,4 +268,16 @@ hdu::nac_str() const
    const size_t NAC_BITS_SZ = sizeof(NAC_BITS) / sizeof(NAC_BITS[0]);
    uint32_t nac = extract(frame_body(), NAC_BITS, NAC_BITS_SZ);
    return lookup(nac, NACS, NACS_SZ);
+}
+
+string
+hdu::src_str() const
+{
+   return "ToDo";
+}
+
+string
+hdu::tgid_str() const
+{
+   return "ToDo";
 }

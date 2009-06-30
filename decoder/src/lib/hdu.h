@@ -106,6 +106,20 @@ private:
    std::string algid_str() const;
 
    /**
+    * Returns a string describing the message destination.
+    *
+    * \return A string identifying the source.
+    */
+   virtual std::string dest_str() const;
+
+   /**
+    * Returns a string describing the key id (KID).
+    *
+    * \return A string identifying the KID.
+    */
+   virtual std::string kid_str() const;
+
+   /**
     * Returns a string describing the manufacturer ID (MFID).
     *
     * \return A string identifying the MFID
@@ -115,7 +129,7 @@ private:
    /**
     * Returns a string describing the message indicator (MI).
     *
-    * \return A string identifying the MI
+    * \return A string identifying the MI.
     */
    virtual std::string mi_str() const;
 
@@ -126,6 +140,19 @@ private:
     */
    virtual std::string nac_str() const;
 
+   /**
+    * Returns a string describing the message source.
+    *
+    * \return A string identifying the source.
+    */
+   virtual std::string src_str() const;
+
+   /**
+    * Returns a string describing the talk group id (TGID).
+    *
+    * \return A string identifying the TGID.
+    */
+   virtual std::string tgid_str() const;
 };
 
 #endif /* INCLUDED_HDU_H */

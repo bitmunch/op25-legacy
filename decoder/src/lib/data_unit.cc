@@ -29,6 +29,9 @@
 #include <swab.h>
 #include <tdu.h>
 
+#include <iostream>
+using namespace std;
+
 data_unit_sptr
 data_unit::make_data_unit(const_bit_queue& frame_body)
 {

@@ -144,7 +144,8 @@ op25_decoder_ff::identified()
    itpp::BCH bch(63, 16, 11,"6 3 3 1 1 4 1 3 6 7 2 3 5 4 5 3", true);
    swab(d_frame_hdr,  NID, NID_SZ, b, 0);
    b = bch.decode(b);
-   if(b != zeroes) {
+   bool identified(b != zeroes);
+   if(identified) {
       b = bch.encode(b);
       unswab(b,  0, d_frame_hdr, NID, NID_SZ);
       d_data_unit = data_unit::make_data_unit(d_frame_hdr);
@@ -152,7 +153,7 @@ op25_decoder_ff::identified()
       data_unit_sptr null;
       d_data_unit = null;
    }
-   return d_data_unit;
+   return identified;
 }
 
 void
