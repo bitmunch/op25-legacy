@@ -41,7 +41,7 @@ lookup(uint16_t value, const value_string mappings[], size_t mappings_sz)
       }
    }
    ostringstream os;
-   os << "Unknown (" << hex << value << ")";
+   os << "Unknown (" << hex << showbase << value << ")";
    return os.str();
 }
 

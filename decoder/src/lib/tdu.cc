@@ -24,8 +24,8 @@
 #include <itpp/base/vec.h>
 #include <itpp/comm/egolay.h>
 #include <itpp/comm/reedsolomon.h>
-#include <swab.h>
 #include <tdu.h>
+#include <yank.h>
 
 using std::string;
 

@@ -21,15 +21,15 @@
  * 02110-1301, USA.
  */
 
-#include <cstdlib>
 #include <cerrno>
-#include <sstream>
+#include <cstdlib>
+#include <cstring>
 #include <fcntl.h>
+#include <sstream>
 #include <stdexcept>
 #include <stdint.h>
-#include <swab.h>
-#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <termios.h>
 #include <vc55_imbe_decoder.h>
 

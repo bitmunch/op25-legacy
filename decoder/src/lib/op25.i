@@ -26,7 +26,7 @@ GR_SWIG_BLOCK_MAGIC(op25, decoder_ff);
 op25_decoder_ff_sptr op25_make_decoder_ff(gr_msg_queue_sptr msgq);
 
 /*
- * The actual op25_decoder block.
+ * The op25_decoder block.
  */
 class op25_decoder_ff : public gr_block
 {

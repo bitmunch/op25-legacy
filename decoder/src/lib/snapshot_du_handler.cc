@@ -21,6 +21,7 @@
  * 02110-1301, USA.
  */
 
+#include <cstring>
 #include <snapshot_du_handler.h>
 #include <string>
 

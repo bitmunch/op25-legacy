@@ -27,6 +27,13 @@
 #include <data_unit.h>
 #include <string>
 #include <vector>
+#include <yank.h>
+
+#include <itpp/base/vec.h>
+#include <vector>
+
+typedef std::vector<bool> bit_vector;
+typedef const std::vector<bool> const_bit_vector;
 
 /**
  * Abstract P25 data unit.

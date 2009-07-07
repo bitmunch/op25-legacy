@@ -30,7 +30,6 @@
 #include <iosfwd>
 #include <imbe_decoder.h>
 #include <stdint.h>
-#include <swab.h>
 
 typedef std::deque<bool> bit_queue;
 typedef const std::deque<bool> const_bit_queue;

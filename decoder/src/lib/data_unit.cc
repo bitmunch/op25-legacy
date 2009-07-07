@@ -26,10 +26,9 @@
 #include <ldu1.h>
 #include <ldu2.h>
 #include <pdu.h>
-#include <swab.h>
 #include <tdu.h>
+#include <yank.h>
 
-#include <iostream>
 using namespace std;
 
 data_unit_sptr

@@ -21,13 +21,13 @@
  * 02110-1301, USA.
  */
 
-#include "sniffer_du_handler.h"
-
-#include <net/if.h>
+#include <cstring>
+#include <fcntl.h>
 #include <linux/if_tun.h>
+#include <net/if.h>
+#include <sniffer_du_handler.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
-#include <fcntl.h>
 
 sniffer_du_handler::sniffer_du_handler(data_unit_handler_sptr next) :
    data_unit_handler(next),

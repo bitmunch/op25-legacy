@@ -106,13 +106,6 @@ private:
    std::string algid_str() const;
 
    /**
-    * Returns a string describing the message destination.
-    *
-    * \return A string identifying the source.
-    */
-   virtual std::string dest_str() const;
-
-   /**
     * Returns a string describing the key id (KID).
     *
     * \return A string identifying the KID.
@@ -139,13 +132,6 @@ private:
     * \return A string identifying the NAC.
     */
    virtual std::string nac_str() const;
-
-   /**
-    * Returns a string describing the message source.
-    *
-    * \return A string identifying the source.
-    */
-   virtual std::string src_str() const;
 
    /**
     * Returns a string describing the talk group id (TGID).

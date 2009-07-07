@@ -32,6 +32,7 @@
 #include <logfile_du_handler.h>
 #include <op25_decoder_ff.h>
 #include <snapshot_du_handler.h>
+#include <yank.h>
 
 using namespace std;
 
@@ -122,7 +123,7 @@ op25_decoder_ff::correlated()
          ++errs;
       }
    }
-   return (errs <= 6);
+   return (errs <= 4);
 }
 
 bool
@@ -142,12 +143,12 @@ op25_decoder_ff::identified()
 
    itpp::bvec b(63), zeroes(16);
    itpp::BCH bch(63, 16, 11,"6 3 3 1 1 4 1 3 6 7 2 3 5 4 5 3", true);
-   swab(d_frame_hdr,  NID, NID_SZ, b, 0);
+   yank(d_frame_hdr,  NID, NID_SZ, b, 0);
    b = bch.decode(b);
    bool identified(b != zeroes);
    if(identified) {
       b = bch.encode(b);
-      unswab(b,  0, d_frame_hdr, NID, NID_SZ);
+      yank_back(b, 0, d_frame_hdr, NID, NID_SZ);
       d_data_unit = data_unit::make_data_unit(d_frame_hdr);
    } else {
       data_unit_sptr null;
@@ -184,6 +185,7 @@ op25_decoder_ff::receive_symbol(dibit d)
    case READING:
       d_data_unit->extend(d);
       if(d_data_unit->is_complete()) {
+         d_data_unit->correct_errors();
          d_data_unit_handler->handle(d_data_unit);
          data_unit_sptr null;
          d_data_unit = null;
