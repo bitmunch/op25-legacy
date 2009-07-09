@@ -120,13 +120,8 @@ void
 hdu::apply_golay_correction(bit_vector& frame)
 {
    static itpp::My_Extended_Golay golay;
-   static const size_t NOF_GOLAY_CODEWORDS = 2, GOLAY_DATA_SZ = 6, GOLAY_CODEWORD_SZ = 18;
-//   static const size_t NOF_GOLAY_CODEWORDS = 36, GOLAY_DATA_SZ = 6, GOLAY_CODEWORD_SZ = 18;
+   static const size_t NOF_GOLAY_CODEWORDS = 36, GOLAY_CODEWORD_SZ = 18;
    static const size_t GOLAY_CODEWORDS[NOF_GOLAY_CODEWORDS][GOLAY_CODEWORD_SZ] = {
-#if 1
-      { 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131 },
-      { 131, 130, 129, 128, 127, 126, 125, 124, 123, 122, 121, 120, 119, 118, 117, 116, 115, 114 }
-#else
       { 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131 },
       { 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 144, 145, 146, 147, 148, 149, 150, 151 },
       { 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169 },
@@ -163,7 +158,6 @@ hdu::apply_golay_correction(bit_vector& frame)
       { 726, 727, 728, 729, 730, 731, 732, 733, 734, 735, 736, 737, 738, 739, 740, 741, 742, 743 },
       { 744, 745, 746, 747, 748, 749, 750, 751, 752, 753, 754, 755, 756, 757, 758, 759, 760, 761 },
       { 762, 763, 764, 765, 766, 767, 768, 769, 770, 771, 772, 773, 774, 775, 776, 777, 778, 779 }
-#endif
    };
    for(size_t i = 0; i < NOF_GOLAY_CODEWORDS; ++i) {
       const size_t PAD_SZ = 6;
@@ -172,10 +166,6 @@ hdu::apply_golay_correction(bit_vector& frame)
       yank(frame, GOLAY_CODEWORDS[i], GOLAY_CODEWORD_SZ, b, PAD_SZ);
       itpp::bvec d(golay.decode(b));
 //         yank_back(d, PAD_SZ, frame, GOLAY_CODEWORDS[i], GOLAY_DATA_SZ);
-
-      clog << " IN:" << b << endl;
-      clog << "OUT:" << d << endl;
-      clog << endl;
    }
 }
 
@@ -257,7 +247,7 @@ string
 hdu::mfid_str() const
 {
    const size_t MFID_BITS[] = {
-      336, 337, 338, 339, 340, 341, 354, 355,
+      336, 337, 338, 339, 340, 341, 354, 355
    };
    const size_t MFID_BITS_SZ = sizeof(MFID_BITS) / sizeof(MFID_BITS_SZ);
    uint8_t mfid = extract(frame_body(), MFID_BITS, MFID_BITS_SZ);
@@ -268,7 +258,7 @@ string
 hdu::nac_str() const
 {
    const size_t NAC_BITS[] = {
-      48,49,50,51,52,53,54,55,56,57,58,59
+      48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59
    };
    const size_t NAC_BITS_SZ = sizeof(NAC_BITS) / sizeof(NAC_BITS[0]);
    uint32_t nac = extract(frame_body(), NAC_BITS, NAC_BITS_SZ);
@@ -279,22 +269,8 @@ string
 hdu::tgid_str() const
 {
    const size_t TGID_BITS[] = {
-      432,
-      433,
-      434,
-      435,
-      448,
-      449,
-      450,
-      451,
-      452,
-      453,
-      466,
-      467,
-      468,
-      469,
-      470,
-      471
+      432, 433, 434, 435, 448, 449, 450, 451,
+      452, 453, 466, 467, 468, 469, 470, 471
    };
    const size_t TGID_BITS_SZ = sizeof(TGID_BITS) / sizeof(TGID_BITS[0]);
    const uint16_t tgid = extract(frame_body(), TGID_BITS, TGID_BITS_SZ);
