@@ -164,8 +164,10 @@ class p25_rx_block (stdgui2.std_top_block):
         self.panel = panel
         self.vbox = vbox
         
-        # setup the "File" menu
+        # setup the menu bar
         menubar = self.frame.GetMenuBar()
+
+        # setup the "File" menu
         file_menu = menubar.GetMenu(0)
         self.file_new = file_menu.Insert(0, wx.ID_NEW)
         self.frame.Bind(wx.EVT_MENU, self._on_file_new, self.file_new)
@@ -177,6 +179,29 @@ class p25_rx_block (stdgui2.std_top_block):
         file_menu.InsertSeparator(4)
         self.file_close = file_menu.Insert(5, wx.ID_CLOSE)
         self.frame.Bind(wx.EVT_MENU, self._on_file_close, self.file_close)
+
+        # setup the "Edit" menu
+        edit_menu = wx.Menu()
+        self.edit_undo = edit_menu.Insert(0, wx.ID_UNDO)
+        self.frame.Bind(wx.EVT_MENU, self._on_edit_undo, self.edit_undo)
+        self.edit_redo = edit_menu.Insert(1, wx.ID_REDO)
+        self.frame.Bind(wx.EVT_MENU, self._on_edit_redo, self.edit_redo)
+        edit_menu.InsertSeparator(2)
+        self.edit_cut = edit_menu.Insert(3, wx.ID_CUT)
+        self.frame.Bind(wx.EVT_MENU, self._on_edit_cut, self.edit_cut)
+        self.edit_copy = edit_menu.Insert(4, wx.ID_COPY)
+        self.frame.Bind(wx.EVT_MENU, self._on_edit_copy, self.edit_copy)
+        self.edit_paste = edit_menu.Insert(5, wx.ID_PASTE)
+        self.frame.Bind(wx.EVT_MENU, self._on_edit_paste, self.edit_paste)
+        self.edit_delete = edit_menu.Insert(6, wx.ID_DELETE)
+        self.frame.Bind(wx.EVT_MENU, self._on_edit_delete, self.edit_delete)
+        edit_menu.InsertSeparator(7)
+        self.edit_select_all = edit_menu.Insert(8, wx.ID_SELECTALL)
+        self.frame.Bind(wx.EVT_MENU, self._on_edit_select_all, self.edit_select_all)
+        edit_menu.InsertSeparator(9)
+        self.edit_prefs = edit_menu.Insert(10, wx.ID_PREFERENCES)
+        self.frame.Bind(wx.EVT_MENU, self._on_edit_prefs, self.edit_prefs)
+        menubar.Append(edit_menu, "&Edit"); # ToDo use wx.ID_EDIT stuff
 
         # setup the toolbar
         if True:
@@ -394,6 +419,47 @@ class p25_rx_block (stdgui2.std_top_block):
         # capture source, capture rate, date(?), size(?),)
         todo = True
 
+    # Undo the last edit
+    #
+    def _on_edit_undo(self, event):
+        todo = True
+
+    # Redo the edit
+    #
+    def _on_edit_redo(self, event):
+        todo = True
+
+    # Cut the current selection
+    #
+    def _on_edit_cut(self, event):
+        todo = True
+
+    # Copy the current selection
+    #
+    def _on_edit_copy(self, event):
+        todo = True
+
+    # Paste into the current sample
+    #
+    def _on_edit_paste(self, event):
+        todo = True
+
+    # Delete the current selection
+    #
+    def _on_edit_delete(self, event):
+        todo = True
+
+    # Select all
+    #
+    def _on_edit_select_all(self, event):
+        todo = True
+
+    # Open the preferences dialog
+    #
+    def _on_edit_prefs(self, event):
+        todo = True
+
+
     # Set channel offset and RF squelch threshold
     #
     def _on_spectrum_left_click(self, event):
@@ -413,6 +479,9 @@ class p25_rx_block (stdgui2.std_top_block):
             ymin, ymax = self.spectrum_plotter.GetYCurrentRange()
             y = min(y, ymax)
             y = max(y, ymin)
+            squelch_increment = 5
+            y += squelch_increment / 2
+            y = (y // squelch_increment) * squelch_increment
             self.set_squelch_threshold(int(y))
 
     # Open an existing capture file
@@ -492,11 +561,11 @@ class TrafficPane(wx.Panel):
         sizer.Add(field, pos=(4,2))
         self.fields["dest"] = field;
 
-        label = wx.StaticText(self, -1, "NID:")
-        sizer.Add(label, pos=(5,1))
-        field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
-        sizer.Add(field, pos=(5,2))
-        self.fields["nid"] = field;
+#        label = wx.StaticText(self, -1, "ToDo:")
+#        sizer.Add(label, pos=(5,1))
+#        field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
+#        sizer.Add(field, pos=(5,2))
+#        self.fields["nid"] = field;
 
         label = wx.StaticText(self, -1, "MFID:")
         sizer.Add(label, pos=(1,4))
