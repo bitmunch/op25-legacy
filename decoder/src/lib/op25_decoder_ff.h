@@ -94,15 +94,15 @@ private:
 
    /**
     * Tests whether d_frame_header identifies a known data unit and if
-    * so sets d_data_unit to point to an appropriate instance. This
-    * method must only be called when the frame header is larger than
-    * 114 bits in length (the minimum size for a frame containing a
-    * NID).
+    * so sets d_data_unit to point to an appropriate instance and
+    * returns a pointer to it. This method must only be called when
+    * the frame header is larger than 114 bits in length (the minimum
+    * size for a frame containing a NID).
     *
-    * \return true if the frame header identifies a known data unit;
-    * otherwise false.
+    * \return A data_unit_sptr pointing to an appropriate data_unit
+    * instance or NULL if the frame header is unrecognized.
     */
-   bool identified();
+   data_unit_sptr identified();
 
    /**
     * Handle a received symbol.

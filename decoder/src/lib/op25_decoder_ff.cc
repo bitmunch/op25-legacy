@@ -126,7 +126,7 @@ op25_decoder_ff::correlated()
    return (errs <= 4);
 }
 
-bool
+data_unit_sptr
 op25_decoder_ff::identified()
 {
    static const size_t NID[] = {
@@ -145,8 +145,7 @@ op25_decoder_ff::identified()
    itpp::BCH bch(63, 16, 11,"6 3 3 1 1 4 1 3 6 7 2 3 5 4 5 3", true);
    yank(d_frame_hdr,  NID, NID_SZ, b, 0);
    b = bch.decode(b);
-   bool identified(b != zeroes);
-   if(identified) {
+   if(b != zeroes) {
       b = bch.encode(b);
       yank_back(b, 0, d_frame_hdr, NID, NID_SZ);
       d_data_unit = data_unit::make_data_unit(d_frame_hdr);
@@ -154,7 +153,7 @@ op25_decoder_ff::identified()
       data_unit_sptr null;
       d_data_unit = null;
    }
-   return identified;
+   return d_data_unit;
 }
 
 void
