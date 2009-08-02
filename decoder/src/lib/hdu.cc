@@ -238,7 +238,7 @@ hdu::mi_str() const
       os << hex << setfill('0') << setw(2) << octet;
    }
 
-   clog << os.str() << endl; // diagnostix
+//   clog << os.str() << endl; // diagnostix
 
    return os.str();
 }

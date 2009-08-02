@@ -66,6 +66,7 @@ _op25_la_SOURCES = \
 	ldu2.cc \
 	pdu.cc \
 	tdu.cc \
+	tsbk.cc \
 	data_unit_handler.cc \
 	logfile_du_handler.cc \
 	snapshot_du_handler.cc \

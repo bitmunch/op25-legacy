@@ -27,6 +27,7 @@
 #include <ldu2.h>
 #include <pdu.h>
 #include <tdu.h>
+#include <tsbk.h>
 #include <yank.h>
 
 using namespace std;
@@ -45,6 +46,9 @@ data_unit::make_data_unit(const_bit_queue& frame_body)
       break;
    case 0x5:
       d = data_unit_sptr(new ldu1(frame_body));
+      break;
+   case 0x7:
+      d = data_unit_sptr(new tsbk(frame_body));
       break;
    case 0xa:
       d = data_unit_sptr(new ldu2(frame_body));
