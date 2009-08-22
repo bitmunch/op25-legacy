@@ -60,9 +60,10 @@ const value_string ALGIDS[] = {
    { 0x83, "3 key Triple DES" },
    { 0x84, "AES-256" },
    /* Motorola proprietary */
-   { 0x9F, "DES-XL" },
-   { 0xA0, "DVI-XL" },
-   { 0xA1, "DVP-XL" },
+   { 0x9F, "Motorola DES-XL" },
+   { 0xA0, "Motorola DVI-XL" },
+   { 0xA1, "Motorola DVP-XL" },
+   { 0xAA, "Motorola ADP" },
 };
 const size_t ALGIDS_SZ = sizeof(ALGIDS) / sizeof(ALGIDS[0]);
 
