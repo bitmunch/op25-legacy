@@ -33,8 +33,8 @@ public:
 	virtual void decode(uint8_t *buf);
 private:
 
-	//NOTE: Single-letter variable names are upper case only;
-	//            Lower case if needed is spelled.   e.g.  L, ell
+	//NOTE: Single-letter variable names are upper case only; Lower
+	//            case if needed is spelled. e.g. L, ell
 
 	// global Seq ER ?
 

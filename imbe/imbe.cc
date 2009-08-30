@@ -1653,13 +1653,14 @@ software_imbe_decoder::synth_voiced()
 
    int ell, en;
 
-   if( L > OldL) { MaxL = L; } else { MaxL = OldL; }
+   if( L > OldL) { 
+      MaxL = L; 
+   } else {
+      MaxL = OldL;
+   }
 
    psi1 = psi1 +(Oldw0 + w0) * 80;
-
-#if 1
-   psi1 = remainderf(psi1, 2 * M_PI); // ToDo decide if its 2pi or pi^2
-#endif
+   psi1 = remainderf(psi1, 2 * M_PI); // ToDo: decide if its 2pi or pi^2
 
    for(ell = 1; ell <= L/4; ell++) {
       phi[ell][ New] = psi1 * ell;
@@ -1669,14 +1670,27 @@ software_imbe_decoder::synth_voiced()
       phi[ell][ New] = psi1 * ell + Tmp * PhzNz[ell];
    }
 
-   for(en = 0; en <= 159; en++) {  sv[en] = 0; }
+   for(en = 0; en <= 159; en++) {
+      sv[en] = 0;
+   }
 
    for(ell = 1; ell <= MaxL; ell++) {
-      if(ell > L) { MNew = 0; } else { MNew = M[ell][ New]; } //128
-      if(ell > OldL) { MOld = 0; } else { MOld = M[ell][ Old]; } //129
+
+      if(ell > L) { 
+         MNew = 0;
+      } else {
+         MNew = M[ell][ New];
+      }
+
+      if(ell > OldL) {
+         MOld = 0;
+      } else {
+         MOld = M[ell][ Old];
+      }
+
       if(vee[ell][ New]) {
          if ( vee[ell][ Old]) {
-            if(ell < 8 & fabsf(w0 - Oldw0) < .1 * w0) { //134(fine transition)
+            if(ell < 8 & fabsf(w0 - Oldw0) < .1 * w0) { // (fine transition)
                const double PI_SQUARED = M_PI * M_PI;
                const double INV_PI_SQUARED = 1.0 / PI_SQUARED;
                Dpl = phi[ell][ New] - phi[ell][ Old] -(Oldw0 + w0) * ell * 80;
@@ -1684,39 +1698,31 @@ software_imbe_decoder::synth_voiced()
                THa = (Oldw0 * (float)ell + Dwl);
                THb = (w0 - Oldw0) * ell * .003125;
                Mb = .00625 *(MNew - MOld);
-               // FOR en = 0 TO 159
                for(en = 0; en <= 159; en++) {
                   sv[en] = sv[en] +(MOld + en * Mb) * cos(phi[ell][ Old] +(THa + THb * en) * en);
                }
-            } else { //133(coarse transition)
-               // FOR en = 0 TO 55
+            } else { // (coarse transition)
                for(en = 0; en <= 55; en++) {
                   sv[en] = sv[en] + ws[en+105] * MOld * cos(Oldw0 * en * ell + phi[ell] [ Old]);
                }
-               // FOR en = 56 TO 105
                for(en = 56; en <= 105; en++) {
                   sv[en] = sv[en] + ws[en+105] * MOld * cos(Oldw0 * en * ell + phi[ell][ Old]);
                   sv[en] = sv[en] + ws[en-55] * MNew * cos(w0 *(en - 160) * ell + phi[ell][ New]);
                }
-               // FOR en = 106 TO 159
                for(en = 106; en <= 159; en++) {
                   sv[en] = sv[en] + ws[en-55] * MNew * cos(w0 *(en - 160) * ell + phi[ell][ New]);
                }
             }
-         } else { //132
-            // FOR en = 56 TO 159
+         } else {
             for(en = 56; en <= 159; en++) {
                sv[en] = sv[en] + ws[en-55] * MNew * cos(w0 *(en - 160) * ell + phi[ell][ New]);
             }
          }
       } else {
-         if( vee[ell][ Old]) { //131
-            // FOR en = 0 TO 105
+         if( vee[ell][Old]) {
             for(en = 0; en <= 105; en++) {
                sv[en] = sv[en] + ws[en+105] * MOld * cos(Oldw0 * en * ell + phi[ell][ Old]);
             }
-            //ELSE '130
-            //  FOR en = 0 TO 159: sv(en) = sv(en) + 0: NEXT en
          }
       }
    }

@@ -2,10 +2,14 @@
 #include <cstdlib>
 #include <imbe.h>
 
+#include <boost/scoped_ptr.hpp>
+
+using namespace boost;
+
 int
 main(int ac, char **av)
 {
-	op25_imbe *imbe = new op25_imbe();
+	scoped_ptr<software_imbe_decoder> imbe(new software_imbe_decoder());
    while(--ac) {
       FILE *fp = fopen(*++av, "r");
       if(fp) {
