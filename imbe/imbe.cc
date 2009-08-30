@@ -1026,7 +1026,7 @@ static const float Uq[129] = {
 	0.000000
 };
 
-op25_imbe::op25_imbe() :
+software_imbe_decoder::software_imbe_decoder() :
    out(fopen("audio.pcm", "w"))
 {
    int i,j;
@@ -1048,7 +1048,7 @@ op25_imbe::op25_imbe() :
    }
 }
 
-op25_imbe::~op25_imbe()
+software_imbe_decoder::~software_imbe_decoder()
 {
    if(out) {
       fclose(out);
@@ -1056,7 +1056,7 @@ op25_imbe::~op25_imbe()
 }
 
 void
-op25_imbe::decode(uint8_t *buf)
+software_imbe_decoder::decode(uint8_t *buf)
 {
 	// process input 144-bit IMBE frame - converts to 88-bit frame
 	int i;
@@ -1105,7 +1105,7 @@ op25_imbe::decode(uint8_t *buf)
 }
 
 void
-op25_imbe::adaptive_smoothing(float SE, float ER, float ET)
+software_imbe_decoder::adaptive_smoothing(float SE, float ER, float ET)
 {
    float VM;
    float AM;
@@ -1141,7 +1141,7 @@ op25_imbe::adaptive_smoothing(float SE, float ER, float ET)
 }
 
 void
-op25_imbe::fft(float REX[], float IMX[])
+software_imbe_decoder::fft(float REX[], float IMX[])
 {
    int I;
    int J;
@@ -1186,7 +1186,7 @@ op25_imbe::fft(float REX[], float IMX[])
 }
 
 void
-op25_imbe::decode_audio(uint8_t *A)
+software_imbe_decoder::decode_audio(uint8_t *A)
 {
    uint32_t u0, u1, u2, u3, u4, u5, u6, u7, E0, ET;
    int K;
@@ -1245,7 +1245,7 @@ op25_imbe::decode_audio(uint8_t *A)
 }
 
 void
-op25_imbe::decode_spectral_amplitudes(int Start3, int Start8)
+software_imbe_decoder::decode_spectral_amplitudes(int Start3, int Start8)
 {
    float G[7];           //Can we use C(1 to 6,1) for this?
    int   J[7];
@@ -1335,7 +1335,7 @@ op25_imbe::decode_spectral_amplitudes(int Start3, int Start8)
 }
 
 void
-op25_imbe::decode_vuv(int K)
+software_imbe_decoder::decode_vuv(int K)
 {
    int bee1, ell, kay;
    bee1 = bee[1];
@@ -1351,7 +1351,7 @@ op25_imbe::decode_vuv(int K)
 }
 
 void
-op25_imbe::enhance_spectral_amplitudes(float& SE)
+software_imbe_decoder::enhance_spectral_amplitudes(float& SE)
 {
    float RM0;
    float RM1;
@@ -1399,7 +1399,7 @@ op25_imbe::enhance_spectral_amplitudes(float& SE)
 }
 
 void
-op25_imbe::ifft(float FDi[], float FDq[], float TD[]) // ToDo: replace "real IFFT" with fftw3 IFFT proc!
+software_imbe_decoder::ifft(float FDi[], float FDq[], float TD[]) // ToDo: replace "real IFFT" with fftw3 IFFT proc!
 {
 	//Inverse FFT:
 	//  transform 129-point freq domain(FDx) to 256-point time domain(TD)
@@ -1470,7 +1470,7 @@ op25_imbe::ifft(float FDi[], float FDq[], float TD[]) // ToDo: replace "real IFF
 }
 
 uint16_t
-op25_imbe::rearrange(uint32_t u0, uint32_t u1, uint32_t u2, uint32_t u3, uint32_t u4, uint32_t u5, uint32_t u6, uint32_t u7)
+software_imbe_decoder::rearrange(uint32_t u0, uint32_t u1, uint32_t u2, uint32_t u3, uint32_t u4, uint32_t u5, uint32_t u6, uint32_t u7)
 {
    int K;
    int I, ubit, Seq, col;
@@ -1572,7 +1572,7 @@ op25_imbe::rearrange(uint32_t u0, uint32_t u1, uint32_t u2, uint32_t u3, uint32_
 }
 
 void
-op25_imbe::synth_unvoiced()
+software_imbe_decoder::synth_unvoiced()
 {
    float Uwi[256] ;
    float Uwq[256] ;
@@ -1639,7 +1639,7 @@ op25_imbe::synth_unvoiced()
 }
 
 void
-op25_imbe::synth_voiced()
+software_imbe_decoder::synth_voiced()
 {
    float MaxL;
    float Tmp;
@@ -1723,7 +1723,7 @@ op25_imbe::synth_voiced()
 }
 
 void
-op25_imbe::unpack(uint8_t *A, uint32_t& u0, uint32_t& u1, uint32_t& u2, uint32_t& u3, uint32_t& u4, uint32_t& u5, uint32_t& u6, uint32_t& u7, uint32_t& E0, uint32_t& ET)
+software_imbe_decoder::unpack(uint8_t *A, uint32_t& u0, uint32_t& u1, uint32_t& u2, uint32_t& u3, uint32_t& u4, uint32_t& u5, uint32_t& u6, uint32_t& u7, uint32_t& E0, uint32_t& ET)
 {
    E0 = A[0];
    ET = A[1];
@@ -1744,7 +1744,7 @@ op25_imbe::unpack(uint8_t *A, uint32_t& u0, uint32_t& u1, uint32_t& u2, uint32_t
 }
  
 uint32_t
-op25_imbe::extract(const uint8_t* buf, size_t begin, size_t end)
+software_imbe_decoder::extract(const uint8_t* buf, size_t begin, size_t end)
 {
    uint32_t x = 0;
    for(size_t i = begin; i < end; ++i) {
@@ -1754,66 +1754,10 @@ op25_imbe::extract(const uint8_t* buf, size_t begin, size_t end)
    return x;
 }
 
-uint32_t
-op25_imbe::vfPickBits0(uint8_t* buf)
-{
-   return extract(buf, 0, 23);
-}
-
-uint32_t
-op25_imbe::vfPickBits1(uint8_t* buf)
-{
-   return extract(buf, 23, 23 + 23);
-}
-
-uint32_t
-op25_imbe::vfPickBits2(uint8_t* buf)
-{
-   return extract(buf, 46, 46 + 23);
-}
-
-uint32_t
-op25_imbe::vfPickBits3(uint8_t* buf)
-{
-   return extract(buf, 69, 69 + 23);
-}
-
-uint32_t
-op25_imbe::vfPickBits4(uint8_t* buf)
-{
-   return extract(buf, 92, 92 + 15);
-}
-
-uint32_t
-op25_imbe::vfPickBits5(uint8_t* buf)
-{
-   return extract(buf, 107, 107 + 15);
-}
-
-uint32_t
-op25_imbe::vfPickBits6(uint8_t* buf)
-{
-   return extract(buf, 122, 122 + 15);
-}
-
-uint32_t
-op25_imbe::vfPickBits7(uint8_t* buf)
-{
-   return extract(buf, 137, 135 + 9);
-}
+// ToDo: swap hamming and golay for external implementations
 
 unsigned int
-op25_imbe::gly23127Dec(unsigned int& CW, unsigned int& ET)
-{
-   unsigned int correction;
-   correction = gly23127DecTbl[gly23127GetSyn(CW)];
-   ET = ET +(correction & 3);
-   CW = (CW ^ correction) / 2048;
-   return CW;
-}
-
-unsigned int
-op25_imbe::gly23127GetSyn(unsigned int pattern)
+gly23127GetSyn(unsigned int pattern)
 {
    unsigned int aux;
    aux = 0x400000;
@@ -1827,7 +1771,34 @@ op25_imbe::gly23127GetSyn(unsigned int pattern)
 }
 
 unsigned int
-op25_imbe::vfPrGen15(unsigned int& Pr)
+gly23127Dec(unsigned int& CW, unsigned int& ET)
+{
+   unsigned int correction;
+   correction = gly23127DecTbl[gly23127GetSyn(CW)];
+   ET = ET +(correction & 3);
+   CW = (CW ^ correction) / 2048;
+   return CW;
+}
+
+#define golay_23_decode gly23127Dec
+
+int
+vfHmg15113Dec(int RX, int ET)  // should be int& ET!
+{
+   int Dat, Par, correction;
+   Dat = RX / 16; Par = RX & 15;
+   correction = hmg15113DecTbl[hmg15113EncTbl[Dat] ^ Par];
+   if( correction) {
+      ET = ET + 1;
+      Dat = Dat ^ correction;
+   }
+   return  Dat;
+}
+
+#define hamming_15_decode vfHmg15113Dec
+
+unsigned int
+software_imbe_decoder::vfPrGen15(unsigned int& Pr)
 {
    int i,n;
    n = 0;
@@ -1841,7 +1812,7 @@ op25_imbe::vfPrGen15(unsigned int& Pr)
 }
 
 unsigned int
-op25_imbe::vfPrGen23(unsigned int& Pr)
+software_imbe_decoder::vfPrGen23(unsigned int& Pr)
 {
    int n = 0;
    for(int i = 22; i >= 0; i--) {
@@ -1854,48 +1825,38 @@ op25_imbe::vfPrGen23(unsigned int& Pr)
 }
 
 void
-op25_imbe::correct(uint8_t* A, uint32_t& u0, uint32_t& u1, uint32_t& u2, uint32_t& u3, uint32_t& u4, uint32_t& u5, uint32_t& u6, uint32_t& u7, uint32_t& E0, uint32_t& ET)
+software_imbe_decoder::correct(uint8_t* A, uint32_t& u0, uint32_t& u1, uint32_t& u2, uint32_t& u3, uint32_t& u4, uint32_t& u5, uint32_t& u6, uint32_t& u7, uint32_t& E0, uint32_t& ET)
 {
-   unsigned int RX = 0;
-
    ET = 0;
 
-   RX = vfPickBits0(A);
-   u0 = gly23127Dec(RX, ET);
+   uint32_t RX = extract(A, 0, 23);
+   u0 = golay_23_decode(RX, ET);
    E0 = ET;
 
-   unsigned int Pr = 16 * u0;
-   unsigned int m1 = vfPrGen23(Pr);
-   unsigned int m2 = vfPrGen23(Pr);
-   unsigned int m3 = vfPrGen23(Pr);
-   unsigned int m4 = vfPrGen15(Pr);
-   unsigned int m5 = vfPrGen15(Pr);
-   unsigned int m6 = vfPrGen15(Pr);
+   uint32_t pn = u0 << 4;
+   uint32_t m1 = vfPrGen23(pn);
+   RX = extract(A, 23, 46) ^ m1;
+   u1 = golay_23_decode(RX, ET);
 
-   RX = vfPickBits1(A) ^ m1;
-   u1 = gly23127Dec(RX, ET);
-   RX = vfPickBits2(A) ^ m2;
-   u2 = gly23127Dec(RX, ET);
-   RX = vfPickBits3(A) ^ m3;
-   u3 = gly23127Dec(RX, ET);
-   RX = vfPickBits4(A) ^ m4;
-   u4 = vfHmg15113Dec(RX, ET);
-   RX = vfPickBits5(A) ^ m5;
-   u5 = vfHmg15113Dec(RX, ET);
-   RX = vfPickBits6(A) ^ m6;
-   u6 = vfHmg15113Dec(RX, ET);
-   u7 = vfPickBits7(A);
-}
+   uint32_t m2 = vfPrGen23(pn);
+   RX = extract(A, 46, 69) ^ m2;
+   u2 = golay_23_decode(RX, ET);
 
-int
-op25_imbe::vfHmg15113Dec(int RX, int ET)  // should be int& ET!
-{
-   int Dat, Par, correction;
-   Dat = RX / 16; Par = RX & 15;
-   correction = hmg15113DecTbl[hmg15113EncTbl[Dat] ^ Par];
-   if( correction) {
-      ET = ET + 1;
-      Dat = Dat ^ correction;
-   }
-   return  Dat;
+   uint32_t m3 = vfPrGen23(pn);
+   RX = extract(A, 69, 92) ^ m3;
+   u3 = golay_23_decode(RX, ET);
+
+   uint32_t m4 = vfPrGen15(pn);
+   RX = extract(A, 92, 107) ^ m4;
+   u4 = hamming_15_decode(RX, ET);
+
+   uint32_t m5 = vfPrGen15(pn);
+   RX = extract(A, 107, 122) ^ m5;
+   u5 = hamming_15_decode(RX, ET);
+
+   uint32_t m6 = vfPrGen15(pn);
+   RX = extract(A, 122, 137) ^ m6;
+   u6 = hamming_15_decode(RX, ET);
+
+   u7 = extract(A, 137, 144);
 }
