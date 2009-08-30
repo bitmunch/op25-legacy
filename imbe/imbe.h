@@ -24,17 +24,12 @@
 #ifndef INCLUDED_IMBE_H
 #define INCLUDED_IMBE_H
 
-#define pi M_PI
-#define pi2 (pi * pi)
-#define pi2inv (1 / pi2)
-
 class op25_imbe {
 public:
-	op25_imbe(void);
-	~op25_imbe(void);
+	op25_imbe();
+	~op25_imbe();
 	void imbe_frame(unsigned char*);
-	void init(void);
-	void eatrxsym(char);
+	void init();
 
 private:
 // define global lookup tables
@@ -71,19 +66,11 @@ private:
 	int sym_bp;
 	int ErFlag;
 
+   FILE *out;
+
 // member functions
 	uint32_t extract(const uint8_t* buf, size_t begin, size_t end);
 
-#if 0
-	uint32_t vfPickBits0(const uint8_t *);
-	uint32_t vfPickBits1(const uint8_t *);
-	uint32_t vfPickBits2(const uint8_t *);
-	uint32_t vfPickBits3(const uint8_t *);
-	uint32_t vfPickBits4(const uint8_t *);
-	uint32_t vfPickBits5(const uint8_t *);
-	uint32_t vfPickBits6(const uint8_t *);
-	uint32_t vfPickBits7(const uint8_t *);
-#else
 	unsigned int vfPickBits0(unsigned char *);
 	unsigned int vfPickBits1(unsigned char *);
 	unsigned int vfPickBits2(unsigned char *);
@@ -92,36 +79,31 @@ private:
 	unsigned int vfPickBits5(unsigned char *);
 	unsigned int vfPickBits6(unsigned char *);
 	unsigned int vfPickBits7(unsigned char *);
-#endif
 
-	int vfHmg15113Dec (int , int ) ;
+	int vfHmg15113Dec(int , int );
+	unsigned int gly23127Dec(unsigned int& , unsigned int& );
+	unsigned int  gly23127GetSyn(unsigned int );
 
-	unsigned int vfPrGen15 (unsigned int& ) ;
-	unsigned int vfPrGen23 (unsigned int& ) ;
-	unsigned int gly23127Dec (unsigned int& , unsigned int& ) ;
-	unsigned int  gly23127GetSyn (unsigned int ) ;
+	unsigned int vfPrGen15(unsigned int& );
+	unsigned int vfPrGen23(unsigned int& );
 
 #if 0
 	void vfDec(const uint8_t*, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&);
-#else
+#else 
 	void vfDec(unsigned char*, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&);
 #endif
-	void Decode (unsigned char *);
-	void DecodeSpectralAmplitudes (int, int );
-	void DecodeVUV (int ) ;
-	void AdaptiveSmoothing (float, float, float ) ;
-	void CplxFFT (float [], float []) ;
-	void EnhanceSpectralAmplitudes (float&) ;
-	void RealIFFT (float [], float [], float []) ;
-	void RearrangeBits (int, int, int, int, int, int, int, int, int&) ;
-	void SynthUnvoiced (void) ;
-	void SynthVoiced (void) ;
-	void Synth(void) ;
-	void UnpackBytes (unsigned char*, int&, int&, int&, int&, int&, int&, int&, int&, int&, int& ) ;
-	int bchDec (char* );
-	void ReadNetID (unsigned int&, unsigned int&, char* );
-	void ProcVF (char *);
-	void proc_lldu (char *, int );
+	void decode(uint8_t *);
+	void DecodeSpectralAmplitudes(int, int );
+	void DecodeVUV(int );
+	void AdaptiveSmoothing(float, float, float );
+	void CplxFFT(float [], float []);
+	void EnhanceSpectralAmplitudes(float&);
+	void RealIFFT(float [], float [], float []);
+	uint16_t rearrange(uint32_t u0, uint32_t u1, uint32_t u2, uint32_t u3, uint32_t u4, uint32_t u5, uint32_t u6, uint32_t u7);
+	void SynthUnvoiced(void);
+	void SynthVoiced(void);
+	void Synth(void);
+	void unpack(uint8_t *buf, uint32_t& u0, uint32_t& u1, uint32_t& u2, uint32_t& u3, uint32_t& u4, uint32_t& u5, uint32_t& u6, uint32_t& u7, uint32_t& E0, uint32_t& ET);
 };
 
 

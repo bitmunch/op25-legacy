@@ -21,6 +21,7 @@
  * 02110-1301, USA.
  */
 
+#include <algorithm>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -28,7 +29,6 @@
 #include <fcntl.h>
 #include <math.h>
 #include <string.h>
-
 
 #include "imbe.h"
 
@@ -162,7 +162,6 @@ static const int gly23127DecTbl[2048] = {
 	4718595, 16387, 16387, 16386, 1048579, 2138115, 65539, 16387, 2099203, 69635, 1343491, 16387, 131075, 262147, 4206595, 526339,
 	1048579, 69635, 141315, 16387, 1048578, 1048579, 1048579, 4456451, 69635, 69634, 524291, 69635, 1048579, 69635, 2113539, 163843
 };
-
 
 static const int hmg15113EncTbl[2048] = {
 	0, 3, 5, 6, 6, 5, 3, 0, 7, 4, 2, 1, 1, 2, 4, 7,
@@ -308,40 +307,6 @@ static const int hmg1063EncTbl[64] = {
 
 static const int hmg1063DecTbl[16] = {
 	0, 0, 0, 2, 0, 0, 0, 4, 0, 0, 0, 8, 1, 16, 32, 0
-};
-
-static const int bchGFexp[64] = {
-	1, 2, 4, 8, 16, 32, 3, 6, 12, 24, 48, 35, 5, 10, 20, 40,
-	19, 38, 15, 30, 60, 59, 53, 41, 17, 34, 7, 14, 28, 56, 51, 37,
-	9, 18, 36, 11, 22, 44, 27, 54, 47, 29, 58, 55, 45, 25, 50, 39,
-	13, 26, 52, 43, 21, 42, 23, 46, 31, 62, 63, 61, 57, 49, 33, 0
-};
-
-static const int bchGFlog[64] = {
-	-1, 0, 1, 6, 2, 12, 7, 26, 3, 32, 13, 35, 8, 48, 27, 18,
-	4, 24, 33, 16, 14, 52, 36, 54, 9, 45, 49, 38, 28, 41, 19, 56,
-	5, 62, 25, 11, 34, 31, 17, 47, 15, 23, 53, 51, 37, 44, 55, 40,
-	10, 61, 46, 30, 50, 22, 39, 43, 29, 60, 42, 21, 20, 59, 57, 58
-};
-
-static const int bchG[48] = {
-	1, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 0,
-	1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0,
-	1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 1
-};
-
-static const int rsGFexp[64] = {
-	1, 2, 4, 8, 16, 32, 3, 6, 12, 24, 48, 35, 5, 10, 20, 40,
-	19, 38, 15, 30, 60, 59, 53, 41, 17, 34, 7, 14, 28, 56, 51, 37,
-	9, 18, 36, 11, 22, 44, 27, 54, 47, 29, 58, 55, 45, 25, 50, 39,
-	13, 26, 52, 43, 21, 42, 23, 46, 31, 62, 63, 61, 57, 49, 33, 0
-};
-
-static const int rsGFlog[64] = {
-	63, 0, 1, 6, 2, 12, 7, 26, 3, 32, 13, 35, 8, 48, 27, 18,
-	4, 24, 33, 16, 14, 52, 36, 54, 9, 45, 49, 38, 28, 41, 19, 56,
-	5, 62, 25, 11, 34, 31, 17, 47, 15, 23, 53, 51, 37, 44, 55, 40,
-	10, 61, 46, 30, 50, 22, 39, 43, 29, 60, 42, 21, 20, 59, 57, 58
 };
 
 static const int BMTn[3600] = {
@@ -1061,7 +1026,8 @@ static const float Uq[129] = {
 	0.000000
 };
 
-op25_imbe::op25_imbe()
+op25_imbe::op25_imbe() :
+   out(fopen("audio.pcm", "w"))
 {
    int i,j;
 	//initialize
@@ -1084,273 +1050,16 @@ op25_imbe::op25_imbe()
 
 op25_imbe::~op25_imbe()
 {
+   if(out) {
+      fclose(out);
+   }
 }
 
 static const char* Sync = "111113113311333313133333";
 
-int
-op25_imbe::bchDec(char* Codeword)
-{
-
-   int elp[24][ 22], S[23];
-   int D[23], L[24], uLu[24];
-   int root[11], locn[11], reg[12];
-   int i,j,U,q,count;
-   int SynError, CantDecode;
-
-   SynError = 0; CantDecode = 0;
-
-   for(i = 1; i <= 22; i++) {
-      S[i] = 0;
-      // FOR j = 0 TO 62
-      for(j = 0; j <= 62; j++) {
-         if( Codeword[j]) { S[i] = S[i] ^ bchGFexp[(i * j) % 63]; }
-      }
-      if( S[i]) { SynError = 1; }
-      S[i] = bchGFlog[S[i]];
-      // printf("S[%d] %d\n", i, S[i]);
-   }
-
-   if( SynError) { //if there are errors, try to correct them
-      L[0] = 0; uLu[0] = -1; D[0] = 0;    elp[0][ 0] = 0;
-      L[1] = 0; uLu[1] = 0;  D[1] = S[1]; elp[1][ 0] = 1;
-      //FOR i = 1 TO 21
-      for(i = 1; i <= 21; i++) {
-         elp[0][ i] = -1; elp[1][ i] = 0;
-      }
-      U = 0;
-
-      do {
-         U = U + 1;
-         if( D[U] == -1) {
-            L[U + 1] = L[U];
-            // FOR i = 0 TO L[U]
-            for(i = 0; i <= L[U]; i++) {
-               elp[U + 1][ i] = elp[U][ i]; elp[U][ i] = bchGFlog[elp[U][ i]];
-            }
-         } else {
-            //search for words with greatest uLu(q) for which d(q)!=0
-            q = U - 1;
-            while((D[q] == -1) &&(q > 0)) { q = q - 1; }
-            //have found first non-zero d(q)
-            if( q > 0) {
-               j = q;
-               do { j = j - 1; if((D[j] != -1) &&(uLu[q] < uLu[j])) { q = j; }
-               } while( j > 0) ;
-            }
-
-            //store degree of new elp polynomial
-            if( L[U] > L[q] + U - q) {
-               L[U + 1] = L[U] ;
-            } else {
-               L[U + 1] = L[q] + U - q;
-            }
-
-            ///* form new elp(x) */
-            // FOR i = 0 TO 21
-            for(i = 0; i <= 21; i++) {
-               elp[U + 1][ i] = 0;
-            }
-            // FOR i = 0 TO L(q)
-            for(i = 0; i <= L[q]; i++) {
-               if( elp[q][ i] != -1) {
-                  elp[U + 1][ i + U - q] = bchGFexp[(D[U] + 63 - D[q] + elp[q][ i]) % 63];
-               }
-            }
-            // FOR i = 0 TO L(U)
-            for(i = 0; i <= L[U]; i++) {
-               elp[U + 1][ i] = elp[U + 1][ i] ^ elp[U][ i];
-               elp[U][ i] = bchGFlog[elp[U][ i]];
-            }
-         }
-         uLu[U + 1] = U - L[U + 1];
-
-         //form(u+1)th discrepancy
-         if( U < 22) {
-            //no discrepancy computed on last iteration
-            if( S[U + 1] != -1) { D[U + 1] = bchGFexp[S[U + 1]]; } else { D[U + 1] = 0; }
-            // FOR i = 1 TO L(U + 1)
-            for(i = 1; i <= L[U + 1]; i++) {
-               if((S[U + 1 - i] != -1) &&(elp[U + 1][ i] != 0)) {
-                  D[U + 1] = D[U + 1] ^ bchGFexp[(S[U + 1 - i] + bchGFlog[elp[U + 1][ i]]) % 63];
-               }
-            }
-            //put d(u+1) into index form */
-            D[U + 1] = bchGFlog[D[U + 1]];
-         }
-      } while((U < 22) &&(L[U + 1] <= 11));
-
-      U = U + 1;
-      if( L[U] <= 11) { // /* Can correct errors */
-         //put elp into index form
-         // FOR i = 0 TO L[U]
-         for(i = 0; i <= L[U]; i++) {
-            elp[U][ i] = bchGFlog[elp[U][ i]];
-         }
-
-         //Chien search: find roots of the error location polynomial
-         // FOR i = 1 TO L(U)
-         for(i = 1; i <= L[U]; i++) {
-            reg[i] = elp[U][ i];
-         }
-         count = 0;
-         // FOR i = 1 TO 63
-         for(i = 1; i <= 63; i++) {
-            q = 1;
-            //FOR j = 1 TO L(U)
-            for(j = 1; j <= L[U]; j++) {
-               if( reg[j] != -1) {
-                  reg[j] =(reg[j] + j) % 63; q = q ^ bchGFexp[reg[j]];
-               }
-            }
-            if( q == 0) { //store root and error location number indices
-               root[count] = i; locn[count] = 63 - i; count = count + 1;
-            }
-         }
-         if( count == L[U]) {
-            //no. roots = degree of elp hence <= t errors
-            //FOR i = 0 TO L[U] - 1
-            for(i = 0; i <= L[U]-1; i++) {
-               Codeword[locn[i]] = Codeword[locn[i]] ^ 1;
-            }
-         } else { //elp has degree >t hence cannot solve
-            CantDecode = 1;
-         }
-      } else {
-         CantDecode = 2;
-      }
-   }
-   return CantDecode;
-}
 
 void
-op25_imbe::ReadNetID(unsigned int& NAC, unsigned int& DUID, char* RxFrame)
-{
-   int i,j,p;
-   p = 61;
-   printf("ReadNetID: ");
-   for(i=1; i<=32; i++) {
-      printf("%c", RxFrame[i]);
-   }
-   printf("\n");
-   for(i=1; i<=31; i++) {
-      j = RxFrame[i] - '0';
-      RxData[p + 1] = j / 2;
-      //printf("RxData[%d] = %d\n", p+1, RxData[p + 1]);
-      RxData[p] = j & 1;
-      //printf("RxData[%d] = %d\n", p, RxData[p]);
-      p = p - 2;
-   }
-   j = RxFrame[i] - '0';
-   RxData[p + 1] = j / 2; // ParBit = j AND 1
-
-   if(bchDec(RxData)) {
-      ErFlag = -1; printf( "  *** BCH DECODE ERROR ***\n");
-   }
-
-   NAC = 0; j = 1;
-   for(i=51; i<=62; i++) {
-      if(RxData[i]) NAC = NAC + j;
-      j = j + j;
-   }
-   DUID = 0; j = 1;
-   for(i=47; i<=50; i++) {
-      if( RxData[i]) DUID = DUID + j;
-      j = j + j;
-   }
-}
-
-void
-op25_imbe::ProcVF(char *p)
-{
-	int i;
-	unsigned char cbuf[20];
-	// printf("ProcVF ");
-	for(i=1; i<=72; i+=4) {
-		cbuf[( i - 1) / 4 ]  = (p[i  ] - '0') << 6;
-		cbuf[( i - 1) / 4 ] |= (p[i+1] - '0') << 4;
-		cbuf[( i - 1) / 4 ] |= (p[i+2] - '0') << 2;
-		cbuf[( i - 1) / 4 ] |= (p[i+3] - '0')     ;
-		// printf("%02x ", cbuf[( i - 1) / 4 ]);
-	}
-	// printf("\n");
-	imbe_frame(cbuf);
-}
-
-void op25_imbe::proc_lldu(char * p, int l) {
-#if 1
-	int i;
-	printf("proc_lldu: %d\n", l);
-	for(i=1; i<=l; i++) {
-		printf("%c", p[i]);
-	}
-	printf("\n");
-#endif
-	ProcVF(&p[0]);
-	ProcVF(&p[72]);
-	ProcVF(&p[164]);
-	ProcVF(&p[256]);
-	ProcVF(&p[348]);
-	ProcVF(&p[440]);
-	ProcVF(&p[532]);
-	ProcVF(&p[624]);
-	ProcVF(&p[712]);
-}
-
-void op25_imbe::eatrxsym(char s) {
-	static int t=0;
-	static int state = 0;
-	static int old_state = 0;
-	unsigned int NAC, DUID;
-	t =(t + 1) % 36;
-	if(!t) return;
-	sym_b[++sym_bp] = s;
-	if(sym_bp >=(int) sizeof(sym_b)) {
-		printf("error, buffer exceeded in state %d,%d,%d\n", state, sym_bp, sizeof(sym_b));
-		exit(3);
-	}
-	// printf("sym_b: %s\n", &sym_b[1]);
-	switch(state) {
-	case 0:
-		t = 24;
-		if(sym_bp >= 24 && !memcmp(&sym_b[strlen(sym_b+1)-23], Sync, 24)) {
-			state = 1;
-			// printf("state 1 sym_bp %d\n", sym_bp);
-		}
-		break;
-	case 1:
-		if(sym_bp == 32) {
-			ErFlag = 0;
-			ReadNetID(NAC, DUID, sym_b);
-			if(ErFlag != 0) {
-				state = 0;
-				break;
-			} else if(DUID == 5 || DUID == 10) {  // LLDU1 or 2
-				state = 11;
-			} else {
-				state = 0;
-			}
-			printf("NAC %d DUID %d ErFlag %d\n", NAC, DUID, ErFlag);
-		}
-		break;
-	case 11:
-		if(sym_bp == 784) {
-			printf("state %d bp %d\n", state, sym_bp);
-			proc_lldu(sym_b, sym_bp);
-			state = 0;
-		}
-		break;
-	}
-	if(state != old_state) {
-		printf("state change %d to %d bp %d\n", old_state, state, sym_bp);
-		sym_bp = 0;
-		memset(sym_b, 0, sizeof(sym_b));
-		old_state = state;
-	}
-}
-
-void
-op25_imbe::imbe_frame(unsigned char* ibuf)
+op25_imbe::imbe_frame(unsigned char* buf)
 {
 	// process input 144-bit IMBE frame - converts to 88-bit frame
 	int i;
@@ -1361,7 +1070,7 @@ op25_imbe::imbe_frame(unsigned char* ibuf)
 	unsigned char O[12];
 
 	// Hamming/Golay - etc.
-	vfDec(ibuf, u0, u1, u2, u3, u4, u5, u6, u7, E0, ET) ;
+	vfDec(buf, u0, u1, u2, u3, u4, u5, u6, u7, E0, ET) ;
 
 	//replace the sync bit(LSB of u7) with the BOT flag
 	BOT = 1;
@@ -1385,7 +1094,9 @@ op25_imbe::imbe_frame(unsigned char* ibuf)
 	O[10] =(u6 & 255);
 	O[11] = E0 + 4 * ET;
 
-#if 1
+#if 0
+   // IMBE diagnostix
+   printf("1: ");
 	for(i=0; i<12; i++) {
 		printf("%02x ", O[i]);
 	}
@@ -1393,16 +1104,16 @@ op25_imbe::imbe_frame(unsigned char* ibuf)
 #endif
 
 	// process 88-bit frame
-	Decode(O);
+	decode(O);
 }
 
 void
 op25_imbe::AdaptiveSmoothing(float SE, float ER, float ET)
 {
-   float VM  ;
-   float AM  ;
-   float YM  ;
-   float TM  ;
+   float VM;
+   float AM;
+   float YM;
+   float TM;
    int ell;
 
    if(ER <= .005 && ET <= 4) {
@@ -1479,22 +1190,23 @@ op25_imbe::CplxFFT(float REX[], float IMX[])
 }
 
 void
-op25_imbe::Decode(unsigned char *A)
+op25_imbe::decode(uint8_t *A)
 {
-
-   int u0, u1, u2, u3, u4, u5, u6, u7, ET, E0, K, VFC;
+   uint32_t u0, u1, u2, u3, u4, u5, u6, u7, E0, ET;
+   int K;
    int Len3, Start3, Len8, Start8;
    int en, ClipCount, tmp_f, samp;
    float SE=0, ER=0, OutSamp=0;
 
-   UnpackBytes(A, u0, u1, u2, u3, u4, u5, u6, u7, E0, ET);
+   unpack(A, u0, u1, u2, u3, u4, u5, u6, u7, E0, ET);
 
    ER = .95 * ER + .000365 * ET;
    if( ER > .0875) {
-   } else if( u0 >= 3328 || E0 >= 2 || ET >=(10 + 40 * ER)) {
+      // Huh?!
+   } else if(u0 >= 3328 || E0 >= 2 || ET >=(10 + 40 * ER)) {
+      // Whuh?!
    } else {
-      //re-arrange the bits from u to b
-      RearrangeBits(u0, u1, u2, u3, u4, u5, u6, u7, K);
+      K = rearrange(u0, u1, u2, u3, u4, u5, u6, u7); // re-arrange the bits from u to b (ToDo: make 'b' return value ???)
       DecodeVUV(K);
 
       Len3 = L - 1; Start3 =((Len3 *(Len3 - 1)) / 2) - 28;
@@ -1503,11 +1215,8 @@ op25_imbe::Decode(unsigned char *A)
       EnhanceSpectralAmplitudes(SE);
       AdaptiveSmoothing(SE, ER, ET);
 
-      //display:
-      VFC = VFC + 1;// PRINT "Frame"; VFC; "  w0=";
-
       //(8000 samp/sec) *(1 sec/50 frame) = 160 samp/frame
-      //fHz = 4000 * w0 / pi
+      //fHz = 4000 * w0 / M_PI
 
       //synth:
       SynthUnvoiced();
@@ -1515,19 +1224,24 @@ op25_imbe::Decode(unsigned char *A)
 
       //output:
       for(en = 0; en <= 159; en++) {
-         //The unvoiced samples are loud and the voiced are low...I don't know why.
-         //Most of the difference is compensated by removing the 146.6433 factor
-         //in the SynthUnvoiced procedure.  The final tweak is done by raising the
-         //voiced samples:
+         // The unvoiced samples are loud and the voiced are low...I don't know why.
+         // Most of the difference is compensated by removing the 146.6433 factor
+         // in the SynthUnvoiced procedure.  The final tweak is done by raising the
+         // voiced samples:
          OutSamp = suv[en] + sv[en] * 4; //balance v/uv loudness
          if(abs((int)OutSamp) > 32767) {
             OutSamp = 32767 *(OutSamp < 0) ? -1 : 1; // * sgn(OutSamp);
             ClipCount = ClipCount + 1;
          }
          samp =(int) rintf(OutSamp);
-         write(2, &samp, 2); // Eek! Todo: write this to a proper file using buffered I/O
-      }
 
+         // write(2, &samp, 2);
+         if(out) {
+            fwrite(&samp, 2, 1, out);
+         } else {
+            printf("warning: couldn't write output\n");
+         }
+      }
    }
    OldL = L;
    Oldw0 = w0;
@@ -1633,12 +1347,13 @@ op25_imbe::DecodeVUV(int K)
    int bee1, ell, kay;
    bee1 = bee[1];
    for(ell = 1; ell <= L; ell++) {
-      if( ell <= 36)
+      if(ell <= 36)
          kay =(ell + 2) / 3;
       else
          kay = 12;
-      //vee(ell, New) =(bee1 \(2 ^(K - kay))) - 2 *(bee1 \(2 ^(K + 1 - kay)))
-      vee[ell][ New] =((bee1 &(1 <<(K - kay))) > 0) ? 1 : 0;
+
+      //vee(ell, New) = (bee1 \(2 ^(K - kay))) - 2 *(bee1 \(2 ^(K + 1 - kay)))
+      vee[ell][ New] = ((bee1 & (1 << (K - kay))) > 0) ? 1 : 0;
    }
 }
 
@@ -1755,14 +1470,11 @@ op25_imbe::RealIFFT(float FDi[], float FDq[], float TD[])
    }
 }
 
-void
-op25_imbe::RearrangeBits(int u0, int u1, int u2, int u3, int u4, int u5, int u6, int u7, int& K)
+uint16_t
+op25_imbe::rearrange(uint32_t u0, uint32_t u1, uint32_t u2, uint32_t u3, uint32_t u4, uint32_t u5, uint32_t u6, uint32_t u7)
 {
+   int K;
    int I, ubit, Seq, col;
-
-
-
-
 
    bee[0] =((u0 / 16) & 0xfc) |((u7 / 2) & 3);
 
@@ -1856,6 +1568,8 @@ op25_imbe::RearrangeBits(int u0, int u1, int u2, int u3, int u4, int u5, int u6,
       }
       Seq = Seq + 1; ubit = ubit / 2;
    }
+
+   return K;
 }
 
 void
@@ -1945,11 +1659,7 @@ op25_imbe::SynthVoiced()
 
    psi1 = psi1 +(Oldw0 + w0) * 80;
 
-#ifdef OLD
-   while(psi1 > pi2) {
-      psi1 -= pi2;
-   }
-#else
+#if 1
    psi1 = remainderf(psi1, 2 * M_PI); // ToDo decide if its 2pi or pi^2
 #endif
 
@@ -1969,10 +1679,12 @@ op25_imbe::SynthVoiced()
       if(vee[ell][ New]) {
          if ( vee[ell][ Old]) {
             if(ell < 8 & fabsf(w0 - Oldw0) < .1 * w0) { //134(fine transition)
+               const double PI_SQUARED = M_PI * M_PI;
+               const double INV_PI_SQUARED = 1.0 / PI_SQUARED;
                Dpl = phi[ell][ New] - phi[ell][ Old] -(Oldw0 + w0) * ell * 80;
-               Dwl = .00625 *(Dpl - pi2 * floorf((Dpl + pi) * pi2inv));
-               THa =(Oldw0 *(float)ell + Dwl);
-               THb =(w0 - Oldw0) * ell * .003125;
+               Dwl = .00625 * (Dpl - PI_SQUARED * floorf((Dpl + M_PI) * INV_PI_SQUARED));
+               THa = (Oldw0 * (float)ell + Dwl);
+               THb = (w0 - Oldw0) * ell * .003125;
                Mb = .00625 *(MNew - MOld);
                // FOR en = 0 TO 159
                for(en = 0; en <= 159; en++) {
@@ -2013,10 +1725,8 @@ op25_imbe::SynthVoiced()
 }
 
 void
-op25_imbe::UnpackBytes(unsigned char* A, int& u0, int& u1, int& u2, int& u3, int& u4, int& u5, int& u6, int& u7, int& E0, int& ET)
+op25_imbe::unpack(uint8_t *A, uint32_t& u0, uint32_t& u1, uint32_t& u2, uint32_t& u3, uint32_t& u4, uint32_t& u5, uint32_t& u6, uint32_t& u7, uint32_t& E0, uint32_t& ET)
 {
-
-
    E0 = A[0];
    ET = A[1];
    u0 = A[4] +(E0 & 240) * 16;
@@ -2035,223 +1745,10 @@ op25_imbe::UnpackBytes(unsigned char* A, int& u0, int& u1, int& u2, int& u3, int
    E0 =(E0 & 84) / 4;
 }
  
-#if 1
-
-#define IS_BIT_SET(x,y,z)(x[y] & z)
-
-unsigned int
-op25_imbe::vfPickBits0(unsigned char* A)
-{
-	unsigned int X = 0;
-
-	if(IS_BIT_SET(A, 0, 0x80)) X |= 4194304;
-	if(IS_BIT_SET(A, 0, 0x1)) X |= 2097152;
-	if(IS_BIT_SET(A, 1, 0x8)) X |= 1048576;
-	if(IS_BIT_SET(A, 2, 0x10)) X |= 524288;
-	if(IS_BIT_SET(A, 3, 0x80)) X |= 262144;
-	if(IS_BIT_SET(A, 3, 0x1)) X |= 131072;
-	if(IS_BIT_SET(A, 4, 0x8)) X |= 65536;
-	if(IS_BIT_SET(A, 5, 0x10)) X |= 32768;
-	if(IS_BIT_SET(A, 6, 0x80)) X |= 16384;
-	if(IS_BIT_SET(A, 6, 0x1)) X |= 8192;
-	if(IS_BIT_SET(A, 7, 0x8)) X |= 4096;
-	if(IS_BIT_SET(A, 8, 0x10)) X |= 2048;
-	if(IS_BIT_SET(A, 9, 0x80)) X |= 1024;
-	if(IS_BIT_SET(A, 9, 0x1)) X |= 512;
-	if(IS_BIT_SET(A, 10, 0x8)) X |= 256;
-	if(IS_BIT_SET(A, 11, 0x10)) X |= 128;
-	if(IS_BIT_SET(A, 12, 0x80)) X |= 64;
-	if(IS_BIT_SET(A, 12, 0x1)) X |= 32;
-	if(IS_BIT_SET(A, 13, 0x8)) X |= 16;
-	if(IS_BIT_SET(A, 14, 0x10)) X |= 8;
-	if(IS_BIT_SET(A, 15, 0x80)) X |= 4;
-	if(IS_BIT_SET(A, 15, 0x1)) X |= 2;
-	if(IS_BIT_SET(A, 16, 0x8)) X |= 1;
-   return X;
-}
-
-unsigned int
-op25_imbe::vfPickBits1(unsigned char* A)
-{
-	unsigned int X = 0;
-	if(IS_BIT_SET(A, 17, 0x10)) X |= 4194304;
-	if(IS_BIT_SET(A, 0, 0x40)) X |= 2097152;
-	if(IS_BIT_SET(A, 0, 0x2)) X |= 1048576;
-	if(IS_BIT_SET(A, 1, 0x4)) X |= 524288;
-	if(IS_BIT_SET(A, 2, 0x20)) X |= 262144;
-	if(IS_BIT_SET(A, 3, 0x40)) X |= 131072;
-	if(IS_BIT_SET(A, 3, 0x2)) X |= 65536;
-	if(IS_BIT_SET(A, 4, 0x4)) X |= 32768;
-	if(IS_BIT_SET(A, 5, 0x20)) X |= 16384;
-	if(IS_BIT_SET(A, 6, 0x40)) X |= 8192;
-	if(IS_BIT_SET(A, 6, 0x2)) X |= 4096;
-	if(IS_BIT_SET(A, 7, 0x4)) X |= 2048;
-	if(IS_BIT_SET(A, 8, 0x20)) X |= 1024;
-	if(IS_BIT_SET(A, 9, 0x40)) X |= 512;
-	if(IS_BIT_SET(A, 9, 0x2)) X |= 256;
-	if(IS_BIT_SET(A, 10, 0x4)) X |= 128;
-	if(IS_BIT_SET(A, 11, 0x20)) X |= 64;
-	if(IS_BIT_SET(A, 12, 0x40)) X |= 32;
-	if(IS_BIT_SET(A, 12, 0x2)) X |= 16;
-	if(IS_BIT_SET(A, 13, 0x4)) X |= 8;
-	if(IS_BIT_SET(A, 14, 0x20)) X |= 4;
-	if(IS_BIT_SET(A, 15, 0x40)) X |= 2;
-	if(IS_BIT_SET(A, 15, 0x2)) X |= 1;
-   return X;
-}
-
-unsigned int
-op25_imbe::vfPickBits2(unsigned char* A)
-{
-	unsigned int X = 0;
-
-	if(IS_BIT_SET(A, 16, 0x4)){X |= 4194304; }
-	if(IS_BIT_SET(A, 17, 0x20)){X |= 2097152; }
-	if(IS_BIT_SET(A, 0, 0x20)){X |= 1048576; }
-	if(IS_BIT_SET(A, 1, 0x40)){X |= 524288; }
-	if(IS_BIT_SET(A, 1, 0x2)){X |= 262144; }
-	if(IS_BIT_SET(A, 2, 0x4)){X |= 131072; }
-	if(IS_BIT_SET(A, 3, 0x20)){X |= 65536; }
-	if(IS_BIT_SET(A, 4, 0x40)){X |= 32768; }
-	if(IS_BIT_SET(A, 4, 0x2)){X |= 16384; }
-	if(IS_BIT_SET(A, 5, 0x4)){X |= 8192; }
-	if(IS_BIT_SET(A, 6, 0x20)){X |= 4096; }
-	if(IS_BIT_SET(A, 7, 0x40)){X |= 2048; }
-	if(IS_BIT_SET(A, 7, 0x2)){X |= 1024; }
-	if(IS_BIT_SET(A, 8, 0x4)){X |= 512; }
-	if(IS_BIT_SET(A, 9, 0x20)){X |= 256; }
-	if(IS_BIT_SET(A, 10, 0x40)){X |= 128; }
-	if(IS_BIT_SET(A, 10, 0x2)){X |= 64; }
-	if(IS_BIT_SET(A, 11, 0x4)){X |= 32; }
-	if(IS_BIT_SET(A, 12, 0x20)){X |= 16; }
-	if(IS_BIT_SET(A, 13, 0x40)){X |= 8; }
-	if(IS_BIT_SET(A, 13, 0x2)){X |= 4; }
-	if(IS_BIT_SET(A, 14, 0x4)){X |= 2; }
-	if(IS_BIT_SET(A, 15, 0x20)){X |= 1; }
-   return X;
-}
-
-unsigned int
-op25_imbe::vfPickBits3(unsigned char* A)
-{
-	unsigned int X = 0;
-
-	if(IS_BIT_SET(A, 16, 0x40)) X |= 4194304;
-	if(IS_BIT_SET(A, 16, 0x2)) X |= 2097152;
-	if(IS_BIT_SET(A, 17, 0x4)) X |= 1048576;
-	if(IS_BIT_SET(A, 0, 0x10)) X |= 524288;
-	if(IS_BIT_SET(A, 1, 0x80)) X |= 262144;
-	if(IS_BIT_SET(A, 1, 0x1)) X |= 131072;
-	if(IS_BIT_SET(A, 2, 0x8)) X |= 65536;
-	if(IS_BIT_SET(A, 3, 0x10)) X |= 32768;
-	if(IS_BIT_SET(A, 4, 0x80)) X |= 16384;
-	if(IS_BIT_SET(A, 4, 0x1)) X |= 8192;
-	if(IS_BIT_SET(A, 5, 0x8)) X |= 4096;
-	if(IS_BIT_SET(A, 6, 0x10)) X |= 2048;
-	if(IS_BIT_SET(A, 7, 0x80)) X |= 1024;
-	if(IS_BIT_SET(A, 7, 0x1)) X |= 512;
-	if(IS_BIT_SET(A, 8, 0x8)) X |= 256;
-	if(IS_BIT_SET(A, 9, 0x10)) X |= 128;
-	if(IS_BIT_SET(A, 10, 0x80)) X |= 64;
-	if(IS_BIT_SET(A, 10, 0x1)) X |= 32;
-	if(IS_BIT_SET(A, 11, 0x8)) X |= 16;
-	if(IS_BIT_SET(A, 12, 0x10)) X |= 8;
-	if(IS_BIT_SET(A, 13, 0x80)) X |= 4;
-	if(IS_BIT_SET(A, 13, 0x1)) X |= 2;
-	if(IS_BIT_SET(A, 14, 0x8)) X |= 1;
-   return X;
-}
-
-unsigned int
-op25_imbe::vfPickBits4(unsigned char* A)
-{
-	unsigned int X = 0;
-
-	if(IS_BIT_SET(A, 15, 0x10)) X |= 16384;
-	if(IS_BIT_SET(A, 16, 0x80)) X |= 8192;
-	if(IS_BIT_SET(A, 16, 0x1)) X |= 4096;
-	if(IS_BIT_SET(A, 17, 0x8)) X |= 2048;
-	if(IS_BIT_SET(A, 0, 0x8)) X |= 1024;
-	if(IS_BIT_SET(A, 1, 0x10)) X |= 512;
-	if(IS_BIT_SET(A, 2, 0x80)) X |= 256;
-	if(IS_BIT_SET(A, 2, 0x1)) X |= 128;
-	if(IS_BIT_SET(A, 3, 0x8)) X |= 64;
-	if(IS_BIT_SET(A, 4, 0x10)) X |= 32;
-	if(IS_BIT_SET(A, 5, 0x80)) X |= 16;
-	if(IS_BIT_SET(A, 5, 0x1)) X |= 8;
-	if(IS_BIT_SET(A, 6, 0x8)) X |= 4;
-	if(IS_BIT_SET(A, 7, 0x10)) X |= 2;
-	if(IS_BIT_SET(A, 8, 0x80)) X |= 1;
-   return X;
-}
-
-unsigned int
-op25_imbe::vfPickBits5(unsigned char* A)
-{
-	unsigned int X = 0;
-
-	if(IS_BIT_SET(A, 8, 0x1)) X |= 16384;
-	if(IS_BIT_SET(A, 9, 0x8)) X |= 8192;
-	if(IS_BIT_SET(A, 10, 0x10)) X |= 4096;
-	if(IS_BIT_SET(A, 11, 0x80)) X |= 2048;
-	if(IS_BIT_SET(A, 11, 0x1)) X |= 1024;
-	if(IS_BIT_SET(A, 12, 0x8)) X |= 512;
-	if(IS_BIT_SET(A, 13, 0x10)) X |= 256;
-	if(IS_BIT_SET(A, 14, 0x80)) X |= 128;
-	if(IS_BIT_SET(A, 14, 0x1)) X |= 64;
-	if(IS_BIT_SET(A, 15, 0x8)) X |= 32;
-	if(IS_BIT_SET(A, 16, 0x10)) X |= 16;
-	if(IS_BIT_SET(A, 17, 0x80)) X |= 8;
-	if(IS_BIT_SET(A, 17, 0x1)) X |= 4;
-	if(IS_BIT_SET(A, 0, 0x4)) X |= 2;
-	if(IS_BIT_SET(A, 1, 0x20)) X |= 1;
-   return X;
-}
-
-unsigned int
-op25_imbe::vfPickBits6(unsigned char* A)
-{
-	unsigned int X = 0;
-
-	if(IS_BIT_SET(A, 2, 0x40)) X |= 16384;
-	if(IS_BIT_SET(A, 2, 0x2)) X |= 8192;
-	if(IS_BIT_SET(A, 3, 0x4)) X |= 4096;
-	if(IS_BIT_SET(A, 4, 0x20)) X |= 2048;
-	if(IS_BIT_SET(A, 5, 0x40)) X |= 1024;
-	if(IS_BIT_SET(A, 5, 0x2)) X |= 512;
-	if(IS_BIT_SET(A, 6, 0x4)) X |= 256;
-	if(IS_BIT_SET(A, 7, 0x20)) X |= 128;
-	if(IS_BIT_SET(A, 8, 0x40)) X |= 64;
-	if(IS_BIT_SET(A, 8, 0x2)) X |= 32;
-	if(IS_BIT_SET(A, 9, 0x4)) X |= 16;
-	if(IS_BIT_SET(A, 10, 0x20)) X |= 8;
-	if(IS_BIT_SET(A, 11, 0x40)) X |= 4;
-	if(IS_BIT_SET(A, 11, 0x2)) X |= 2;
-	if(IS_BIT_SET(A, 12, 0x4)) X |= 1;
-   return X;
-}
-
-unsigned int
-op25_imbe::vfPickBits7(unsigned char* A)
-{
-	unsigned int X = 0;
-
-	if(IS_BIT_SET(A, 13, 0x20)) X |= 64;
-	if(IS_BIT_SET(A, 14, 0x40)) X |= 32;
-	if(IS_BIT_SET(A, 14, 0x2)) X |= 16;
-	if(IS_BIT_SET(A, 15, 0x4)) X |= 8;
-	if(IS_BIT_SET(A, 16, 0x20)) X |= 4;
-	if(IS_BIT_SET(A, 17, 0x40)) X |= 2;
-	if(IS_BIT_SET(A, 17, 0x2)) X |= 1;
-   return X;
-}
-
-#else
-
-uint16_t
+uint32_t
 op25_imbe::extract(const uint8_t* buf, size_t begin, size_t end)
 {
-   uint16_t x = 0;
+   uint32_t x = 0;
    for(size_t i = begin; i < end; ++i) {
       x <<= 1;
       x |= (buf[i / 8] & (1 << (7 - (i % 8)))) ? 1 : 0;
@@ -2259,55 +1756,53 @@ op25_imbe::extract(const uint8_t* buf, size_t begin, size_t end)
    return x;
 }
 
-uint16_t
+uint32_t
 op25_imbe::vfPickBits0(uint8_t* buf)
 {
-   return extract(buf, 0, 12);
+   return extract(buf, 0, 23);
 }
 
-uint16_t
+uint32_t
 op25_imbe::vfPickBits1(uint8_t* buf)
 {
-   return extract(buf, 23, 23 + 12);
+   return extract(buf, 23, 23 + 23);
 }
 
-uint16_t
+uint32_t
 op25_imbe::vfPickBits2(uint8_t* buf)
 {
-   return extract(buf, 46, 46 + 12);
+   return extract(buf, 46, 46 + 23);
 }
 
-uint16_t
+uint32_t
 op25_imbe::vfPickBits3(uint8_t* buf)
 {
-   return extract(buf, 69, 69 + 12);
+   return extract(buf, 69, 69 + 23);
 }
 
-uint16_t
+uint32_t
 op25_imbe::vfPickBits4(uint8_t* buf)
 {
-   return extract(buf, 92, 92 + 11);
+   return extract(buf, 92, 92 + 15);
 }
 
-uint16_t
+uint32_t
 op25_imbe::vfPickBits5(uint8_t* buf)
 {
-   return extract(buf, 107, 107 + 11);
+   return extract(buf, 107, 107 + 15);
 }
 
-uint16_t
+uint32_t
 op25_imbe::vfPickBits6(uint8_t* buf)
 {
-   return extract(buf, 122, 122 + 11);
+   return extract(buf, 122, 122 + 15);
 }
 
-uint16_t
+uint32_t
 op25_imbe::vfPickBits7(uint8_t* buf)
 {
-   return extract(buf, 137, 135 + 7);
+   return extract(buf, 137, 135 + 9);
 }
-
-#endif
 
 unsigned int
 op25_imbe::gly23127Dec(unsigned int& CW, unsigned int& ET)
@@ -2315,7 +1810,7 @@ op25_imbe::gly23127Dec(unsigned int& CW, unsigned int& ET)
    unsigned int correction;
    correction = gly23127DecTbl[gly23127GetSyn(CW)];
    ET = ET +(correction & 3);
-   CW =(CW ^ correction) / 2048;
+   CW = (CW ^ correction) / 2048;
    return CW;
 }
 
@@ -2339,7 +1834,7 @@ op25_imbe::vfPrGen15(unsigned int& Pr)
    int i,n;
    n = 0;
    for(i = 14; i >= 0; i--) {
-      Pr =(173 * Pr + 13849) & 65535;
+      Pr =(173 * Pr + 13849) & 0xffffu;
       if(Pr & 32768) { n = n +(1 << i); }
    }
    return n;
@@ -2350,7 +1845,7 @@ op25_imbe::vfPrGen23(unsigned int& Pr)
 {
    int n = 0;
    for(int i = 22; i >= 0; i--) {
-      Pr =(173 * Pr + 13849) & 65535;
+      Pr = (173 * Pr + 13849) & 0xffffu;
       if(Pr & 32768) {
          n += (int) powf(2, i);
       }
@@ -2361,14 +1856,7 @@ op25_imbe::vfPrGen23(unsigned int& Pr)
 void
 op25_imbe::vfDec(unsigned char* A, unsigned int& u0, unsigned int& u1, unsigned int& u2, unsigned int& u3, unsigned int& u4, unsigned int& u5, unsigned int& u6, unsigned int& u7, unsigned int& E0, unsigned int& ET)
 {
-   unsigned int m1;
-   unsigned int m2;
-   unsigned int m3;
-   unsigned int m4;
-   unsigned int m5;
-   unsigned int m6;
    unsigned int RX=0;
-   unsigned int Pr=0;
 
    ET = 0;
 
@@ -2376,23 +1864,31 @@ op25_imbe::vfDec(unsigned char* A, unsigned int& u0, unsigned int& u1, unsigned 
    u0 = gly23127Dec(RX, ET);
    E0 = ET;
 
-   Pr = 16 * u0;
-   m1 = vfPrGen23(Pr); m2 = vfPrGen23(Pr); m3 = vfPrGen23(Pr);
-   m4 = vfPrGen15(Pr); m5 = vfPrGen15(Pr); m6 = vfPrGen15(Pr);
+   unsigned int Pr = 16 * u0;
+   unsigned int m1 = vfPrGen23(Pr);
+   unsigned int m2 = vfPrGen23(Pr);
+   unsigned int m3 = vfPrGen23(Pr);
+   unsigned int m4 = vfPrGen15(Pr);
+   unsigned int m5 = vfPrGen15(Pr);
+   unsigned int m6 = vfPrGen15(Pr);
 
-   RX = vfPickBits1(A) ^ m1; u1 = gly23127Dec(RX, ET);
-   RX = vfPickBits2(A) ^ m2; u2 = gly23127Dec(RX, ET);
-   RX = vfPickBits3(A) ^ m3; u3 = gly23127Dec(RX, ET);
-
-   RX = vfPickBits4(A) ^ m4; u4 = vfHmg15113Dec(RX, ET);
-   RX = vfPickBits5(A) ^ m5; u5 = vfHmg15113Dec(RX, ET);
-   RX = vfPickBits6(A) ^ m6; u6 = vfHmg15113Dec(RX, ET);
-
+   RX = vfPickBits1(A) ^ m1;
+   u1 = gly23127Dec(RX, ET);
+   RX = vfPickBits2(A) ^ m2;
+   u2 = gly23127Dec(RX, ET);
+   RX = vfPickBits3(A) ^ m3;
+   u3 = gly23127Dec(RX, ET);
+   RX = vfPickBits4(A) ^ m4;
+   u4 = vfHmg15113Dec(RX, ET);
+   RX = vfPickBits5(A) ^ m5;
+   u5 = vfHmg15113Dec(RX, ET);
+   RX = vfPickBits6(A) ^ m6;
+   u6 = vfHmg15113Dec(RX, ET);
    u7 = vfPickBits7(A);
 }
 
 int
-op25_imbe::vfHmg15113Dec(int RX, int ET)  // should be int& ET ???
+op25_imbe::vfHmg15113Dec(int RX, int ET)  // should be int& ET!
 {
    int Dat, Par, correction;
    Dat = RX / 16; Par = RX & 15;
@@ -2404,7 +1900,6 @@ op25_imbe::vfHmg15113Dec(int RX, int ET)  // should be int& ET ???
    return  Dat;
 }
 
-#ifdef NEWAPI
 int
 main(int ac, char **av)
 {
@@ -2423,43 +1918,3 @@ main(int ac, char **av)
    }
    return(0);
 }
-#else
-int
-main(int argc, char* argv[]) {
-   int l1;
-   FILE* fp1;
-	char* cp1;
-	char* b;
-   char line1[4096];
-   char buf1[6];
-	char s;
-	int i;
-	op25_imbe* AP = new op25_imbe();
-   fp1 = fopen("P25DEMOD.OUT", "r");
-   if(!fp1)
-      exit(5);
-	for(;;) {
-		cp1 = fgets(line1, sizeof(line1), fp1);
-		l1 = strlen(line1)-1; if((line1[l1] == 0x0a) ||(line1[l1] == 0x0d)) line1[l1] = 0;
-		l1 = strlen(line1)-1; if((line1[l1] == 0x0a) ||(line1[l1] == 0x0d)) line1[l1] = 0;
-		if  (!cp1) break;
-		memcpy(buf1, line1, 5);
-		buf1[5] = 0;
-		sscanf(buf1, "%d", &l1);
-		b = &line1[5];
-		if(l1 !=(int)strlen(line1)+43) exit(1);
-		for(i=0; i < 24; i++) {
-			AP->eatrxsym(Sync[i]);
-		}
-		for(i=0; i <(int) strlen(b); i+=2) {
-			if(!memcmp(&b[i], "--", 2)) s = '0';
-			else if(!memcmp(&b[i], "-#", 2)) s = '1';
-			else if(!memcmp(&b[i], "#-", 2)) s = '2';
-			else if(!memcmp(&b[i], "##", 2)) s = '3';
-			else printf("error %02x %02x\n", b[i], b[i+1]);
-			AP->eatrxsym(s);
-		}
-	}
-	exit(0);
-}
-#endif
