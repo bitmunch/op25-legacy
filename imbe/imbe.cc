@@ -22,9 +22,9 @@
  */
 
 #include <algorithm>
-#include <stdio.h>
+#include <cstdio>
+#include <cstdlib>
 #include <stdint.h>
-#include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <math.h>
@@ -1055,11 +1055,8 @@ op25_imbe::~op25_imbe()
    }
 }
 
-static const char* Sync = "111113113311333313133333";
-
-
 void
-op25_imbe::imbe_frame(unsigned char* buf)
+op25_imbe::decode(uint8_t *buf)
 {
 	// process input 144-bit IMBE frame - converts to 88-bit frame
 	int i;
@@ -1069,8 +1066,8 @@ op25_imbe::imbe_frame(unsigned char* buf)
 	unsigned int ET = 0;
 	unsigned char O[12];
 
-	// Hamming/Golay - etc.
-	vfDec(buf, u0, u1, u2, u3, u4, u5, u6, u7, E0, ET) ;
+	// PN/Hamming/Golay - etc.
+	correct(buf, u0, u1, u2, u3, u4, u5, u6, u7, E0, ET) ;
 
 	//replace the sync bit(LSB of u7) with the BOT flag
 	BOT = 1;
@@ -1104,11 +1101,11 @@ op25_imbe::imbe_frame(unsigned char* buf)
 #endif
 
 	// process 88-bit frame
-	decode(O);
+	decode_audio(O);
 }
 
 void
-op25_imbe::AdaptiveSmoothing(float SE, float ER, float ET)
+op25_imbe::adaptive_smoothing(float SE, float ER, float ET)
 {
    float VM;
    float AM;
@@ -1144,9 +1141,8 @@ op25_imbe::AdaptiveSmoothing(float SE, float ER, float ET)
 }
 
 void
-op25_imbe::CplxFFT(float REX[], float IMX[])
+op25_imbe::fft(float REX[], float IMX[])
 {
-
    int I;
    int J;
    int K;
@@ -1190,7 +1186,7 @@ op25_imbe::CplxFFT(float REX[], float IMX[])
 }
 
 void
-op25_imbe::decode(uint8_t *A)
+op25_imbe::decode_audio(uint8_t *A)
 {
    uint32_t u0, u1, u2, u3, u4, u5, u6, u7, E0, ET;
    int K;
@@ -1207,26 +1203,26 @@ op25_imbe::decode(uint8_t *A)
       // Whuh?!
    } else {
       K = rearrange(u0, u1, u2, u3, u4, u5, u6, u7); // re-arrange the bits from u to b (ToDo: make 'b' return value ???)
-      DecodeVUV(K);
+      decode_vuv(K);
 
       Len3 = L - 1; Start3 =((Len3 *(Len3 - 1)) / 2) - 28;
       Len8 = L - 6; Start8 =((Len8 *(Len8 - 1)) / 2) - 3;
-      DecodeSpectralAmplitudes(Start3, Start8);
-      EnhanceSpectralAmplitudes(SE);
-      AdaptiveSmoothing(SE, ER, ET);
+      decode_spectral_amplitudes(Start3, Start8);
+      enhance_spectral_amplitudes(SE);
+      adaptive_smoothing(SE, ER, ET);
 
       //(8000 samp/sec) *(1 sec/50 frame) = 160 samp/frame
       //fHz = 4000 * w0 / M_PI
 
       //synth:
-      SynthUnvoiced();
-      SynthVoiced();
+      synth_unvoiced();
+      synth_voiced();
 
       //output:
       for(en = 0; en <= 159; en++) {
          // The unvoiced samples are loud and the voiced are low...I don't know why.
          // Most of the difference is compensated by removing the 146.6433 factor
-         // in the SynthUnvoiced procedure.  The final tweak is done by raising the
+         // in the synth_unvoiced procedure.  The final tweak is done by raising the
          // voiced samples:
          OutSamp = suv[en] + sv[en] * 4; //balance v/uv loudness
          if(abs((int)OutSamp) > 32767) {
@@ -1249,7 +1245,7 @@ op25_imbe::decode(uint8_t *A)
 }
 
 void
-op25_imbe::DecodeSpectralAmplitudes(int Start3, int Start8)
+op25_imbe::decode_spectral_amplitudes(int Start3, int Start8)
 {
    float G[7];           //Can we use C(1 to 6,1) for this?
    int   J[7];
@@ -1262,9 +1258,6 @@ op25_imbe::DecodeSpectralAmplitudes(int Start3, int Start8)
    float Tp ;
 
    int P3, P8, eye, jay, kay, ell, em, iTk;
-
-
-
 
    P3 = Start3; P8 = Start8;
 
@@ -1342,7 +1335,7 @@ op25_imbe::DecodeSpectralAmplitudes(int Start3, int Start8)
 }
 
 void
-op25_imbe::DecodeVUV(int K)
+op25_imbe::decode_vuv(int K)
 {
    int bee1, ell, kay;
    bee1 = bee[1];
@@ -1358,7 +1351,7 @@ op25_imbe::DecodeVUV(int K)
 }
 
 void
-op25_imbe::EnhanceSpectralAmplitudes(float& SE)
+op25_imbe::enhance_spectral_amplitudes(float& SE)
 {
    float RM0;
    float RM1;
@@ -1406,7 +1399,7 @@ op25_imbe::EnhanceSpectralAmplitudes(float& SE)
 }
 
 void
-op25_imbe::RealIFFT(float FDi[], float FDq[], float TD[])
+op25_imbe::ifft(float FDi[], float FDq[], float TD[]) // ToDo: replace "real IFFT" with fftw3 IFFT proc!
 {
 	//Inverse FFT:
 	//  transform 129-point freq domain(FDx) to 256-point time domain(TD)
@@ -1424,20 +1417,26 @@ op25_imbe::RealIFFT(float FDi[], float FDq[], float TD[])
       J = I + 64;    //64 to 127
       K = I * 2;     //0 to 126(step 2)
       H = 128 - K;   //128 to 2(step 2)
-      Ai[I] = FDi[K] + FDq[K]; Aq[I] = FDi[K + 1] + FDq[K + 1];
-      Ai[J] = FDi[H] - FDq[H]; Aq[J] = FDi[H - 1] - FDq[H - 1];
+      Ai[I] = FDi[K] + FDq[K];
+      Aq[I] = FDi[K + 1] + FDq[K + 1];
+      Ai[J] = FDi[H] - FDq[H];
+      Aq[J] = FDi[H - 1] - FDq[H - 1];
    }
 
-   CplxFFT( Ai, Aq);
+   fft(Ai, Aq);
 
    for(I = 1; I <= 63; I++) {
       J = 128 - I;    //127 to 65
       K = I + 128;    //129 to 191
       H = J + 128;    //255 to 193
-      FDi[K] =(Aq[I] + Aq[J]) / 2;  FDi[H] = FDi[K]  ; //a
-      FDq[K] = -(Ai[I] - Ai[J]) / 2; FDq[H] = -FDq[K] ; //b
-      FDi[I] =(Ai[I] + Ai[J]) / 2;  FDi[J] = FDi[I]  ; //c
-      FDq[I] =(Aq[I] - Aq[J]) / 2;  FDq[J] = -FDq[I] ; //d
+      FDi[K] =(Aq[I] + Aq[J]) / 2;
+      FDi[H] = FDi[K]  ; //a
+      FDq[K] = -(Ai[I] - Ai[J]) / 2;
+      FDq[H] = -FDq[K] ; //b
+      FDi[I] =(Ai[I] + Ai[J]) / 2;
+      FDi[J] = FDi[I]  ; //c
+      FDq[I] =(Aq[I] - Aq[J]) / 2;
+      FDq[J] = -FDq[I] ; //d
    }
 
    //I,J=64  K,H=192
@@ -1573,7 +1572,7 @@ op25_imbe::rearrange(uint32_t u0, uint32_t u1, uint32_t u2, uint32_t u3, uint32_
 }
 
 void
-op25_imbe::SynthUnvoiced()
+op25_imbe::synth_unvoiced()
 {
    float Uwi[256] ;
    float Uwq[256] ;
@@ -1619,7 +1618,7 @@ op25_imbe::SynthUnvoiced()
       Uwi[em] = 0; Uwq[em] = 0;
    }
 
-   RealIFFT(Uwi, Uwq, uw);
+   ifft(Uwi, Uwq, uw);
 
    //         ws(n)*uw(n,-1) + ws(n-159)*uw(n-159,0)          uw(-128 to 127)
    //suv(n) = --------------------------------------
@@ -1640,18 +1639,17 @@ op25_imbe::SynthUnvoiced()
 }
 
 void
-op25_imbe::SynthVoiced()
+op25_imbe::synth_voiced()
 {
-
-   float MaxL ;
-   float Tmp ;
-   float Dpl ;
-   float Dwl ;
-   float THa ;
-   float THb ;
-   float MNew ;
-   float MOld ;
-   float Mb ;
+   float MaxL;
+   float Tmp;
+   float Dpl;
+   float Dwl;
+   float THa;
+   float THb;
+   float MNew;
+   float MOld;
+   float Mb;
 
    int ell, en;
 
@@ -1667,7 +1665,7 @@ op25_imbe::SynthVoiced()
       phi[ell][ New] = psi1 * ell;
    }
    Tmp = Luv / L;
-   for( ; ell <= MaxL; ell++) {
+   for(; ell <= MaxL; ell++) {
       phi[ell][ New] = psi1 * ell + Tmp * PhzNz[ell];
    }
 
@@ -1835,7 +1833,9 @@ op25_imbe::vfPrGen15(unsigned int& Pr)
    n = 0;
    for(i = 14; i >= 0; i--) {
       Pr =(173 * Pr + 13849) & 0xffffu;
-      if(Pr & 32768) { n = n +(1 << i); }
+      if(Pr & 32768) {
+         n = n +(1 << i);
+      }
    }
    return n;
 }
@@ -1854,9 +1854,9 @@ op25_imbe::vfPrGen23(unsigned int& Pr)
 }
 
 void
-op25_imbe::vfDec(unsigned char* A, unsigned int& u0, unsigned int& u1, unsigned int& u2, unsigned int& u3, unsigned int& u4, unsigned int& u5, unsigned int& u6, unsigned int& u7, unsigned int& E0, unsigned int& ET)
+op25_imbe::correct(uint8_t* A, uint32_t& u0, uint32_t& u1, uint32_t& u2, uint32_t& u3, uint32_t& u4, uint32_t& u5, uint32_t& u6, uint32_t& u7, uint32_t& E0, uint32_t& ET)
 {
-   unsigned int RX=0;
+   unsigned int RX = 0;
 
    ET = 0;
 
@@ -1898,23 +1898,4 @@ op25_imbe::vfHmg15113Dec(int RX, int ET)  // should be int& ET!
       Dat = Dat ^ correction;
    }
    return  Dat;
-}
-
-int
-main(int ac, char **av)
-{
-	op25_imbe *imbe = new op25_imbe();
-   while(--ac) {
-      FILE *fp = fopen(*++av, "r");
-      if(fp) {
-         uint8_t buf[18];
-         while(1 == fread(buf, sizeof(buf), 1, fp)) {
-            imbe->imbe_frame(buf);
-         }
-         fclose(fp);
-      } else {
-         perror(*av);
-      }
-   }
-   return(0);
 }

@@ -24,22 +24,20 @@
 #ifndef INCLUDED_IMBE_H
 #define INCLUDED_IMBE_H
 
+#include <stdint.h>
+
 class op25_imbe {
 public:
 	op25_imbe();
 	~op25_imbe();
-	void imbe_frame(unsigned char*);
-	void init();
-
+	void decode(uint8_t *buf);
 private:
-// define global lookup tables
 
-//NOTE: Single-letter variable names are upper case only;
-//            Lower case if needed is spelled.   e.g.  L, ell
+	//NOTE: Single-letter variable names are upper case only;
+	//            Lower case if needed is spelled.   e.g.  L, ell
 
-// global Seq ER ?
+	// global Seq ER ?
 
-//Working arrays
 	int bee[58];         //Encoded Spectral Amplitudes
 	float M[57][2];   //Enhanced Spectral Amplitudes
 	float Mu[57][2];  //Unenhanced Spectral Amplitudes
@@ -51,7 +49,6 @@ private:
 	float psi1;
 	float phi[57][2];
 
-//Variables
 	int Old;
 	int New;
 	int L;
@@ -68,7 +65,7 @@ private:
 
    FILE *out;
 
-// member functions
+	// member functions
 	uint32_t extract(const uint8_t* buf, size_t begin, size_t end);
 
 	unsigned int vfPickBits0(unsigned char *);
@@ -87,22 +84,18 @@ private:
 	unsigned int vfPrGen15(unsigned int& );
 	unsigned int vfPrGen23(unsigned int& );
 
-#if 0
-	void vfDec(const uint8_t*, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&);
-#else 
-	void vfDec(unsigned char*, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&, unsigned int&);
-#endif
-	void decode(uint8_t *);
-	void DecodeSpectralAmplitudes(int, int );
-	void DecodeVUV(int );
-	void AdaptiveSmoothing(float, float, float );
-	void CplxFFT(float [], float []);
-	void EnhanceSpectralAmplitudes(float&);
-	void RealIFFT(float [], float [], float []);
+	void correct(uint8_t* A, uint32_t& u0, uint32_t& u1, uint32_t& u2, uint32_t& u3, uint32_t& u4, uint32_t& u5, uint32_t& u6, uint32_t& u7, uint32_t& E0, uint32_t& ET);
+
+	void decode_audio(uint8_t *);
+	void decode_spectral_amplitudes(int, int );
+	void decode_vuv(int );
+	void adaptive_smoothing(float, float, float );
+	void fft(float i[], float q[]);
+	void enhance_spectral_amplitudes(float&);
+	void ifft(float i[], float q[], float[]);
 	uint16_t rearrange(uint32_t u0, uint32_t u1, uint32_t u2, uint32_t u3, uint32_t u4, uint32_t u5, uint32_t u6, uint32_t u7);
-	void SynthUnvoiced(void);
-	void SynthVoiced(void);
-	void Synth(void);
+	void synth_unvoiced();
+	void synth_voiced();
 	void unpack(uint8_t *buf, uint32_t& u0, uint32_t& u1, uint32_t& u2, uint32_t& u3, uint32_t& u4, uint32_t& u5, uint32_t& u6, uint32_t& u7, uint32_t& E0, uint32_t& ET);
 };
 
