@@ -1,6 +1,6 @@
 #include <cstdio>
 #include <cstdlib>
-#include <imbe.h>
+#include <software_imbe_decoder.h>
 
 #include <boost/scoped_ptr.hpp>
 
@@ -20,6 +20,7 @@ main(int ac, char **av)
          fclose(fp);
       } else {
          perror(*av);
+         exit(1);
       }
    }
    return(0);

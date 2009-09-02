@@ -30,7 +30,7 @@
 #include <math.h>
 #include <string.h>
 
-#include "imbe.h"
+#include "software_imbe_decoder.h"
 
 static const int gly23127DecTbl[2048] = {
 	0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 147459,
