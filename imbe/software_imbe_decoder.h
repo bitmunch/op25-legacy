@@ -66,8 +66,8 @@ private:
    FILE *out;
 
 	uint32_t extract(const uint8_t* buf, size_t begin, size_t end);
-	uint32_t vfPrGen15(uint32_t& pn);
-	uint32_t vfPrGen23(uint32_t& pn);
+	uint32_t pngen15(uint32_t& pn);
+	uint32_t pngen23(uint32_t& pn);
 
 	void correct(uint8_t* A, uint32_t& u0, uint32_t& u1, uint32_t& u2, uint32_t& u3, uint32_t& u4, uint32_t& u5, uint32_t& u6, uint32_t& u7, uint32_t& E0, uint32_t& ET);
 
