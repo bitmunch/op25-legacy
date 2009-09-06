@@ -795,9 +795,7 @@ software_imbe_decoder::decode(uint8_t *buf)
 	correct(buf, u0, u1, u2, u3, u4, u5, u6, u7, E0, ET) ;
 
 	//replace the sync bit(LSB of u7) with the BOT flag
-	BOT = 1;
-	u7 = u7 | BOT; //ECC procedure called above always returns u7 LSB = 0
-	BOT = 0;
+	u7 = u7 | 0x01; //ECC procedure called above always returns u7 LSB = 0
 
 	// 'because E0 is 3 max and ET is 15 max, the 2 MSB of the error count byte are
 	// ' free for other data such as a 100 bit/sec serial bit stream to carry info

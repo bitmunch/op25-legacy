@@ -56,7 +56,6 @@ private:
 	float w0;
 	float Oldw0;
 	float Luv;                 //number of unvoiced spectral amplitudes
-	int BOT;
 
 	char sym_b[4096];
 	char RxData[4096];
