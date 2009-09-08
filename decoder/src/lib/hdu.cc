@@ -110,7 +110,7 @@ hdu::snapshot() const
 }
 
 void
-hdu::correct_errors(bit_vector& frame)
+hdu::do_correct_errors(bit_vector& frame)
 {
    apply_golay_correction(frame);
    apply_rs_correction(frame);

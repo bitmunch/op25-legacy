@@ -27,8 +27,8 @@
 #include <imbe_decoder.h>
 
 /**
- * dummy_imbe_decoder produces white noise in response to voice
- * frames. It is the imbe_decoder of last resort.
+ * dummy_imbe_decoder is the imbe_decoder of last resort. It consumes
+ * the voice_codeeword and does nothing.
  */
 class dummy_imbe_decoder : public imbe_decoder {
 public:
@@ -44,14 +44,11 @@ public:
    virtual ~dummy_imbe_decoder();
 
    /**
-    * Ignores in_out and generates white noise in response to all
-    * compressed voice samples.
+    * Ignores in_out and generates no audio.
     *
     * \param in_out IMBE codewords and parity.
-    * \param in Queue of audio samples to which output is written.
-    * \return The number of samples written to out.
     */
-   virtual size_t decode(voice_codeword& in_out, audio_output& out);
+   virtual void decode(voice_codeword& in_out);
 
 };
 

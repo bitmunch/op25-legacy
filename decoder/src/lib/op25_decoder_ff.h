@@ -29,6 +29,7 @@
 #include <data_unit_handler.h>
 #include <gr_block.h>
 #include <gr_msg_queue.h>
+#include <imbe_decoder.h>
 #include <sniffer_du_handler.h>
 
 typedef boost::shared_ptr<class op25_decoder_ff> op25_decoder_ff_sptr;
@@ -127,6 +128,11 @@ private:
     * A bit_queue used to correlate the FS.
     */
    bit_queue d_frame_hdr;
+
+   /**
+    * The IMBE decoder to use.
+    */
+   imbe_decoder_sptr d_imbe;
 
    /**
     * The message queue used to send snapshots to the UI.

@@ -29,7 +29,7 @@
 #include <deque>
 #include <vector>
 
-typedef std::deque<float> audio_output;
+typedef std::deque<float> audio_samples;
 typedef std::vector<bool> voice_codeword;
 
 typedef boost::shared_ptr<class imbe_decoder> imbe_decoder_sptr;
@@ -56,13 +56,19 @@ public:
 
    /**
     * Apply error correction to the voice_codeword in_out,
-    * decode the audio and write it to the audio_output.
+    * decode the audio and write it to the audio_samples.
     *
-    * \param in_out IMBE codewords and parity.
-    * \param in Queue of audio samples to which output is written.
-    * \return The number of samples written to out.
+    * \param in_out IMBE codeword (including parity check bits).
     */
-   virtual size_t decode(voice_codeword& in_out, audio_output& out) = 0;
+   virtual void decode(voice_codeword& in_out) = 0;
+
+   /**
+    * Returns the audio_samples samples. These are mono samples at
+    * 8KS/s represented as a float in the range -1.0 .. +1.0.
+    *
+    * \return A non-null pointer to a deque<float> of audio samples.
+    */
+   audio_samples *audio();
 
 protected:
 
@@ -72,6 +78,13 @@ protected:
     * make_imbe_decoder to construct  concrete instances.
     */
    imbe_decoder();
+
+private:
+
+   /**
+    * The audio samples produced by the IMBE decoder.
+    */
+   audio_samples d_audio;
    
 };
 

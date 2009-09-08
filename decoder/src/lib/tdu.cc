@@ -46,7 +46,7 @@ tdu::duid_str() const
 }
 
 void
-tdu::correct_errors(bit_vector& frame)
+tdu::do_correct_errors(bit_vector& frame)
 {
    if(d_has_link_control) {
       apply_golay_correction(frame);

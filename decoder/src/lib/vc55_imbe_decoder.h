@@ -27,7 +27,9 @@
 #include <imbe_decoder.h>
 
 /**
- * vc55_imbe_decoder uses the VC55PR vocoder to decode voice.
+ * vc55_imbe_decoder uses the VC55PR vocoder to decode voice. Note
+ * that the VC55 produces audio but this is not fed back to the flow
+ * graph.
  * 
  */
 class vc55_imbe_decoder : public imbe_decoder {
@@ -44,13 +46,11 @@ public:
    virtual ~vc55_imbe_decoder();
 
    /**
-    * Passess the voice_codeword in_out to the VC55PR device
+    * Passess the voice_codeword in_out to the VC55PR device.
     *
     * \param in_out IMBE codewords and parity.
-    * \param in Queue of audio samples to which output is written.
-    * \return The number of samples written to out.
     */
-   virtual size_t decode(voice_codeword& in_out, audio_output& out);
+   virtual void decode(voice_codeword& in_out);
 
 private:
 

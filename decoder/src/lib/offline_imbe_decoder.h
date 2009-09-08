@@ -49,10 +49,8 @@ public:
     * Dump voice_codeword in_out to file.
     *
     * \param in_out IMBE codewords and parity.
-    * \param in Queue of audio samples to which output is written.
-    * \return The number of samples written to out.
     */
-   virtual size_t decode(voice_codeword& in_out, audio_output& out);
+   virtual void decode(voice_codeword& in_out);
 
 private:
 

@@ -58,7 +58,7 @@ protected:
     * \param frame_body The bit vector to decode.
     * \return 
     */
-   virtual void correct_errors(bit_vector& frame_body);
+   virtual void do_correct_errors(bit_vector& frame_body);
 
    /**
     * Returns the expected size (in bits) of this data unit in

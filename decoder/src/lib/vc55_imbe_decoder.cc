@@ -68,19 +68,18 @@ vc55_imbe_decoder::~vc55_imbe_decoder()
    }
 }
 
-size_t
-vc55_imbe_decoder::decode(voice_codeword& in_out, audio_output& out)
+void
+vc55_imbe_decoder::decode(voice_codeword& in_out)
 {
    if(-1 != d_fd) {
       uint8_t packet[20];
       packet[0] = 0x56;
       packet[1] = 0xf0;
-      /* ToDo: extract(in_out, 0, 144, &packet[2]); */
+      // ToDo extract(in_out, 0, 144, &packet[2]);
       if(-1 == write(d_fd, packet, sizeof(packet))) {
          perror("write(d_fd, packet, sizeof(packet))");
          close(d_fd);
          d_fd = -1;
       }
    }
-   return 0;
 }

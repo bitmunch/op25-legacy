@@ -1,7 +1,7 @@
 /* -*- C++ -*- */
 
 /*
- * Copyright 2008 Steve Glass
+ * Copyright 2008, 2009 Steve Glass
  * 
  * This file is part of OP25.
  * 
@@ -30,8 +30,10 @@
 #include <iostream>
 #include <itpp/comm/bch.h>
 #include <logfile_du_handler.h>
+#include <offline_imbe_decoder.h>
 #include <op25_decoder_ff.h>
 #include <snapshot_du_handler.h>
+#include <voice_du_handler.h>
 #include <yank.h>
 
 using namespace std;
@@ -58,6 +60,7 @@ op25_decoder_ff::general_work(int nof_output_items, gr_vector_int& nof_input_ite
 {
    try {
 
+      // process symbol
       const float *in = reinterpret_cast<const float*>(input_items[0]);
       for(int i = 0; i < nof_input_items[0]; ++i) {
          dibit d;
@@ -72,9 +75,11 @@ op25_decoder_ff::general_work(int nof_output_items, gr_vector_int& nof_input_ite
          }
          receive_symbol(d);
       }
+
+      // produce audio (even if silence)
       consume(0, nof_input_items[0]);
       float *out = reinterpret_cast<float*>(output_items[0]);
-      fill(out, out + nof_output_items, 0.0); // audio silence - for now
+      fill(out, out + nof_output_items, 0.0);
       return nof_output_items;
 
    } catch(const std::exception& x) {
@@ -96,12 +101,14 @@ op25_decoder_ff::op25_decoder_ff(gr_msg_queue_sptr msgq) :
    d_data_unit(),
    d_data_unit_handler(),
    d_frame_hdr(),
+   d_imbe(new offline_imbe_decoder()),
    d_state(SYNCHRONIZING),
    d_sniffer_du_handler(NULL)
 {
    d_sniffer_du_handler =  new sniffer_du_handler(d_data_unit_handler);
    d_data_unit_handler = data_unit_handler_sptr(d_sniffer_du_handler);
    d_data_unit_handler = data_unit_handler_sptr(new snapshot_du_handler(d_data_unit_handler, msgq));
+   d_data_unit_handler = data_unit_handler_sptr(new voice_du_handler(d_data_unit_handler, d_imbe));
 }
 
 bool
@@ -142,7 +149,7 @@ op25_decoder_ff::identified()
    size_t NID_SZ = sizeof(NID) / sizeof(NID[0]);
 
    itpp::bvec b(63), zeroes(16);
-   itpp::BCH bch(63, 16, 11,"6 3 3 1 1 4 1 3 6 7 2 3 5 4 5 3", true);
+   itpp::BCH bch(63, 16, 11, "6 3 3 1 1 4 1 3 6 7 2 3 5 4 5 3", true);
    yank(d_frame_hdr,  NID, NID_SZ, b, 0);
    b = bch.decode(b);
    if(b != zeroes) {

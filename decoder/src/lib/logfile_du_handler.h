@@ -59,7 +59,7 @@ public:
 private:
 
    /**
-    * The msg_queue to which decoded frames are written.
+    * The file to which decoded frames are written.
     */
    std::ofstream d_log;
 

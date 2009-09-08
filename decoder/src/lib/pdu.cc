@@ -40,7 +40,7 @@ pdu::duid_str() const
 }
 
 void
-pdu::correct_errors(bit_vector& frame_body)
+pdu::do_correct_errors(bit_vector& frame_body)
 {
 }
 

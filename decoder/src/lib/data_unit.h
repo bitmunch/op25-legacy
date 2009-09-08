@@ -74,10 +74,8 @@ public:
     *
     * \precondition is_complete() == true.
     * \param imbe The imbe_decoder to use to generate the audio.
-    * \param audio A deque<float> to which the audio (if any) is appended.
-    * \return The number of samples written to audio.
     */
-   virtual size_t decode_audio(imbe_decoder& imbe, float_queue& audio) = 0;
+   virtual void decode_audio(imbe_decoder& imbe) = 0;
 
    /**
     * Decode the frame into an octet vector.

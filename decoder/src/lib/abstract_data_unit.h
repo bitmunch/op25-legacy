@@ -56,15 +56,12 @@ public:
    virtual void correct_errors();
 
    /**
-    * Decode compressed audio using the supplied imbe_decoder and
-    * writes output to audio.
+    * Decode compressed audio using the supplied imbe_decoder.
     *
     * \precondition is_complete() == true.
     * \param imbe The imbe_decoder to use to generate the audio.
-    * \param audio A deque<float> to which the audio (if any) is appended.
-    * \return The number of samples written to audio.
     */
-   virtual size_t decode_audio(imbe_decoder& imbe, float_queue& audio);
+   virtual void decode_audio(imbe_decoder& imbe);
 
    /**
     * Decode the frame into an octet vector.
@@ -133,19 +130,16 @@ protected:
     *
     * \param frame_body The bit vector to decode.
     */
-   virtual void correct_errors(bit_vector& frame_body);
+   virtual void do_correct_errors(bit_vector& frame_body);
 
    /**
-    * Decode compressed audio using the supplied imbe_decoder and
-    * writes output to audio.
+    * Decode compressed audio using the supplied imbe_decoder.
     *
     * \precondition is_complete() == true.
     * \param frame_body The const_bit_vector to decode.
-    * \param imbe The imbe_decoder to use to generate the audio.
-    * \param audio A deque<float> to which the audio (if any) is appended.
-    * \return The number of samples written to audio.
+    * \param imbe The imbe_decoder to use.
     */
-   virtual size_t decode_audio(const_bit_vector& frame_body, imbe_decoder& imbe, float_queue& audio);
+   virtual void do_decode_audio(const_bit_vector& frame_body, imbe_decoder& imbe);
 
    /**
     * Decode frame_body and write the decoded frame contents to msg.

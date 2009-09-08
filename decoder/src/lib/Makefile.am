@@ -75,6 +75,7 @@ _op25_la_SOURCES = \
 	dummy_imbe_decoder.cc \
 	offline_imbe_decoder.cc \
 	voice_data_unit.cc \
+	voice_du_handler.cc \
 	op25.cc \
 	op25_decoder_ff.cc \
 	vc55_imbe_decoder.cc \

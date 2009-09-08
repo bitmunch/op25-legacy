@@ -31,10 +31,8 @@ dummy_imbe_decoder::~dummy_imbe_decoder()
 {
 }
 
-size_t
-dummy_imbe_decoder::decode(voice_codeword& in_out, audio_output& out)
+void
+dummy_imbe_decoder::decode(voice_codeword& in_out)
 {
-   // ToDo: implement me!
-   return 0;
 }
 

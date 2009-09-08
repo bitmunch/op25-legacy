@@ -68,7 +68,7 @@ protected:
     * \param frame_body The bit vector to decode.
     * \return 
     */
-   virtual void correct_errors(bit_vector& frame_body);
+   virtual void do_correct_errors(bit_vector& frame_body);
 
    /**
     * Apply Golay error correction code to the specified bit_vector.

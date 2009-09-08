@@ -36,12 +36,12 @@ voice_data_unit::voice_data_unit(const_bit_queue& frame_body) :
 }
 
 void
-voice_data_unit::correct_errors(bit_vector& frame_body)
+voice_data_unit::do_correct_errors(bit_vector& frame_body)
 {
 }
 
-size_t
-voice_data_unit::decode_audio(const_bit_vector& frame_body, imbe_decoder& imbe, float_queue& audio)
+void
+voice_data_unit::do_decode_audio(const_bit_vector& frame_body, imbe_decoder& imbe)
 {
    static const size_t nof_voice_codewords = 9, voice_codeword_sz = 144;
    static const size_t voice_codeword_bits[nof_voice_codewords][voice_codeword_sz] = {
@@ -165,15 +165,13 @@ voice_data_unit::decode_audio(const_bit_vector& frame_body, imbe_decoder& imbe, 
 
    };
 
-   size_t nof_samples = 0;
    for(size_t i = 0; i < nof_voice_codewords; ++i) {
       voice_codeword cw(voice_codeword_sz);
       for(size_t j = 0; j < voice_codeword_sz; ++j) {
          cw[j] = frame_body[voice_codeword_bits[i][j]];
       }
-      nof_samples += imbe.decode(cw, audio);
+      imbe.decode(cw);
    }
-   return nof_samples;
 }
 
 uint16_t

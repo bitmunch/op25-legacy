@@ -42,7 +42,7 @@ void
 abstract_data_unit::correct_errors()
 {
    if(is_complete()) {
-      correct_errors(d_frame_body);
+      do_correct_errors(d_frame_body);
    } else {
       ostringstream msg;
       msg << "cannot correct errors - frame is not complete" << endl;
@@ -55,28 +55,10 @@ abstract_data_unit::correct_errors()
 }
 
 void
-abstract_data_unit::extend(dibit d)
+abstract_data_unit::decode_audio(imbe_decoder& imbe)
 {
-   if(frame_size() < frame_size_max()) {
-      d_frame_body.push_back(d & 0x2);
-      d_frame_body.push_back(d & 0x1);
-   } else {
-      ostringstream msg;
-      msg << "cannot extend frame " << endl;
-      msg << "(size now: " << frame_size() << ", expected size: " << frame_size_max() << ")" << endl;
-      msg << "func: " << __PRETTY_FUNCTION__ << endl;
-      msg << "file: " << __FILE__ << endl;
-      msg << "line: " << __LINE__ << endl;
-      throw length_error(msg.str());
-   }
-}
-
-size_t
-abstract_data_unit::decode_audio(imbe_decoder& imbe, float_queue& audio)
-{
-   size_t n = 0;
    if(is_complete()) {
-      n = decode_audio(d_frame_body, imbe, audio);
+      do_decode_audio(d_frame_body, imbe);
    } else {
       ostringstream msg;
       msg << "cannot decode audio - frame is not complete" << endl;
@@ -86,7 +68,6 @@ abstract_data_unit::decode_audio(imbe_decoder& imbe, float_queue& audio)
       msg << "line: " << __LINE__ << endl;
       throw logic_error(msg.str());
    }
-   return n;
 }
 
 size_t
@@ -122,6 +103,23 @@ abstract_data_unit::decode_frame(const_bit_vector& frame_body, size_t msg_sz, ui
    }
    return n;
 
+}
+
+void
+abstract_data_unit::extend(dibit d)
+{
+   if(frame_size() < frame_size_max()) {
+      d_frame_body.push_back(d & 0x2);
+      d_frame_body.push_back(d & 0x1);
+   } else {
+      ostringstream msg;
+      msg << "cannot extend frame " << endl;
+      msg << "(size now: " << frame_size() << ", expected size: " << frame_size_max() << ")" << endl;
+      msg << "func: " << __PRETTY_FUNCTION__ << endl;
+      msg << "file: " << __FILE__ << endl;
+      msg << "line: " << __LINE__ << endl;
+      throw length_error(msg.str());
+   }
 }
 
 bool
@@ -161,14 +159,13 @@ abstract_data_unit::abstract_data_unit(const_bit_queue& frame_body) :
 }
 
 void
-abstract_data_unit::correct_errors(bit_vector& frame_body)
+abstract_data_unit::do_correct_errors(bit_vector& frame_body)
 {
 }
 
-size_t
-abstract_data_unit::decode_audio(const_bit_vector& frame_body, imbe_decoder& imbe, float_queue& audio)
+void
+abstract_data_unit::do_decode_audio(const_bit_vector& frame_body, imbe_decoder& imbe)
 {
-   return 0;
 }
 
 const_bit_vector& 

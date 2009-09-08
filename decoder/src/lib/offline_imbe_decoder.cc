@@ -48,8 +48,8 @@ offline_imbe_decoder::~offline_imbe_decoder()
    }
 }
 
-size_t
-offline_imbe_decoder::decode(voice_codeword& in_out, audio_output& out)
+void
+offline_imbe_decoder::decode(voice_codeword& in_out)
 {
    if(d_fp) {
       uint8_t codewords[18];
@@ -60,5 +60,4 @@ offline_imbe_decoder::decode(voice_codeword& in_out, audio_output& out)
          d_fp = NULL;
       }
    }
-   return 0;
 }

@@ -50,7 +50,7 @@ size_t extract(const X& in, int begin, int end, uint8_t *out)
    const size_t out_sz = (7 + end - begin) / 8;
 	std::fill(out, out + out_sz, 0);
    for(int i = begin, j = 0; i < end; ++i, ++j) {
-      out[j / 8] ^= in[i] << (7 - (j % 8));
+      out[j / 8] |= (in[i] ? 1 << (7 - (j % 8)) : 0);
    }
    return out_sz;
 }

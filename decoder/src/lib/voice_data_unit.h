@@ -55,18 +55,15 @@ protected:
     * \param frame_body The bit vector to decode.
     * \return 
     */
-   virtual void correct_errors(bit_vector& frame_body);
+   virtual void do_correct_errors(bit_vector& frame_body);
 
    /**
-    * Decode compressed audio using the supplied imbe_decoder and
-    * writes output to audio.
+    * Decode compressed audio using the supplied imbe_decoder.
     *
     * \param frame_body The const_bit_vector to decode.
     * \param imbe The imbe_decoder to use to generate the audio.
-    * \param audio A deque<float> to which the audio (if any) is appended.
-    * \return The number of samples written to audio.
     */
-   virtual size_t decode_audio(const_bit_vector& frame_body, imbe_decoder& imbe, float_queue& audio);
+   virtual void do_decode_audio(const_bit_vector& frame_body, imbe_decoder& imbe);
 
    /**
     * Returns the expected size (in bits) of this data_unit. For
