@@ -46,9 +46,9 @@ public:
    /**
     * Ignores in_out and generates no audio.
     *
-    * \param in_out IMBE codewords and parity.
+    * \param cw IMBE codewords and parity.
     */
-   virtual void decode(voice_codeword& in_out);
+   virtual void decode(const voice_codeword& cw);
 
 };
 

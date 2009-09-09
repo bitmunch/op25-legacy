@@ -21,12 +21,10 @@
  * 02110-1301, USA.
  */
 
-#include <egolay.h>
 #include <hdu.h>
 #include <iomanip>
 #include <iostream>
 #include <itpp/base/vec.h>
-// #include <itpp/comm/egolay.h>
 #include <itpp/comm/reedsolomon.h>
 #include <sstream>
 #include <value_string.h>
@@ -119,7 +117,6 @@ hdu::do_correct_errors(bit_vector& frame)
 void
 hdu::apply_golay_correction(bit_vector& frame)
 {
-   static itpp::My_Extended_Golay golay;
    static const size_t NOF_GOLAY_CODEWORDS = 36, GOLAY_CODEWORD_SZ = 18;
    static const size_t GOLAY_CODEWORDS[NOF_GOLAY_CODEWORDS][GOLAY_CODEWORD_SZ] = {
       { 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131 },
@@ -160,12 +157,9 @@ hdu::apply_golay_correction(bit_vector& frame)
       { 762, 763, 764, 765, 766, 767, 768, 769, 770, 771, 772, 773, 774, 775, 776, 777, 778, 779 }
    };
    for(size_t i = 0; i < NOF_GOLAY_CODEWORDS; ++i) {
-      const size_t PAD_SZ = 6;
-      itpp::bvec b(PAD_SZ + GOLAY_CODEWORD_SZ);
-      b.zeros();
-      yank(frame, GOLAY_CODEWORDS[i], GOLAY_CODEWORD_SZ, b, PAD_SZ);
-      itpp::bvec d(golay.decode(b));
-//         yank_back(d, PAD_SZ, frame, GOLAY_CODEWORDS[i], GOLAY_DATA_SZ);
+//      yank(frame, GOLAY_CODEWORDS[i], GOLAY_CODEWORD_SZ, b, PAD_SZ);
+//      itpp::bvec d(golay.decode(b));
+//      yank_back(d, PAD_SZ, frame, GOLAY_CODEWORDS[i], GOLAY_DATA_SZ);
    }
 }
 

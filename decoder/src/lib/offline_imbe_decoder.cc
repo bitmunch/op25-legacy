@@ -49,13 +49,13 @@ offline_imbe_decoder::~offline_imbe_decoder()
 }
 
 void
-offline_imbe_decoder::decode(voice_codeword& in_out)
+offline_imbe_decoder::decode(const voice_codeword& cw)
 {
    if(d_fp) {
       uint8_t codewords[18];
-      extract(in_out, 0, 144, codewords);
+      extract(cw, 0, 144, codewords);
       if(0 == fwrite(codewords, sizeof(codewords), 1, d_fp)) {
-         perror("fwrite(d_fp, 1, codewords, sizeof(codewords))");
+         perror("fwrite(codewords, sizeof(codewords), 1, d_fp)");
          fclose(d_fp);
          d_fp = NULL;
       }

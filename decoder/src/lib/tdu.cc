@@ -22,7 +22,6 @@
  */
 
 #include <itpp/base/vec.h>
-#include <itpp/comm/egolay.h>
 #include <itpp/comm/reedsolomon.h>
 #include <tdu.h>
 #include <yank.h>
@@ -57,7 +56,6 @@ tdu::do_correct_errors(bit_vector& frame)
 void
 tdu::apply_golay_correction(bit_vector& frame)
 {
-   static itpp::Extended_Golay golay;
 }
 
 void

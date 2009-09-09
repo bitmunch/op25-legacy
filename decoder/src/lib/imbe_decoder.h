@@ -55,12 +55,11 @@ public:
    virtual ~imbe_decoder();
 
    /**
-    * Apply error correction to the voice_codeword in_out,
-    * decode the audio and write it to the audio_samples.
+    * Decode the compressed IMBE audio.
     *
-    * \param in_out IMBE codeword (including parity check bits).
+    * \param cw IMBE codeword (including parity check bits).
     */
-   virtual void decode(voice_codeword& in_out) = 0;
+   virtual void decode(const voice_codeword& cw) = 0;
 
    /**
     * Returns the audio_samples samples. These are mono samples at

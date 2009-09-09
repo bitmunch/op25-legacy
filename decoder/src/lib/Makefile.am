@@ -79,8 +79,7 @@ _op25_la_SOURCES = \
 	op25.cc \
 	op25_decoder_ff.cc \
 	vc55_imbe_decoder.cc \
-	value_string.cc \
-	egolay.cc
+	value_string.cc
 
 
 # magic flags

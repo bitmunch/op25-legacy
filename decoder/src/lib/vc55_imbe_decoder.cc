@@ -32,6 +32,7 @@
 #include <sys/types.h>
 #include <termios.h>
 #include <vc55_imbe_decoder.h>
+#include <yank.h>
 
 using namespace std;
 
@@ -69,13 +70,13 @@ vc55_imbe_decoder::~vc55_imbe_decoder()
 }
 
 void
-vc55_imbe_decoder::decode(voice_codeword& in_out)
+vc55_imbe_decoder::decode(const voice_codeword& cw)
 {
    if(-1 != d_fd) {
       uint8_t packet[20];
       packet[0] = 0x56;
       packet[1] = 0xf0;
-      // ToDo extract(in_out, 0, 144, &packet[2]);
+      extract(cw, 0, 144, &packet[2]);
       if(-1 == write(d_fd, packet, sizeof(packet))) {
          perror("write(d_fd, packet, sizeof(packet))");
          close(d_fd);

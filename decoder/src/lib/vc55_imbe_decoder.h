@@ -48,9 +48,9 @@ public:
    /**
     * Passess the voice_codeword in_out to the VC55PR device.
     *
-    * \param in_out IMBE codewords and parity.
+    * \param cw IMBE codewords and parity.
     */
-   virtual void decode(voice_codeword& in_out);
+   virtual void decode(const voice_codeword& cw);
 
 private:
 

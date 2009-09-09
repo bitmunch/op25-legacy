@@ -32,7 +32,6 @@ dummy_imbe_decoder::~dummy_imbe_decoder()
 }
 
 void
-dummy_imbe_decoder::decode(voice_codeword& in_out)
+dummy_imbe_decoder::decode(const voice_codeword& cw)
 {
 }
-
