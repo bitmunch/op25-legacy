@@ -263,12 +263,9 @@ class p25_rx_block (stdgui2.std_top_block):
     #
     def __set_rx_from_file(self, filename, capture_rate):
         file = gr.file_source(gr.sizeof_gr_complex, filename, True)
-        if 0:
-            throttle = gr.throttle(gr.sizeof_gr_complex, capture_rate)
-            self.__connect([[file, throttle]])
-            self.__build_graph(throttle, capture_rate)
-        else:
-            self.__build_graph(file, capture_rate)
+        throttle = gr.throttle(gr.sizeof_gr_complex, capture_rate)
+        self.__connect([[file, throttle]])
+        self.__build_graph(throttle, capture_rate)
 
     # setup to rx from USRP
     #

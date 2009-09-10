@@ -51,12 +51,17 @@ op25_decoder_ff::~op25_decoder_ff()
 void
 op25_decoder_ff::forecast(int nof_output_items, gr_vector_int &nof_input_items_reqd)
 {
+   /* This block consumes 4800 symbols/s and produces 8000
+    * samples/s. That's a sampling rate of 3/5 or 0.6. If no output is
+    * available we'll produce silence so it should be ok to stick with
+    * this.
+    */
    const size_t nof_inputs = nof_input_items_reqd.size();
-   const int nof_samples_reqd = 3 * nof_output_items; // guesstimate to minimize audio under-runs
+   const int nof_samples_reqd = .6 * nof_output_items;
    fill(&nof_input_items_reqd[0], &nof_input_items_reqd[nof_inputs], nof_samples_reqd);
 }
 
-int  
+int
 op25_decoder_ff::general_work(int nof_output_items, gr_vector_int& nof_input_items, gr_vector_const_void_star& input_items, gr_vector_void_star& output_items)
 {
    try {
@@ -86,14 +91,11 @@ op25_decoder_ff::general_work(int nof_output_items, gr_vector_int& nof_input_ite
          copy(samples->begin(), samples->begin() + n, out);
          samples->erase(samples->begin(), samples->begin() + n);
       }
-#if 1
-      return n;
-#else
       if(n < nof_output_items) {
          fill(out + n, out + nof_output_items, 0.0);
       }
       return nof_output_items;
-#endif
+
    } catch(const std::exception& x) {
       cerr << x.what() << endl;
       exit(1);
