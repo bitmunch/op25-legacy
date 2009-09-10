@@ -52,7 +52,8 @@ void
 op25_decoder_ff::forecast(int nof_output_items, gr_vector_int &nof_input_items_reqd)
 {
    const size_t nof_inputs = nof_input_items_reqd.size();
-   fill(&nof_input_items_reqd[0], &nof_input_items_reqd[nof_inputs], nof_output_items);
+   const int nof_samples_reqd = 3 * nof_output_items; // guesstimate to minimize audio under-runs
+   fill(&nof_input_items_reqd[0], &nof_input_items_reqd[nof_inputs], nof_samples_reqd);
 }
 
 int  
@@ -60,7 +61,7 @@ op25_decoder_ff::general_work(int nof_output_items, gr_vector_int& nof_input_ite
 {
    try {
 
-      // process symbol
+      // process input
       const float *in = reinterpret_cast<const float*>(input_items[0]);
       for(int i = 0; i < nof_input_items[0]; ++i) {
          dibit d;
@@ -75,13 +76,24 @@ op25_decoder_ff::general_work(int nof_output_items, gr_vector_int& nof_input_ite
          }
          receive_symbol(d);
       }
+      consume_each(nof_input_items[0]);
 
-      // produce audio (even if silence)
-      consume(0, nof_input_items[0]);
+      // produce audio
+      audio_samples *samples = d_imbe->audio();
       float *out = reinterpret_cast<float*>(output_items[0]);
-      fill(out, out + nof_output_items, 0.0);
+      const int n = min(static_cast<int>(samples->size()), nof_output_items);
+      if(0 < n) {
+         copy(samples->begin(), samples->begin() + n, out);
+         samples->erase(samples->begin(), samples->begin() + n);
+      }
+#if 1
+      return n;
+#else
+      if(n < nof_output_items) {
+         fill(out + n, out + nof_output_items, 0.0);
+      }
       return nof_output_items;
-
+#endif
    } catch(const std::exception& x) {
       cerr << x.what() << endl;
       exit(1);
@@ -101,7 +113,7 @@ op25_decoder_ff::op25_decoder_ff(gr_msg_queue_sptr msgq) :
    d_data_unit(),
    d_data_unit_handler(),
    d_frame_hdr(),
-   d_imbe(new offline_imbe_decoder()),
+   d_imbe(imbe_decoder::make()),
    d_state(SYNCHRONIZING),
    d_sniffer_du_handler(NULL)
 {

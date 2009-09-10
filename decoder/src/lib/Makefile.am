@@ -72,15 +72,18 @@ _op25_la_SOURCES = \
 	snapshot_du_handler.cc \
 	sniffer_du_handler.cc \
 	imbe_decoder.cc \
+	imbe_decoder_factory.cc \
 	dummy_imbe_decoder.cc \
 	offline_imbe_decoder.cc \
 	voice_data_unit.cc \
 	voice_du_handler.cc \
 	op25.cc \
 	op25_decoder_ff.cc \
+	software_imbe_decoder.cc \
 	vc55_imbe_decoder.cc \
-	value_string.cc
-
+	value_string.cc \
+	golay.cc \
+	hamming.cc 
 
 # magic flags
 _op25_la_LDFLAGS = $(NO_UNDEFINED) -module -avoid-version

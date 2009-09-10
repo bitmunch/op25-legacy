@@ -47,7 +47,7 @@ public:
     *
     * \return A shared_ptr to an imbe_decoder.
     */
-   static imbe_decoder_sptr make_imbe_decoder();
+   static imbe_decoder_sptr make();
 
    /**
     * imbe_decoder (virtual) destructor.
