@@ -614,8 +614,9 @@ class p25_rx_block (stdgui2.std_top_block):
 
     # for datascope, choose monitor viewpoint
     def filter_select(self, evt):
+        self.lock()
         self.connect_data_scope(self.data_scope.win.radio_box.GetSelection())
-        print "FIXME: try using the --datascope-raw-input option"
+        self.unlock()
 
 # A snapshot of important fields in current traffic
 #
