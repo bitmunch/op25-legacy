@@ -114,18 +114,18 @@ class p25_rx_block (stdgui2.std_top_block):
         fm_demod = gr.quadrature_demod_cf(fm_demod_gain)
         # symbol filter        
         symbol_decim = 1
-        #symbol_coeffs = gr.firdes.root_raised_cosine(1.0, channel_rate, self.symbol_rate, 0.2, 500)
+        # symbol_coeffs = gr.firdes.root_raised_cosine(1.0, channel_rate, self.symbol_rate, 0.2, 500)
         # boxcar coefficients for "integrate and dump" filter
         samples_per_symbol = channel_rate // self.symbol_rate
         symbol_coeffs = (1.0/samples_per_symbol,)*samples_per_symbol
         symbol_filter = gr.fir_filter_fff(symbol_decim, symbol_coeffs)
-
         # C4FM demodulator
         autotuneq = gr.msg_queue(2)
         self.demod_watcher = demod_watcher(autotuneq, self.adjust_channel_offset)
         demod_fsk4 = fsk4.demod_ff(autotuneq, channel_rate, self.symbol_rate)
-        # for now no audio output
-        sink = gr.null_sink(gr.sizeof_float)
+        # audio output
+        sink = audio.sink(8000, "plughw:0,0") # ToDo: get device from prefs
+
         # connect it all up
         self.__connect([[source, self.channel_filter, self.squelch, fm_demod, symbol_filter, demod_fsk4, self.p25_decoder, sink],
                         [source, self.spectrum],
@@ -224,19 +224,22 @@ class p25_rx_block (stdgui2.std_top_block):
 
         # setup the notebook
         self.notebook = wx.Notebook(self.panel)
-        self.vbox.Add(self.notebook, 1, wx.EXPAND)       
+        self.vbox.Add(self.notebook, 1, wx.EXPAND)     
         # add spectrum scope
-        self.spectrum = fftsink2.fft_sink_c(self.notebook, fft_size=512, fft_rate=2, average=True, peak_hold=True)
+        self.spectrum = fftsink2.fft_sink_c(self.notebook, fft_size=512, average=True, peak_hold=True)
         self.spectrum_plotter = self.spectrum.win.plot
+##        self.spectrum_plotter = self.spectrum.win.plotter # opengl
         self.spectrum_plotter.Bind(wx.EVT_LEFT_DOWN, self._on_spectrum_left_click)
         self.notebook.AddPage(self.spectrum.win, "RF Spectrum")
         # add C4FM scope
         self.signal_scope = scopesink2.scope_sink_f(self.notebook, sample_rate = self.channel_rate, v_scale=5, t_scale=0.001)
         self.signal_plotter = self.signal_scope.win.graph
+##        self.signal_plotter = self.signal_scope.win
         self.notebook.AddPage(self.signal_scope.win, "C4FM Signal")
         # add symbol scope
         self.symbol_scope = scopesink2.scope_sink_f(self.notebook, frame_decim=1, sample_rate=self.symbol_rate, v_scale=1, t_scale=0.05)
         self.symbol_plotter = self.symbol_scope.win.graph
+##        self.symbol_plotter = self.symbol_scope.win
         self.symbol_scope.win.set_format_plus()
         self.notebook.AddPage(self.symbol_scope.win, "Demodulated Symbols")
         # Traffic snapshot
@@ -260,9 +263,12 @@ class p25_rx_block (stdgui2.std_top_block):
     #
     def __set_rx_from_file(self, filename, capture_rate):
         file = gr.file_source(gr.sizeof_gr_complex, filename, True)
-        throttle = gr.throttle(gr.sizeof_gr_complex, capture_rate)
-        self.__connect([[file, throttle]])
-        self.__build_graph(throttle, capture_rate)
+        if 0:
+            throttle = gr.throttle(gr.sizeof_gr_complex, capture_rate)
+            self.__connect([[file, throttle]])
+            self.__build_graph(throttle, capture_rate)
+        else:
+            self.__build_graph(file, capture_rate)
 
     # setup to rx from USRP
     #
@@ -695,6 +701,7 @@ class decode_watcher(threading.Thread):
             msg = self.msgq.delete_head()
             pickled_dict = msg.to_string()
             attrs = pickle.loads(pickled_dict)
+            print attrs # diagnostix!
             self.traffic_pane.update(attrs)
 
 
