@@ -23,6 +23,7 @@
 
 #include <software_imbe_decoder.h>
 #include <yank.h>
+#include <imbe_frame.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -788,7 +789,7 @@ software_imbe_decoder::decode(const voice_codeword& cw)
 	unsigned char O[12];
 
 	// PN/Hamming/Golay - etc.
-	correct(cw, u0, u1, u2, u3, u4, u5, u6, u7, E0, ET) ;
+	imbe_header_decode(cw, u0, u1, u2, u3, u4, u5, u6, u7, E0, ET) ;
 
 	//replace the sync bit(LSB of u7) with the BOT flag
 	u7 = u7 | 0x01; //ECC procedure called above always returns u7 LSB = 0
@@ -892,7 +893,7 @@ software_imbe_decoder::decode_audio(uint8_t *A)
    int en, tmp_f;
    float SE = 0, ER = 0;
 
-   unpack(A, u0, u1, u2, u3, u4, u5, u6, u7, E0, ET);
+   imbe_frame_unpack(A, u0, u1, u2, u3, u4, u5, u6, u7, E0, ET);
 
    ER = .95 * ER + .000365 * ET;
    if( ER > .0875) {
@@ -1430,95 +1431,3 @@ software_imbe_decoder::synth_voiced()
    }
 }
 
-void
-software_imbe_decoder::unpack(uint8_t *A, uint32_t& u0, uint32_t& u1, uint32_t& u2, uint32_t& u3, uint32_t& u4, uint32_t& u5, uint32_t& u6, uint32_t& u7, uint32_t& E0, uint32_t& ET)
-{
-   E0 = A[0];
-   ET = A[1];
-   u0 = A[4] + (E0 & 240) * 16;
-   u1 = A[5] + (E0 & 15) * 256;
-   u2 = A[6] + (ET & 240) * 16;
-   u3 = A[7] + (ET & 15) * 256;
-   E0 = A[2];
-   ET = A[3];
-   u4 = A[8] + (E0 & 224) * 8;
-   u5 = A[9] + (E0 & 28) * 64;
-   u6 = A[10] + (ET & 128) * 2 + (E0 & 3) * 512;
-   u7 = ET & 127;
-   E0 = A[11];
-   if(E0 & 192) exit(4);
-   ET = E0 & 3;
-   E0 = (E0 & 84) / 4;
-}
-
-uint32_t
-software_imbe_decoder::pngen15(uint32_t& Pr)
-{
-   int n = 0;
-   for(int i = 14; i >= 0; --i) {
-      Pr = (173 * Pr + 13849) & 0xffffu;
-      if(Pr & 32768) {
-         n += (1 << i);
-      }
-   }
-   return n;
-}
-
-uint32_t
-software_imbe_decoder::pngen23(uint32_t& Pr)
-{
-   int n = 0;
-   for(int i = 22; i >= 0; --i) {
-      Pr = (173 * Pr + 13849) & 0xffffu;
-      if(Pr & 32768) {
-         n += (1 << i);
-      }
-   }
-   return  n;
-}
-
-void
-software_imbe_decoder::correct(const voice_codeword& cw, uint32_t& u0, uint32_t& u1, uint32_t& u2, uint32_t& u3, uint32_t& u4, uint32_t& u5, uint32_t& u6, uint32_t& u7, uint32_t& E0, uint32_t& ET)
-{
-   ET = 0;
-
-   size_t errs = 0;
-   uint32_t v0 = extract(cw, 0, 23);
-   errs = golay_23_decode(v0);
-   u0 = v0;
-   E0 = ET;
-
-   uint32_t pn = u0 << 4;
-   uint32_t m1 = pngen23(pn);
-   uint32_t v1 = extract(cw, 23, 46) ^ m1;
-   errs += golay_23_decode(v1);
-   u1 = v1;
-
-   uint32_t m2 = pngen23(pn);
-   uint32_t v2 = extract(cw, 46, 69) ^ m2;
-   errs += golay_23_decode(v2);
-   u2 = v2;
-
-   uint32_t m3 = pngen23(pn);
-   uint32_t v3 = extract(cw, 69, 92) ^ m3;
-   errs += golay_23_decode(v3);
-   u3 = v3;
-
-   uint32_t m4 = pngen15(pn);
-   uint16_t v4 = extract(cw, 92, 107) ^ m4;
-   errs += hamming_15_decode(v4);
-   u4 = v4;
-
-   uint32_t m5 = pngen15(pn);
-   uint16_t v5 = extract(cw, 107, 122) ^ m5;
-   errs += hamming_15_decode(v5);
-   u5 = v5;
-
-   uint32_t m6 = pngen15(pn);
-   uint16_t v6 = extract(cw, 122, 137) ^ m6;
-   errs += hamming_15_decode(v6);
-   u6 = v6;
-
-   u7 = extract(cw, 137, 144);
-   u7 <<= 1; /* so that bit0 is free (see note about BOT bit */
-}

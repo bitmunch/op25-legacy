@@ -86,7 +86,6 @@ private:
 
 	uint32_t pngen15(uint32_t& pn);
 	uint32_t pngen23(uint32_t& pn);
-	void correct(const voice_codeword& cw, uint32_t& u0, uint32_t& u1, uint32_t& u2, uint32_t& u3, uint32_t& u4, uint32_t& u5, uint32_t& u6, uint32_t& u7, uint32_t& E0, uint32_t& ET);
 	void decode_audio(uint8_t *);
 	void decode_spectral_amplitudes(int, int );
 	void decode_vuv(int );
