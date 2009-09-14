@@ -34,38 +34,36 @@
 class software_imbe_decoder : public imbe_decoder {
 public:
 
-   /**
-    * Default constructor for the software_imbe_decoder.
-    */
+	/**
+	 * Default constructor for the software_imbe_decoder.
+	 */
 	software_imbe_decoder();
 
-   /**
-    * Destructor for the software_imbe_decoder.
-    */
+	/**
+	 * Destructor for the software_imbe_decoder.
+	 */
 	virtual ~software_imbe_decoder();
 
-   /**
-    * Decode the compressed audio.
-    *
-    * \cw in IMBE codeword (including parity check bits).
-    */
-   virtual void decode(const voice_codeword& cw);
+	/**
+	 * Decode the compressed audio.
+	 *
+	 * \cw in IMBE codeword (including parity check bits).
+	 */
+	virtual void decode(const voice_codeword& cw);
 
 private:
 
-   FILE *out;
-
 	//NOTE: Single-letter variable names are upper case only; Lower
-	//            case if needed is spelled. e.g. L, ell
+	//				  case if needed is spelled. e.g. L, ell
 
 	// global Seq ER ?
 
-	int bee[58];                 //Encoded Spectral Amplitudes
-	float M[57][2];              //Enhanced Spectral Amplitudes
-	float Mu[57][2];             //Unenhanced Spectral Amplitudes
-	int vee[57][2];              //V/UV decisions
-	float suv[160];              //Unvoiced samples
-	float sv[160];               //Voiced samples
+	int bee[58];					  //Encoded Spectral Amplitudes
+	float M[57][2];				  //Enhanced Spectral Amplitudes
+	float Mu[57][2];				  //Unenhanced Spectral Amplitudes
+	int vee[57][2];				  //V/UV decisions
+	float suv[160];				  //Unvoiced samples
+	float sv[160];					  //Voiced samples
 	float log2Mu[58][2];
 	float Olduw[256];
 	float psi1;
@@ -77,7 +75,7 @@ private:
 	int OldL;
 	float w0;
 	float Oldw0;
-	float Luv;                 //number of unvoiced spectral amplitudes
+	float Luv;						//number of unvoiced spectral amplitudes
 
 	char sym_b[4096];
 	char RxData[4096];
