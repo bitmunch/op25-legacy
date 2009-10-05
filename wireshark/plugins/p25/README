@@ -2,109 +2,23 @@ Development environment setup:
 
 This works for me.  YMMV.
 
-Check out wireshark:
+Install wireshark source tree:
 
-% svn checkout http://anonsvn.wireshark.org/wireshark/trunk/
+% tar -xjvf /tmp/wireshark-1.2.2.tar.bz2 
 
 Within the wireshark tree, check out p25 plugin from op25:
 
-% cd wireshark/plugins
+% cd wireshark-1.2.2/plugins
 % svn checkout http://www.sedition.org.au/svn/op25/trunk/wireshark/plugins/p25
 
 A few small changes need to be made to the wireshark tree outside of the
-plugins directory (see wireshark/doc/README.plugins).  Here is an svn diff:
+plugins directory.  Apply a patch to accomplish this:
 
-Index: configure.in
-===================================================================
---- configure.in	(revision 25150)
-+++ configure.in	(working copy)
-@@ -1701,6 +1701,7 @@
-   plugins/mate/Makefile
-   plugins/opcua/Makefile
-   plugins/opsi/Makefile
-+  plugins/p25/Makefile
-   plugins/pcli/Makefile
-   plugins/profinet/Makefile
-   plugins/rlm/Makefile
-Index: Makefile.am
-===================================================================
---- Makefile.am	(revision 25150)
-+++ Makefile.am	(working copy)
-@@ -253,6 +253,7 @@
- 	-dlopen plugins/mate/mate.la \
- 	-dlopen plugins/opcua/opcua.la \
- 	-dlopen plugins/opsi/opsi.la \
-+	-dlopen plugins/p25/p25cai.la \
- 	-dlopen plugins/pcli/pcli.la \
- 	-dlopen plugins/profinet/profinet.la \
- 	-dlopen plugins/rlm/rlm.la \
-Index: Makefile.nmake
-===================================================================
---- Makefile.nmake	(revision 25150)
-+++ Makefile.nmake	(working copy)
-@@ -916,6 +916,7 @@
- 	xcopy ".\plugins\mate\mate.dll" $(INSTALL_DIR)\plugins\$(VERSION) /d
- 	xcopy ".\plugins\opcua\opcua.dll" $(INSTALL_DIR)\plugins\$(VERSION) /d
- 	xcopy ".\plugins\opsi\opsi.dll" $(INSTALL_DIR)\plugins\$(VERSION) /d
-+	xcopy ".\plugins\p25\p25cai.dll" $(INSTALL_DIR)\plugins\$(VERSION) /d
- 	xcopy ".\plugins\pcli\pcli.dll" $(INSTALL_DIR)\plugins\$(VERSION) /d
- 	xcopy ".\plugins\profinet\profinet.dll" $(INSTALL_DIR)\plugins\$(VERSION) /d
- 	xcopy ".\plugins\rlm\rlm.dll" $(INSTALL_DIR)\plugins\$(VERSION) /d
-Index: plugins/Makefile.nmake
-===================================================================
---- plugins/Makefile.nmake	(revision 25150)
-+++ plugins/Makefile.nmake	(working copy)
-@@ -77,6 +77,9 @@
- 	cd opsi
- 	$(MAKE) /$(MAKEFLAGS) -f Makefile.nmake $(PLUGIN_TARGET)
- 	cd ..
-+	cd p25
-+	$(MAKE) /$(MAKEFLAGS) -f Makefile.nmake $(PLUGIN_TARGET)
-+	cd ..
- 	cd pcli
- 	$(MAKE) /$(MAKEFLAGS) -f Makefile.nmake $(PLUGIN_TARGET)
- 	cd ..
-@@ -137,6 +140,7 @@
- 	xcopy mate\*.dll $(VERSION) /d
- 	xcopy opcua\*.dll $(VERSION) /d
- 	xcopy opsi\*.dll $(VERSION) /d
-+	xcopy p25\*.dll $(VERSION) /d
- 	xcopy pcli\*.dll $(VERSION) /d
- 	xcopy profinet\*.dll $(VERSION) /d
- 	xcopy rlm\*.dll $(VERSION) /d
-Index: plugins/Makefile.am
-===================================================================
---- plugins/Makefile.am	(revision 25150)
-+++ plugins/Makefile.am	(working copy)
-@@ -38,6 +38,7 @@
- 	mate \
- 	opcua \
- 	opsi \
-+	p25 \
- 	pcli \
- 	profinet \
- 	rlm \
-Index: packaging/nsis/Makefile.nmake
-===================================================================
---- packaging/nsis/Makefile.nmake	(revision 25150)
-+++ packaging/nsis/Makefile.nmake	(working copy)
-@@ -62,6 +62,7 @@
- 	../../plugins/m2m/m2m.dll \
- 	../../plugins/mate/mate.dll \
- 	../../plugins/opsi/opsi.dll \
-+	../../plugins/p25/p25cai.dll \
- 	../../plugins/pcli/pcli.dll \
- 	../../plugins/rlm/rlm.dll \
- 	../../plugins/rtnet/rtnet.dll \
-Index: packaging/nsis/wireshark.nsi
-===================================================================
---- packaging/nsis/wireshark.nsi	(revision 25150)
-+++ packaging/nsis/wireshark.nsi	(working copy)
-@@ -757,6 +757,7 @@
- File "..\..\plugins\lwres\lwres.dll"
- File "..\..\plugins\m2m\m2m.dll"
- File "..\..\plugins\opsi\opsi.dll"
-+File "..\..\plugins\p25\p25cai.dll"
- File "..\..\plugins\pcli\pcli.dll"
- File "..\..\plugins\profinet\profinet.dll"
- File "..\..\plugins\rlm\rlm.dll"
+% cd ..
+% patch -p1 <../op25/wireshark/patches/wireshark-1.2.2.patch 
+
+Update the build tree with these changes and compile:
+
+% ./autogen.sh 
+% ./configure
+% make
