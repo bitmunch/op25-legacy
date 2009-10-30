@@ -95,7 +95,7 @@ sniffer_du_handler::handle(data_unit_sptr du)
       uint8_t tap[tap_sz];
       memset(&tap[0], 0x00, 6);
       memset(&tap[6], 0x00, 6);
-      memset(&tap[12], 0x00, 2);
+      memset(&tap[12], 0xff, 2);
       du->decode_frame(du_sz, &tap[tap_hdr_sz]);
       write(d_tap, tap, tap_sz);
    }

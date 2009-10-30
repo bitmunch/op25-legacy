@@ -52,9 +52,8 @@ void
 op25_decoder_ff::forecast(int nof_output_items, gr_vector_int &nof_input_items_reqd)
 {
    /* This block consumes 4800 symbols/s and produces 8000
-    * samples/s. That's a sampling rate of 3/5 or 0.6. If no output is
-    * available we'll produce silence so it should be ok to stick with
-    * this.
+    * samples/s. That's a work rate of 3/5 or 0.6. If no audio output
+    * is available we'll produce silence.
     */
    const size_t nof_inputs = nof_input_items_reqd.size();
    const int nof_samples_reqd = .6 * nof_output_items;
