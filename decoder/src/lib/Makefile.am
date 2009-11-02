@@ -83,8 +83,7 @@ _op25_la_SOURCES = \
 	vc55_imbe_decoder.cc \
 	value_string.cc \
 	golay.cc \
-	hamming.cc \
-	imbe_frame.cc
+	hamming.cc
 
 # magic flags
 _op25_la_LDFLAGS = $(NO_UNDEFINED) -module -avoid-version
