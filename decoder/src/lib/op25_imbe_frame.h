@@ -5,8 +5,8 @@
 #include <stdint.h>
 #include <vector>
 #include <yank.h>
-#include <golay.h>
-#include <hamming.h>
+#include <op25_golay.h>
+#include <op25_hamming.h>
 
 typedef std::vector<bool> voice_codeword;
 typedef const std::vector<bool> const_bit_vector;
@@ -14,8 +14,7 @@ typedef std::vector<bool> bit_vector;
 
 static const size_t nof_voice_codewords = 9, voice_codeword_sz = 144;
 
-#if 0
-static const imbe_ldu_NID_bits[] = {
+static const uint16_t imbe_ldu_NID_bits[] = {
    48,   49,   50,   51,   52,   53,   54,   55,   56,   57,   58,   59,
    60,   61,   62,   63,   64,   65,   66,   67,   68,   69,   72,   73,
    74,   75,   76,   77,   78,   79,   80,   81,   82,   83,   84,   85,
@@ -23,13 +22,25 @@ static const imbe_ldu_NID_bits[] = {
    98,   99,  100,  101,  102,  103,  104,  105,  106,  107,  108,  109,
   110,  111,  112,  113 };
 
-static const imbe_ldu_status_bits[] = {
+static const uint16_t imbe_ldu_status_bits[] = {
    70,   71,  142,  143,  214,  215,  286,  287,  358,  359,  430,  431,
   502,  503,  574,  575,  646,  647,  718,  719,  790,  791,  862,  863,
   934,  935, 1006, 1007, 1078, 1079, 1150, 1151, 1222, 1223, 1294, 1295,
  1366, 1367, 1438, 1439, 1510, 1511, 1582, 1583, 1654, 1655, 1726, 1727 };
 
-static const imbe_ldu_ls_data_bits[] = {
+static const uint16_t imbe_ldu_lcf_bits[] = {
+ 410, 411, 412, 413, 414, 415, 420, 421,
+ 422, 423, 424, 425, 432, 433, 434, 435,
+ 436, 437, 442, 443, 444, 445, 446, 447,
+ 600, 601, 602, 603, 604, 605, 610, 611,
+ 612, 613, 614, 615, 620, 621, 622, 623,
+ 624, 625, 630, 631, 632, 633, 634, 635,
+ 788, 789, 792, 793, 794, 795, 800, 801,
+ 802, 803, 804, 805, 810, 811, 812, 813,
+ 814, 815, 820, 821, 822, 823, 824, 825 };
+
+// FIXME: separate these into their respective fields
+static const uint16_t imbe_ldu_ls_data_bits[] = {
   410,  411,  412,  413,  414,  415,  416,  417,  418,  419,  420,  421,
   422,  423,  424,  425,  426,  427,  428,  429,  432,  433,  434,  435,
   436,  437,  438,  439,  440,  441,  442,  443,  444,  445,  446,  447,
@@ -53,7 +64,6 @@ static const imbe_ldu_ls_data_bits[] = {
  1546, 1547, 1548, 1549, 1550, 1551, 1552, 1553, 1554, 1555, 1556, 1557,
  1558, 1559, 1560, 1561, 1562, 1563, 1564, 1565, 1566, 1567, 1568, 1569,
  1570, 1571, 1572, 1573, 1574, 1575, 1576, 1577 };
-#endif
 
 static const uint16_t voice_codeword_bits[nof_voice_codewords][voice_codeword_sz] = {
 
@@ -388,7 +398,7 @@ imbe_regenerate_frame(bit_vector& cw) {
         // PN/Hamming/Golay - etc.
         imbe_header_decode(cw, u0, u1, u2, u3, u4, u5, u6, u7, E0, ET) ;
 #if DEBUG
-	printf("u_0: %x\nu_1: %x\nu_2: %x\nu_3: %x\nu_4: %x\nu_5: %x\nu_6: %x\nu_7: %x\n\n", u0, u1, u2, u3, u4, u5, u6, u7>>1);
+	printf("u_0: %x\r\nu_1: %x\r\nu_2: %x\r\nu_3: %x\r\nu_4: %x\r\nu_5: %x\r\nu_6: %x\r\nu_7: %x\r\n\r\n", u0, u1, u2, u3, u4, u5, u6, u7>>1);
 #endif
         imbe_header_encode(cw, u0, u1, u2, u3, u4, u5, u6, u7);
 }

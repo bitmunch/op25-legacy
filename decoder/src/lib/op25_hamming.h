@@ -1,6 +1,16 @@
-#include "hamming.h"
+#ifndef INCLUDED_OP25_HAMMING_H
+#define INCLUDED_OP25_HAMMING_H
 
-uint16_t
+#include <cstddef>
+#include <stdint.h>
+
+/*
+ * APCO Hamming(15,11,3) ecoder.
+ *
+ * \param val The 11-bit value to encode.
+ * \return The encoded codeword.
+ */
+static inline uint16_t
 hamming_15_encode(uint16_t code_word_in)
 {
    static long int encoding[11] = {
@@ -17,7 +27,13 @@ hamming_15_encode(uint16_t code_word_in)
    return code_word_out;
 }
 
-size_t
+/*
+ * APCO Hamming(15,11,3) decoder.
+ *
+ * \param cw The 15-bit codeword to decode.
+ * \return The number of errors detected.
+ */
+static inline size_t
 hamming_15_decode(uint16_t& cw)
 {
    static const int encoding[2048] = {
@@ -166,3 +182,5 @@ hamming_15_decode(uint16_t& cw)
    }
    return errs;
 }
+
+#endif /* INCLUDED_OP25_HAMMING_H */

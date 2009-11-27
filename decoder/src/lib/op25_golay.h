@@ -1,6 +1,10 @@
-#include "golay.h"
+#ifndef INCLUDED_OP25_GOLAY_H
+#define INCLUDED_OP25_GOLAY_H
 
-uint32_t
+#include <cstddef>
+#include <stdint.h>
+
+static inline uint32_t
 golay_24_encode(uint32_t code_word_in)
 {
    static const uint32_t encoding[12] = {
@@ -28,13 +32,19 @@ golay_24_encode(uint32_t code_word_in)
 	return(code_word_out);
 }
 
-uint32_t
+/* APCO Golay(23,11,7) ecoder.
+ *
+ * \param val The 12-bit value to encode.
+ * \return The encoded codeword.
+ */
+
+static inline uint32_t
 golay_23_encode(uint32_t code_word_in)
 {
 	return golay_24_encode(code_word_in) >> 1;
 }
 
-uint32_t
+static inline uint32_t
 golay_23_syndrome(uint32_t pattern)
 {
    uint32_t aux = 0x400000;
@@ -46,8 +56,13 @@ golay_23_syndrome(uint32_t pattern)
    }
    return  pattern;
 }
+/* APCO Golay(23,11,7) decoder.
+ *
+ * \param cw The 23-bit codeword to decode.
+ * \return The number of errors detected.
+ */
 
-size_t
+static inline size_t
 golay_23_decode(uint32_t& cw)
 {
    static const uint32_t decoding[2048] = {
@@ -187,3 +202,5 @@ golay_23_decode(uint32_t& cw)
    cw >>= 11;
    return correction & 3;
 }
+
+#endif /* INCLUDED_OP25_GOLAY_H */

@@ -23,7 +23,7 @@
 
 #include <sstream>
 #include <voice_data_unit.h>
-#include <imbe_frame.h>
+#include <op25_imbe_frame.h>
 
 using namespace std;
 

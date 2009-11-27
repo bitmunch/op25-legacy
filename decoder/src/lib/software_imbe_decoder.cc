@@ -23,13 +23,13 @@
 
 #include <software_imbe_decoder.h>
 #include <yank.h>
-#include <imbe_frame.h>
+#include <op25_imbe_frame.h>
 
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
-#include <golay.h>
-#include <hamming.h>
+#include <op25_golay.h>
+#include <op25_hamming.h>
 #include <stdint.h>
 #include <unistd.h>
 #include <fcntl.h>
