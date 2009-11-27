@@ -102,7 +102,8 @@ grinclude_HEADERS = \
 	op25_p25_frame.h	\
 	op25_imbe_frame.h	\
 	op25_golay.h		\
-	op25_hamming.h
+	op25_hamming.h		\
+	op25_yank.h
 
 # These swig headers get installed in ${prefix}/include/gnuradio/swig
 swiginclude_HEADERS = \

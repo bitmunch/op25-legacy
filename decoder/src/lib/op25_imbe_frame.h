@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <stdint.h>
 #include <vector>
-#include <yank.h>
+#include <op25_yank.h>
 #include <op25_golay.h>
 #include <op25_hamming.h>
 

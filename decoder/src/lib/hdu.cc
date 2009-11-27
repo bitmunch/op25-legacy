@@ -28,7 +28,7 @@
 #include <itpp/comm/reedsolomon.h>
 #include <sstream>
 #include <value_string.h>
-#include <yank.h>
+#include <op25_yank.h>
 
 using namespace std;
 

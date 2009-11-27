@@ -24,7 +24,7 @@
 #include <cstdio>
 #include <offline_imbe_decoder.h>
 #include <stdint.h>
-#include <yank.h>
+#include <op25_yank.h>
 
 using namespace std;
 

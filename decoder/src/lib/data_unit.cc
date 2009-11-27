@@ -28,7 +28,7 @@
 #include <pdu.h>
 #include <tdu.h>
 #include <tsbk.h>
-#include <yank.h>
+#include <op25_yank.h>
 
 using namespace std;
 

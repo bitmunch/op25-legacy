@@ -22,7 +22,7 @@
  */
 
 #include <software_imbe_decoder.h>
-#include <yank.h>
+#include <op25_yank.h>
 #include <op25_imbe_frame.h>
 
 #include <algorithm>

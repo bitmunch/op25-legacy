@@ -32,7 +32,7 @@
 #include <sys/types.h>
 #include <termios.h>
 #include <vc55_imbe_decoder.h>
-#include <yank.h>
+#include <op25_yank.h>
 
 using namespace std;
 

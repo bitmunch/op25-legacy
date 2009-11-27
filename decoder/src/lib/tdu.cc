@@ -24,7 +24,7 @@
 #include <itpp/base/vec.h>
 #include <itpp/comm/reedsolomon.h>
 #include <tdu.h>
-#include <yank.h>
+#include <op25_yank.h>
 
 using std::string;
 

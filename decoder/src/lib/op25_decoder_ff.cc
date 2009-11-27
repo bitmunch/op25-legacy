@@ -34,7 +34,7 @@
 #include <op25_decoder_ff.h>
 #include <snapshot_du_handler.h>
 #include <voice_du_handler.h>
-#include <yank.h>
+#include <op25_yank.h>
 
 using namespace std;
 
