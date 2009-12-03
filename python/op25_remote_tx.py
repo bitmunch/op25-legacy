@@ -43,11 +43,17 @@ class app_top_block(gr.top_block):
         self.audio_amps = []
         self.converters = []
         self.vocoders = []
+        self.output_files = []
 
         input_audio_rate = 8000
         self.audio_input = audio.source(input_audio_rate, options.audio_input)
 
         for i in range (options.nchannels):
+            udp_port = options.udp_port + i
+            if options.output_files:
+                t = gr.file_sink(gr.sizeof_char, "baseband-%d.dat" % i)
+                self.output_files.append(t)
+                udp_port = 0
             t = gr.multiply_const_ff(32767 * options.audio_gain)
             self.audio_amps.append(t)
             t = gr.float_to_short()
@@ -56,18 +62,21 @@ class app_top_block(gr.top_block):
                                   options.verbose,      # Verbose flag
                                   options.stretch,      # flex amount
                                   options.udp_addr,     # udp ip address
-                                  options.udp_port + i, # udp port
+                                  udp_port,             # udp port or zero
                                   False)                # dump raw u vectors
             self.vocoders.append(t)
 
         for i in range (options.nchannels):
             self.connect((self.audio_input, i), self.audio_amps[i], self.converters[i], self.vocoders[i])
+            if options.output_files:
+                self.connect(self.vocoders[i], self.output_files[i])
 
 def main():
     parser = OptionParser(option_class=eng_option)
     parser.add_option("-a", "--udp-addr", type="string", default="127.0.0.1", help="destination host IP address")
     parser.add_option("-g", "--audio-gain", type="eng_float", default=1.0, help="gain factor")
     parser.add_option("-n", "--nchannels", type="int", default=2, help="number of audio channels")
+    parser.add_option("-o", "--output-files", action="store_true", default=False, help="write P25 symbols to output files instead of UDP")
     parser.add_option("-p", "--udp-port", type="int", default=2525, help="destination host port")
     parser.add_option("-v", "--verbose", action="store_true", default=False, help="dump demodulation data")
     parser.add_option("-I", "--audio-input", type="string", default="", help="pcm input device name.  E.g., hw:0,0 or /dev/dsp")
