@@ -29,7 +29,7 @@ you should start this program beforehand, to start the data flow.
 
 """
 
-import math
+import time
 from gnuradio import gr, gru, audio, eng_notation, blks2, optfir
 from gnuradio.eng_option import eng_option
 from optparse import OptionParser
@@ -80,6 +80,7 @@ def main():
     try:
         tb.start()
         while 1:
+            time.sleep(1)
             if not queue.empty_p():
                 sys.stderr.write("main: q.delete_head()\n")
                 msg = queue.delete_head()
