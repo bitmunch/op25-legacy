@@ -1885,13 +1885,14 @@ proto_reg_handoff_p25cai(void)
 		 *  returns the number of bytes it dissected (or 0 if it thinks the packet
 		 *  does not belong to APCO Project 25 Common Air Interface).
 		 */
-		p25cai_handle = new_create_dissector_handle(dissect_p25cai,	proto_p25cai);
-		/* FIXME: Temporarily using a reserved ethertype!  This is a
-		 * development shortcut that should be corrected later.  Perhaps we
+		p25cai_handle = new_create_dissector_handle(dissect_p25cai, proto_p25cai);
+		/* FIXME: Temporarily using a reserved ethertype and UDP port!  This is
+		 * a development shortcut that should be corrected later.  Perhaps we
 		 * will apply for a libpcap data link type or use other mechanisms in
 		 * the future.  Also, we can always use "decode as" in Wireshark.
 		 */
 		dissector_add("ethertype", 0xFFFF, p25cai_handle);
+		dissector_add("udp.port", 23456, p25cai_handle);
 
 		inited = TRUE;
 	}
