@@ -22,6 +22,7 @@
  */
 
 #include <cstring>
+#include <cstdio>
 #include <fcntl.h>
 #include <linux/if_tun.h>
 #include <net/if.h>

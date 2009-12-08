@@ -24,6 +24,7 @@
 #ifndef INCLUDED_VALUE_STRING
 #define INCLUDED_VALUE_STRING
 
+#include <stdint.h>
 #include <string>
 
 /*
