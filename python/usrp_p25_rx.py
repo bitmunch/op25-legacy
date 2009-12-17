@@ -27,12 +27,19 @@ import wx
 import wx.html
 import wx.wizard
 
-from gnuradio import audio, eng_notation, fsk4, gr, gru, op25
+from gnuradio import audio, eng_notation, gr, gru
 from gnuradio.eng_option import eng_option
 from gnuradio.wxgui import stdgui2, fftsink2, scopesink2
 from math import pi
 from optparse import OptionParser
 from usrpm import usrp_dbid
+
+# Python is doing strange things to our packages
+# So we try to handle it here
+try:
+    from gnuradio import fsk4, op25
+except Exception:
+    import fsk4, op25
 
 # The P25 receiver
 #
