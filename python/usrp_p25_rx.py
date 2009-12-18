@@ -36,6 +36,7 @@ from usrpm import usrp_dbid
 
 # Python is doing strange things to our packages
 # So we try to handle it here
+
 try:
     from gnuradio import fsk4, op25
 except Exception:
@@ -79,6 +80,7 @@ class p25_rx_block (stdgui2.std_top_block):
         parser.add_option("-w", "--wait", action="store_true", default=False, help="block on startup")
         parser.add_option("-R", "--rx-subdev-spec", type="subdev", default=(0, 0), help="select USRP Rx side A or B (default=A)")
         parser.add_option("-g", "--gain", type="eng_float", default=None, help="set USRP gain in dB (default is midpoint)")
+	parser.add_option("-t", "--transient", action="store_true", default=False, help="enable transient captures")
         (options, args) = parser.parse_args()
         if len(args) != 0:
             parser.print_help()
@@ -94,9 +96,12 @@ class p25_rx_block (stdgui2.std_top_block):
             self.open_file(options.input)
         elif options.frequency:
             self._set_state("CAPTURING")
-            self.open_usrp(options.rx_subdev_spec, options.decim, options.gain, options.frequency, True)
+            self.open_usrp(options.rx_subdev_spec, options.decim, options.gain, options.frequency, options.transient)
         else:
             self._set_state("STOPPED")
+
+        # save cmd-line options
+        self.options = options
 
     # setup common flow graph elements
     #
@@ -407,7 +412,7 @@ class p25_rx_block (stdgui2.std_top_block):
         self.stop()
         self.wait()
         # ToDo: get open_usrp() arguments from wizard
-        self.open_usrp((0,0), 256, None, 434.08e06, True)  # Test freq
+        self.open_usrp(self.options.rx_subdev_spec, self.options.decim, self.options.gain, self.options.frequency, not self.options.transient)
         self.start()
 
     # Open an existing capture
