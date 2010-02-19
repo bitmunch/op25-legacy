@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from gnuradio import gr, gru, blks
+from gnuradio import gr, gru, blks2
 from gnuradio.eng_option import eng_option
 from optparse import OptionParser
 
@@ -10,9 +10,9 @@ input: complex sample captured by USRP
 output: real baseband sample at 48 ksps
 """
 
-class app_flow_graph(gr.flow_graph):
+class my_top_block(gr.top_block):
 	def __init__(self, options):
-		gr.flow_graph.__init__(self)
+		gr.top_block.__init__(self)
 
 		bandwidth = 12.5e3
 		symbol_rate = 4800
@@ -34,7 +34,7 @@ class app_flow_graph(gr.flow_graph):
 				bandwidth/2,
 				gr.firdes.WIN_HANN)
 		ddc =  gr.freq_xlating_fir_filter_ccf (1,ddc_coeffs,-options.frequency,options.sample_rate)
-		resampler = blks.rational_resampler_ccc(self, intrp, decim)
+		resampler = blks2.rational_resampler_ccc(intrp, decim, None, None)
 		qdemod = gr.quadrature_demod_cf(1.0)
 
 		if options.output_file == '-':
@@ -59,9 +59,9 @@ def main():
 
 	(options, args) = parser.parse_args()
 
-	fg = app_flow_graph(options)
+	tb = my_top_block(options)
 	try:
-		fg.run()
+		tb.run()
 	except KeyboardInterrupt:
 		pass
 
