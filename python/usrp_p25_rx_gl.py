@@ -21,8 +21,9 @@
 # Software Foundation, Inc., 51 Franklin Street, Boston, MA
 # 02110-1301, USA.
 
+import cPickle
+import common
 import os
-import pickle
 import sys
 import threading
 import wx
@@ -36,13 +37,14 @@ from math import pi
 from optparse import OptionParser
 from usrpm import usrp_dbid
 
-# Python is doing strange things to our packages
-# So we try to handle it here
-
+# Python is putting the packages in some strange places
+# This is a workaround until we figure out WTF is going on
 try:
     from gnuradio import fsk4, op25
 except Exception:
     import fsk4, op25
+
+non_GL = False
 
 # The P25 receiver
 #
@@ -76,13 +78,14 @@ class p25_rx_block (stdgui2.std_top_block):
 
         # command line argument parsing
         parser = OptionParser(option_class=eng_option)
-        parser.add_option("-R", "--rx-subdev-spec", type="subdev", default=(1, 0), help="select USRP Rx side A or B")
+        parser.add_option("-R", "--rx-subdev-spec", type="subdev", default=(0, 0), help="select USRP Rx side A or B")
         parser.add_option("-d", "--decim", type="int", default=256, help="source decimation factor")
+#        parser.add_option("-f", "--frequency", type="eng_float", default=434.075e6, help="USRP center frequency", metavar="Hz")
         parser.add_option("-f", "--frequency", type="eng_float", default=None, help="USRP center frequency", metavar="Hz")
         parser.add_option("-g", "--gain", type="eng_float", default=None, help="set USRP gain in dB (default is midpoint)")
         parser.add_option("-i", "--input", default=None, help="input file name")
         parser.add_option("-w", "--wait", action="store_true", default=False, help="block on startup")
-	parser.add_option("-t", "--transient", action="store_true", default=False, help="enable transient captures")
+        parser.add_option("-t", "--transient", action="store_true", default=False, help="enable transient capture mode")
         (options, args) = parser.parse_args()
         if len(args) != 0:
             parser.print_help()
@@ -98,8 +101,7 @@ class p25_rx_block (stdgui2.std_top_block):
         if options.input:
             self.open_file(options.input)
         elif options.frequency:
-            self._set_state("CAPTURING")
-            self.open_usrp(options.rx_subdev_spec, options.decim, options.gain, options.frequency, not options.transient)
+            self.open_usrp(self.options.rx_subdev_spec, self.options.decim, self.options.gain, self.options.frequency, not options.transient)
         else:
             self._set_state("STOPPED")
 
@@ -119,7 +121,7 @@ class p25_rx_block (stdgui2.std_top_block):
         trans_centre = trans_width + (trans_width / 2)
         coeffs = gr.firdes.low_pass(1.0, capture_rate, trans_centre, trans_width, gr.firdes.WIN_HANN)
         self.channel_filter = gr.freq_xlating_fir_filter_ccf(channel_decim, coeffs, 0.0, capture_rate)
-        self.set_channel_offset(0.0, 0, self.spectrum.win._units)
+        self.set_channel_offset(0.0)
         # power squelch
         squelch_db = 0
         self.squelch = gr.pwr_squelch_cc(squelch_db, 1e-3, 0, True)
@@ -231,6 +233,8 @@ class p25_rx_block (stdgui2.std_top_block):
             toolbar_new = self.toolbar.AddSimpleTool(wx.ID_NEW, new_icon, "New Capture")
             open_icon = wx.ArtProvider.GetBitmap(wx.ART_FILE_OPEN, wx.ART_TOOLBAR, icon_size)
             toolbar_open = self.toolbar.AddSimpleTool(wx.ID_OPEN, open_icon, "Open")
+##            open_icon = wx.ArtProvider.GetBitmap(wx.ART_FILE_CLOSE, wx.ART_TOOLBAR, icon_size)
+##            toolbar_open = self.toolbar.AddSimpleTool(wx.ID_CLOSE, open_icon, "Open")
             #
             # self.toolbar.AddSeparator()
             # self.gain_control = wx.Slider(self.toolbar, 100, 50, 1, 100, style=wx.SL_HORIZONTAL)
@@ -246,20 +250,18 @@ class p25_rx_block (stdgui2.std_top_block):
         self.vbox.Add(self.notebook, 1, wx.EXPAND)     
         # add spectrum scope
         self.spectrum = fftsink2.fft_sink_c(self.notebook, fft_size=512, average=True, peak_hold=True)
-        self.spectrum_plotter = self.spectrum.win.plot
-##        self.spectrum_plotter = self.spectrum.win.plotter # opengl
+        self.spectrum_plotter = self.spectrum.win.plotter
+        self.spectrum_plotter.enable_point_label(False)
         self.spectrum_plotter.Bind(wx.EVT_LEFT_DOWN, self._on_spectrum_left_click)
         self.notebook.AddPage(self.spectrum.win, "RF Spectrum")
         # add C4FM scope
         self.signal_scope = scopesink2.scope_sink_f(self.notebook, sample_rate = self.channel_rate, v_scale=5, t_scale=0.001)
-        self.signal_plotter = self.signal_scope.win.graph
-##        self.signal_plotter = self.signal_scope.win
+        self.signal_scope.win.plotter.enable_point_label(False)
         self.notebook.AddPage(self.signal_scope.win, "C4FM Signal")
         # add symbol scope
         self.symbol_scope = scopesink2.scope_sink_f(self.notebook, frame_decim=1, sample_rate=self.symbol_rate, v_scale=1, t_scale=0.05)
-        self.symbol_plotter = self.symbol_scope.win.graph
-##        self.symbol_plotter = self.symbol_scope.win
-        self.symbol_scope.win.set_format_plus()
+        self.symbol_scope.win.plotter.enable_point_label(False)
+##        self.symbol_plotter.set_format_plus()
         self.notebook.AddPage(self.symbol_scope.win, "Demodulated Symbols")
         # Traffic snapshot
         self.traffic = TrafficPane(self.notebook)
@@ -273,9 +275,8 @@ class p25_rx_block (stdgui2.std_top_block):
     # read capture file properties (decimation etc.)
     #
     def __read_file_properties(self, filename):
-        f = open(filename, "r")
-        self.info = pickle.load(f)
-        ToDo = True
+        f = open(filename, "rb")
+        self.info = cPickle.load(f)
         f.close()
 
     # setup to rx from file
@@ -336,9 +337,12 @@ class p25_rx_block (stdgui2.std_top_block):
             # Visually reflect "no file"
             self.frame.SetStatusText("", 1)
             self.frame.SetStatusText("", 2)
-            self.spectrum_plotter.Clear()
-            self.signal_plotter.Clear()
-            self.symbol_plotter.Clear()
+##            self.spectrum_plotter.Clear()
+            self.spectrum.win.ClearBackground()
+##            self.signal_plotter.Clear()
+            self.signal_scope.win.ClearBackground()
+##            self.symbol_plotter.Clear()
+            self.symbol_scope.win.ClearBackground()
             self.traffic.clear()
         elif "RUNNING" == self.state:
             # menu items
@@ -371,7 +375,7 @@ class p25_rx_block (stdgui2.std_top_block):
     #
     def __write_file_properties(self, filename):
         f = open(filename, "w")
-        pickle.dump(self.info, f)
+        cPickle.dump(self.info, f)
         f.close()
 
     # Adjust the channel offset
@@ -419,7 +423,7 @@ class p25_rx_block (stdgui2.std_top_block):
         self.stop()
         self.wait()
         # ToDo: get open_usrp() arguments from wizard
-        self.open_usrp(self.options.rx_subdev_spec, self.options.decim, self.options.gain, self.options.frequency, not self.options.transient)
+        self.open_usrp(self.options.rx_subdev_spec, self.options.decim, self.options.gain, self.options.frequency, not options.transient)
         self.start()
 
     # Open an existing capture
@@ -484,26 +488,30 @@ class p25_rx_block (stdgui2.std_top_block):
     # Set channel offset and RF squelch threshold
     #
     def _on_spectrum_left_click(self, event):
+        # get mouse pos
+        x,y = event.GetPosition()
+        if x < self.spectrum_plotter.padding_left or x > self.spectrum_plotter.width-self.spectrum_plotter.padding_right: 
+            return
+        if y < self.spectrum_plotter.padding_top or y > self.spectrum_plotter.height-self.spectrum_plotter.padding_bottom:
+            return
+        #scale to window bounds
+        x_win_scalar = float(x - self.spectrum_plotter.padding_left) / (self.spectrum_plotter.width-self.spectrum_plotter.padding_left-self.spectrum_plotter.padding_right)
+        y_win_scalar = float((self.spectrum_plotter.height - y) - self.spectrum_plotter.padding_bottom) / (self.spectrum_plotter.height-self.spectrum_plotter.padding_top-self.spectrum_plotter.padding_bottom)
+        #scale to grid bounds
+        x_val = x_win_scalar*(self.spectrum_plotter.x_max-self.spectrum_plotter.x_min) + self.spectrum_plotter.x_min
+        y_val = y_win_scalar*(self.spectrum_plotter.y_max-self.spectrum_plotter.y_min) + self.spectrum_plotter.y_min
+
         if "STOPPED" != self.state:
             # set frequency
-            x,y = self.spectrum_plotter.GetXY(event)
-            xmin, xmax = self.spectrum_plotter.GetXCurrentRange()
-            x = min(x, xmax)
-            x = max(x, xmin)
-            scale_factor = self.spectrum.win._scale_factor
             chan_width = 6.25e3
-            x /= scale_factor
-            x += chan_width / 2
-            x  = (x // chan_width) * chan_width
-            self.set_channel_offset(x, scale_factor, self.spectrum.win._units)
+            x_val += chan_width / 2
+            x_val  = (x_val // chan_width) * chan_width
+            self.set_channel_offset(x_val)
             # set squelch threshold
-            ymin, ymax = self.spectrum_plotter.GetYCurrentRange()
-            y = min(y, ymax)
-            y = max(y, ymin)
             squelch_increment = 5
-            y += squelch_increment / 2
-            y = (y // squelch_increment) * squelch_increment
-            self.set_squelch_threshold(int(y))
+            y_val += squelch_increment / 2
+            y_val = (y_val // squelch_increment) * squelch_increment
+            self.set_squelch_threshold(int(y_val))
 
     # Open an existing capture file
     #
@@ -534,16 +542,17 @@ class p25_rx_block (stdgui2.std_top_block):
 
     # Set the channel offset
     #
-    def set_channel_offset(self, offset_hz, scale, units):
+    def set_channel_offset(self, offset_hz):
         self.channel_offset = -offset_hz
         self.channel_filter.set_center_freq(self.channel_offset)
-        self.frame.SetStatusText("Channel offset: " + str(offset_hz * scale) + units, 1)
+        self.frame.SetStatusText("%s: %s"%(self.spectrum_plotter.x_label, common.eng_format(offset_hz, self.spectrum_plotter.x_units)), 1)
+
 
     # Set the RF squelch threshold level
     #
     def set_squelch_threshold(self, squelch_db):
         self.squelch.set_threshold(squelch_db)
-        self.frame.SetStatusText("Squelch: " + str(squelch_db) + "dB", 2)
+        self.frame.SetStatusText("%s: %s"%(self.spectrum_plotter.y_label, common.eng_format(squelch_db, self.spectrum_plotter.y_units)), 2)
 
 
 # A snapshot of important fields in current traffic
@@ -581,12 +590,6 @@ class TrafficPane(wx.Panel):
         field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
         sizer.Add(field, pos=(4,2))
         self.fields["dest"] = field;
-
-#        label = wx.StaticText(self, -1, "ToDo:")
-#        sizer.Add(label, pos=(5,1))
-#        field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
-#        sizer.Add(field, pos=(5,2))
-#        self.fields["nid"] = field;
 
         label = wx.StaticText(self, -1, "MFID:")
         sizer.Add(label, pos=(1,4))
@@ -715,8 +718,16 @@ class decode_watcher(threading.Thread):
         while(self.keep_running):
             msg = self.msgq.delete_head()
             pickled_dict = msg.to_string()
-            attrs = pickle.loads(pickled_dict)
+            attrs = cPickle.loads(pickled_dict)
             self.traffic_pane.update(attrs)
+
+
+# debug info
+#
+def info(object, spacing=10):
+    methods = [method for method in dir(object) if callable(getattr(object, method))]
+    f = (lambda s: " ".join(s.split()))
+    print "\n".join(["%s %s" % (method.ljust(spacing), f(str(getattr(object, method).__doc__))) for method in methods])
 
 
 # Start the receiver
