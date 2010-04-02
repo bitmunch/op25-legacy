@@ -47,9 +47,21 @@ pdu::do_correct_errors(bit_vector& frame_body)
 uint16_t
 pdu::frame_size_max() const
 {
-  const size_t HEADER_BLOCK_SIZE = 312;
-
-  // ToDo: decide how do to get header fields when block is not yet complete
-
+#if 1
+  const size_t HEADER_BLOCK_SIZE = 720;
   return HEADER_BLOCK_SIZE;
+#else
+  const size_t MIN_HEADER_BLOCK_SZ = 312;
+  // after HEADER_BLOCK_SIZE bits have been read we can then use the
+  // header contents to decide on frame_size_max
+
+  size_t n = MIN_HEADER_BLOCK_SZ;
+  if(n < ) {
+     static const size_t BITS[] = {};
+     static const size_t BITS_SZ = sizeof(BITS) / sizeof(BITS[0]);
+     n = extract();
+  }
+  return n;
+
+#endif
 }

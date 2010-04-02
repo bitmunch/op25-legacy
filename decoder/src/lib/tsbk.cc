@@ -43,5 +43,10 @@ tsbk::duid_str() const
 uint16_t
 tsbk::frame_size_max() const
 {
-   return 350;
+#if 1
+   return 720
+#else
+   // todo: check this out!
+   return 358;
+#endif
 }
