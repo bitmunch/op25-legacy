@@ -44,7 +44,7 @@ uint16_t
 tsbk::frame_size_max() const
 {
 #if 1
-   return 720
+   return 720;
 #else
    // todo: check this out!
    return 358;
