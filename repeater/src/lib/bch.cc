@@ -2,7 +2,9 @@
 #include <stdio.h>
 #include <vector>
 #include <bch.h>
-
+/*
+ * Copyright 2010, KA1RBI 
+ */
 static const int bchGFexp[64] = {
 	1, 2, 4, 8, 16, 32, 3, 6, 12, 24, 48, 35, 5, 10, 20, 40,
 	19, 38, 15, 30, 60, 59, 53, 41, 17, 34, 7, 14, 28, 56, 51, 37,
