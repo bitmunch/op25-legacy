@@ -46,6 +46,36 @@ except Exception:
 
 non_GL = False
 
+# This stuff is from common.py
+#
+def eng_format(num, units=''):
+        coeff, exp, prefix = get_si_components(num)
+        if -3 <= exp < 3: return '%g'%num
+        return '%g%s%s%s'%(coeff, units and ' ' or '', prefix, units)
+
+def get_si_components(num):
+        num = float(num)
+        exp = get_exp(num)
+        exp -= exp%3
+        exp = min(max(exp, -24), 24)
+        prefix = {
+                24: 'Y', 21: 'Z',
+                18: 'E', 15: 'P',
+                12: 'T', 9: 'G',
+                6: 'M', 3: 'k',
+                0: '',
+                -3: 'm', -6: 'u',
+                -9: 'n', -12: 'p',
+                -15: 'f', -18: 'a',
+                -21: 'z', -24: 'y',
+        }[exp]
+        coeff = num/10**exp
+        return coeff, exp, prefix
+
+def get_exp(num):
+        if num==0: return 0
+        return int(math.floor(math.log10(abs(num))))
+
 # The P25 receiver
 #
 class p25_rx_block (stdgui2.std_top_block):
@@ -540,19 +570,20 @@ class p25_rx_block (stdgui2.std_top_block):
         except Exception, x:
             wx.MessageBox("Cannot open USRP: " + x.message, "USRP Error", wx.CANCEL | wx.ICON_EXCLAMATION)
 
+  
     # Set the channel offset
     #
     def set_channel_offset(self, offset_hz):
         self.channel_offset = -offset_hz
         self.channel_filter.set_center_freq(self.channel_offset)
-        self.frame.SetStatusText("%s: %s"%(self.spectrum_plotter.x_label, self.eng_format(offset_hz, self.spectrum_plotter.x_units)), 1)
+        self.frame.SetStatusText("%s: %s"%(self.spectrum_plotter.x_label, eng_format(offset_hz, self.spectrum_plotter.x_units)), 1)
 
 
     # Set the RF squelch threshold level
     #
     def set_squelch_threshold(self, squelch_db):
         self.squelch.set_threshold(squelch_db)
-        self.frame.SetStatusText("%s: %s"%(self.spectrum_plotter.y_label, self.eng_format(squelch_db, self.spectrum_plotter.y_units)), 2)
+        self.frame.SetStatusText("%s: %s"%(self.spectrum_plotter.y_label, eng_format(squelch_db, self.spectrum_plotter.y_units)), 2)
 
 
 # A snapshot of important fields in current traffic
@@ -728,36 +759,6 @@ def info(object, spacing=10):
     methods = [method for method in dir(object) if callable(getattr(object, method))]
     f = (lambda s: " ".join(s.split()))
     print "\n".join(["%s %s" % (method.ljust(spacing), f(str(getattr(object, method).__doc__))) for method in methods])
-
-# This stuff is from common.py
-#
-def eng_format(num, units=''):
-	coeff, exp, prefix = get_si_components(num)
-	if -3 <= exp < 3: return '%g'%num
-	return '%g%s%s%s'%(coeff, units and ' ' or '', prefix, units)
-
-def get_si_components(num):
-	num = float(num)
-	exp = get_exp(num)
-	exp -= exp%3
-	exp = min(max(exp, -24), 24)
-	prefix = {
-		24: 'Y', 21: 'Z',
-		18: 'E', 15: 'P',
-		12: 'T', 9: 'G',
-		6: 'M', 3: 'k',
-		0: '',
-		-3: 'm', -6: 'u',
-		-9: 'n', -12: 'p',
-		-15: 'f', -18: 'a',
-		-21: 'z', -24: 'y',
-	}[exp]
-	coeff = num/10**exp
-	return coeff, exp, prefix
-
-def get_exp(num):
-	if num==0: return 0
-	return int(math.floor(math.log10(abs(num))))
 
 # Start the receiver
 #
