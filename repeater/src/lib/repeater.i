@@ -13,6 +13,7 @@
 #include "repeater_imbe_decode_fb.h"
 #include "repeater_pipe.h"
 #include "repeater_ctcss_squelch_ff.h"
+#include "repeater_gardner_symbol_recovery_cc.h"
 #include <stdexcept>
 %}
 
@@ -112,4 +113,16 @@ public:
   void set_level(float level) { d_level = level; }
   int len() const { return d_len; }
 
+};
+
+// ----------------------------------------------------------------
+
+GR_SWIG_BLOCK_MAGIC(repeater,gardner_symbol_recovery_cc);
+
+repeater_gardner_symbol_recovery_cc_sptr repeater_make_gardner_symbol_recovery_cc (int samples_per_symbol, float timing_error_gain);
+
+class repeater_gardner_symbol_recovery_cc : public gr_sync_block
+{
+ private:
+  repeater_gardner_symbol_recovery_cc (int samples_per_symbol, float timing_error_gain);
 };
