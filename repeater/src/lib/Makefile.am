@@ -67,6 +67,7 @@ _repeater_la_SOURCES = 	repeater\
 	repeater_ctcss_squelch_ff.cc	\
 	repeater_squelch_base_ff.cc	\
 	repeater_gardner_symbol_recovery_cc.cc	\
+	repeater_costas_loop_cc.cc	\
 	bch.cc
 
 # magic flags
@@ -88,6 +89,7 @@ grinclude_HEADERS =			\
 	repeater_imbe_decode_fb.h	\
 	repeater_pipe.h			\
 	repeater_gardner_symbol_recovery_cc.h	\
+	repeater_costas_loop_cc.h	\
 	repeater_ctcss_squelch_ff.h
 
 

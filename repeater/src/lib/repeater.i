@@ -14,6 +14,7 @@
 #include "repeater_pipe.h"
 #include "repeater_ctcss_squelch_ff.h"
 #include "repeater_gardner_symbol_recovery_cc.h"
+#include "repeater_costas_loop_cc.h"
 #include <stdexcept>
 %}
 
@@ -125,4 +126,29 @@ class repeater_gardner_symbol_recovery_cc : public gr_sync_block
 {
  private:
   repeater_gardner_symbol_recovery_cc (int samples_per_symbol, float timing_error_gain);
+};
+
+// ----------------------------------------------------------------
+
+GR_SWIG_BLOCK_MAGIC(repeater,costas_loop_cc);
+
+repeater_costas_loop_cc_sptr
+repeater_make_costas_loop_cc (float alpha, float beta, 
+			float max_freq, float min_freq,
+			int order
+			) throw (std::invalid_argument);
+
+
+class repeater_costas_loop_cc : public gr_sync_block
+{
+ private:
+  repeater_costas_loop_cc (float alpha, float beta,
+		     float max_freq, float min_freq, int order);
+
+ public:
+   void set_alpha(float alpha);
+   float alpha();
+   void set_beta(float beta);
+   float beta();
+   float freq();   
 };
