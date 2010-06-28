@@ -120,12 +120,12 @@ public:
 
 GR_SWIG_BLOCK_MAGIC(repeater,gardner_symbol_recovery_cc);
 
-repeater_gardner_symbol_recovery_cc_sptr repeater_make_gardner_symbol_recovery_cc (int samples_per_symbol, float timing_error_gain);
+repeater_gardner_symbol_recovery_cc_sptr repeater_make_gardner_symbol_recovery_cc (float samples_per_symbol, float timing_error_gain);
 
 class repeater_gardner_symbol_recovery_cc : public gr_sync_block
 {
  private:
-  repeater_gardner_symbol_recovery_cc (int samples_per_symbol, float timing_error_gain);
+  repeater_gardner_symbol_recovery_cc (float samples_per_symbol, float timing_error_gain);
 };
 
 // ----------------------------------------------------------------

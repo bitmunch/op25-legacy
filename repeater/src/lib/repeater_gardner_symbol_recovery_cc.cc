@@ -36,34 +36,38 @@
 #include <cstdio>
 #include <string.h>
 
-#define M_TWOPI (2*M_PI)
-
 // Public constructor
 
 repeater_gardner_symbol_recovery_cc_sptr 
-repeater_make_gardner_symbol_recovery_cc(int samples_per_symbol, float timing_error_gain)
+repeater_make_gardner_symbol_recovery_cc(float samples_per_symbol, float timing_error_gain)
 {
   return repeater_gardner_symbol_recovery_cc_sptr (new repeater_gardner_symbol_recovery_cc (samples_per_symbol, timing_error_gain));
 }
 
-repeater_gardner_symbol_recovery_cc::repeater_gardner_symbol_recovery_cc (int samples_per_symbol, float timing_error_gain)
+repeater_gardner_symbol_recovery_cc::repeater_gardner_symbol_recovery_cc (float samples_per_symbol, float timing_error_gain)
   : gr_block ("repeater_gardner_symbol_recovery_cc",
 	      gr_make_io_signature (1, 1, sizeof (gr_complex)),
-	      gr_make_io_signature (1, 2, sizeof (gr_complex))),
-	      d_last_sample(0), d_interp(new gri_mmse_fir_interpolator_cc()),
+	      gr_make_io_signature (1, 1, sizeof (gr_complex))),
+    d_mu(0),
+    d_gain_mu(timing_error_gain),
+    d_last_sample(0), d_interp(new gri_mmse_fir_interpolator_cc()),
     d_verbose(gr_prefs::singleton()->get_bool("repeater_gardner_symbol_recovery_cc", "verbose", false)),
-    d_dl_index(0),
-    d_samples_per_symbol(samples_per_symbol), d_timing_error_gain(timing_error_gain), 
-    d_timing_error(0)
+    d_dl_index(0)
 {
-  assert (d_samples_per_symbol >= 2);
-  assert ((d_samples_per_symbol & 1) == 0);   // sps must be even
-
-  d_half_sps = d_samples_per_symbol >> 1;
-  d_twice_sps = d_samples_per_symbol * 2;
-  set_relative_rate (1.0 / d_samples_per_symbol);
+  set_omega(samples_per_symbol);
+  d_gain_omega = 0.25 * d_gain_mu * d_gain_mu;	// FIXME: parameterize this
+  set_relative_rate (1.0 / d_omega);
   set_history(d_twice_sps);			// ensure extra input is available
   d_dl = new gr_complex[d_twice_sps*2];
+}
+
+void repeater_gardner_symbol_recovery_cc::set_omega (float omega) {
+    assert (omega >= 2.0);
+    d_omega = omega;
+    d_min_omega = omega*(1.0 - d_omega_rel);
+    d_max_omega = omega*(1.0 + d_omega_rel);
+    d_omega_mid = 0.5*(d_min_omega+d_max_omega);
+    d_twice_sps = 2 * (int) ceilf(d_omega);
 }
 
 repeater_gardner_symbol_recovery_cc::~repeater_gardner_symbol_recovery_cc ()
@@ -78,55 +82,7 @@ repeater_gardner_symbol_recovery_cc::forecast(int noutput_items, gr_vector_int &
   unsigned ninputs = ninput_items_required.size();
   for (unsigned i=0; i < ninputs; i++)
     ninput_items_required[i] =
-      (int) ceil((noutput_items * d_samples_per_symbol) + d_interp->ntaps());
-}
-
-// sample processing - includes slip by +/- 1 sample if error is excessive
-bool
-repeater_gardner_symbol_recovery_cc::input_sample0(gr_complex samp, gr_complex& outp) {
-	bool rc0=false, rc1=false;
-
-	if (d_timing_error >= 0.5) {
-		d_timing_error = -0.5;
-		return false;   // skip this samp
-	}
-	if (d_timing_error <= -0.5) {
-		d_timing_error =  0.5;
-		rc0 = input_sample(samp, outp);   // repeat this samp
-	}
-
-	rc1 = input_sample(samp, outp);
-	return rc0 | rc1;
-}
-
-// returns true if an output sample was generated and stored in outp
-bool
-repeater_gardner_symbol_recovery_cc::input_sample(gr_complex samp, gr_complex& outp) {
-	bool rc = false;
-
-	d_dl[d_dl_index] = samp;
-	d_dl[d_dl_index + d_twice_sps] = samp;
-	d_dl_index ++;
-	d_dl_index = d_dl_index % d_twice_sps;
-
-	if ((d_dl_index % d_samples_per_symbol) == 0) {
-		float mu = 0.5 + d_timing_error;
-		if (mu < 0.0) mu = 0.0;
-		if (mu > 1.0) mu = 1.0;
-		gr_complex interp_samp_mid = d_interp->interpolate(&d_dl[ d_dl_index ], mu);
-		gr_complex interp_samp = d_interp->interpolate(&d_dl[ d_dl_index + d_half_sps], mu);
-		outp = interp_samp;
-		float error_real = (d_last_sample.real() - interp_samp.real()) * interp_samp_mid.real();
-		float error_imag = (d_last_sample.imag() - interp_samp.imag()) * interp_samp_mid.imag();
-		d_last_sample = interp_samp;
-		float symbol_error = error_real + error_imag;
-		if (symbol_error < -1.0) symbol_error = -1.0;
-		if (symbol_error >  1.0) symbol_error =  1.0;
-		d_timing_error = d_timing_error + d_timing_error_gain * symbol_error;
-		// printf("%f\t%f\t%f\n", symbol_error, d_timing_error, mu);
-		rc = true;
-	}
-	return rc;
+      (int) ceil((noutput_items * d_omega) + d_interp->ntaps());
 }
 
 int
@@ -141,11 +97,51 @@ repeater_gardner_symbol_recovery_cc::general_work (int noutput_items,
   int i=0, o=0;
 
   while((o < noutput_items) && (i < ninput_items[0])) {
-     gr_complex interp_sample;
-     if(input_sample0(in[i++], interp_sample)) {
-      out[o++] = interp_sample;
-     }
+    while((d_mu > 1.0) && (i < ninput_items[0]))  {
+	d_mu --;
+
+	d_dl[d_dl_index] = in[i];
+	d_dl[d_dl_index + d_twice_sps] = in[i];
+	d_dl_index ++;
+	d_dl_index = d_dl_index % d_twice_sps;
+
+	i++;
+    }
+    
+    if(d_mu <= 1.0) {
+		float half_omega = d_omega / 2.0;
+		int half_sps = (int) floorf(half_omega);
+		float half_mu = d_mu + half_omega - (float) half_sps;
+		if (half_mu > 1.0) {
+			half_mu -= 1.0;
+			half_sps += 1;
+		}
+		// locate two points, separated by half of one symbol time
+		// interp_samp is (we hope) at the optimum sampling point 
+		gr_complex interp_samp_mid = d_interp->interpolate(&d_dl[ d_dl_index ], d_mu);
+		gr_complex interp_samp = d_interp->interpolate(&d_dl[ d_dl_index + half_sps], half_mu);
+
+		float error_real = (d_last_sample.real() - interp_samp.real()) * interp_samp_mid.real();
+		float error_imag = (d_last_sample.imag() - interp_samp.imag()) * interp_samp_mid.imag();
+		d_last_sample = interp_samp;	// save for next time
+		float symbol_error = error_real + error_imag; // Gardner loop error
+		if (symbol_error < -1.0) symbol_error = -1.0;
+		if (symbol_error >  1.0) symbol_error =  1.0;
+
+		d_omega = d_omega + d_gain_omega * symbol_error;  // update omega based on loop error
+		d_omega = d_omega_mid + gr_branchless_clip(d_omega-d_omega_mid, d_omega_rel);   // make sure we don't walk away
+
+		// printf("%f\t%f\t%f\n", symbol_error, d_mu, d_omega);
+		d_mu += d_omega + d_gain_mu * symbol_error;   // update mu based on loop error
+  
+      out[o++] = interp_samp;
+    }
   }
+
+  #if 0
+  printf("ninput_items: %d   noutput_items: %d   consuming: %d   returning: %d\n",
+	 ninput_items[0], noutput_items, i, o);
+  #endif
 
   consume_each(i);
   return o;

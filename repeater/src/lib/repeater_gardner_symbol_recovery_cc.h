@@ -36,7 +36,7 @@ typedef boost::shared_ptr<repeater_gardner_symbol_recovery_cc> repeater_gardner_
 
 // public constructor
 repeater_gardner_symbol_recovery_cc_sptr 
-repeater_make_gardner_symbol_recovery_cc (int samples_per_symbol, float timing_error_gain);
+repeater_make_gardner_symbol_recovery_cc (float samples_per_symbol, float timing_error_gain);
 
 /*!
  * \brief Gardner based repeater gardner_symbol_recovery block with complex input, complex output.
@@ -59,12 +59,19 @@ class repeater_gardner_symbol_recovery_cc : public gr_block
 		    gr_vector_void_star &output_items);
   void set_verbose (bool verbose) { d_verbose = verbose; }
 
+  //! Sets value of omega and its min and max values 
+  void set_omega (float omega);
+
 protected:
   bool input_sample0(gr_complex, gr_complex& outp);
   bool input_sample(gr_complex, gr_complex& outp);
-  repeater_gardner_symbol_recovery_cc (int samples_per_symbol, float timing_error_gain);
+  repeater_gardner_symbol_recovery_cc (float samples_per_symbol, float timing_error_gain);
 
  private:
+
+  float				d_mu;
+  float d_omega, d_gain_omega, d_omega_rel, d_max_omega, d_min_omega, d_omega_mid;
+  float				d_gain_mu;
 
   gr_complex                    d_last_sample;
   gri_mmse_fir_interpolator_cc 	*d_interp;
@@ -73,15 +80,13 @@ protected:
   gr_complex			*d_dl;
   int				d_dl_index;
 
-  int				d_samples_per_symbol;
   float				d_timing_error_gain;
-  int				d_half_sps;
   int				d_twice_sps;
 
   float				d_timing_error;
 
   friend repeater_gardner_symbol_recovery_cc_sptr
-  repeater_make_gardner_symbol_recovery_cc (int samples_per_symbol, float timing_error_gain);
+  repeater_make_gardner_symbol_recovery_cc (float samples_per_symbol, float timing_error_gain);
 
 };
 
