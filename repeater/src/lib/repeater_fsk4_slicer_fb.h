@@ -46,7 +46,7 @@ typedef boost::shared_ptr<repeater_fsk4_slicer_fb> repeater_fsk4_slicer_fb_sptr;
  * constructor is private.  repeater_make_fsk4_slicer_fb is the public
  * interface for creating new instances.
  */
-repeater_fsk4_slicer_fb_sptr repeater_make_fsk4_slicer_fb ();
+repeater_fsk4_slicer_fb_sptr repeater_make_fsk4_slicer_fb (const std::vector<float> &slice_levels);
 
 /*!
  * \brief produce a stream of dibits, given a stream of floats in [-3,-1,1,3]
@@ -60,9 +60,11 @@ private:
   // The friend declaration allows repeater_make_fsk4_slicer_fb to
   // access the private constructor.
 
-  friend repeater_fsk4_slicer_fb_sptr repeater_make_fsk4_slicer_fb ();
+  friend repeater_fsk4_slicer_fb_sptr repeater_make_fsk4_slicer_fb (const std::vector<float> &slice_levels);
 
-  repeater_fsk4_slicer_fb ();  	// private constructor
+  repeater_fsk4_slicer_fb (const std::vector<float> &slice_levels);  	// private constructor
+
+  float d_slice_levels[4];
 
  public:
   ~repeater_fsk4_slicer_fb ();	// public destructor

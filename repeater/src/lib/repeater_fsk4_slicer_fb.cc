@@ -33,15 +33,16 @@
 
 #include <repeater_fsk4_slicer_fb.h>
 #include <gr_io_signature.h>
+#include <stdio.h>
 
 /*
  * Create a new instance of repeater_fsk4_slicer_fb and return
  * a boost shared_ptr.  This is effectively the public constructor.
  */
 repeater_fsk4_slicer_fb_sptr 
-repeater_make_fsk4_slicer_fb ()
+repeater_make_fsk4_slicer_fb (const std::vector<float> &slice_levels)
 {
-  return repeater_fsk4_slicer_fb_sptr (new repeater_fsk4_slicer_fb ());
+  return repeater_fsk4_slicer_fb_sptr (new repeater_fsk4_slicer_fb (slice_levels));
 }
 
 /*
@@ -61,12 +62,15 @@ static const int MAX_OUT = 1;	// maximum number of output streams
 /*
  * The private constructor
  */
-repeater_fsk4_slicer_fb::repeater_fsk4_slicer_fb ()
+repeater_fsk4_slicer_fb::repeater_fsk4_slicer_fb (const std::vector<float> &slice_levels)
   : gr_sync_block ("fsk4_slicer_fb",
 		   gr_make_io_signature (MIN_IN, MAX_IN, sizeof (float)),
 		   gr_make_io_signature (MIN_OUT, MAX_OUT, sizeof (unsigned char)))
 {
-  // nothing else required in this example
+	d_slice_levels[0] = slice_levels[0];
+	d_slice_levels[1] = slice_levels[1];
+	d_slice_levels[2] = slice_levels[2];
+	d_slice_levels[3] = slice_levels[3];
 }
 
 /*
@@ -86,15 +90,33 @@ repeater_fsk4_slicer_fb::work (int noutput_items,
   unsigned char *out = (unsigned char *) output_items[0];
 
   for (int i = 0; i < noutput_items; i++){
+#if 0
     if (in[i] < -2.0) {
       out[i] = 3;
     } else if (in[i] < 0.0) {
       out[i] = 2;
-    } else if (in[i] < 2.0) {
+    } else if (in[i] <  2.0) {
       out[i] = 0;
     } else {
       out[i] = 1;
     }
+#endif
+    uint8_t dibit;
+    float sym = in[i];
+    if (d_slice_levels[3] < 0) {
+      dibit = 1;
+      if (d_slice_levels[3] <= sym && sym < d_slice_levels[0])
+        dibit = 3;
+    } else {
+      dibit = 3;
+      if (d_slice_levels[2] <= sym && sym < d_slice_levels[3])
+        dibit = 1;
+    }
+    if (d_slice_levels[0] <= sym && sym < d_slice_levels[1])
+      dibit = 2;
+    if (d_slice_levels[1] <= sym && sym < d_slice_levels[2])
+      dibit = 0;
+    out[i] = dibit;
   }
 
   // Tell runtime system how many output items we produced.

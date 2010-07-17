@@ -9,12 +9,11 @@
 #include "gnuradio_swig_bug_workaround.h"	// mandatory bug fix
 #include "repeater_squelch_base_ff.h"
 #include "repeater_fsk4_slicer_fb.h"
-#include "repeater_p25_frame_fb.h"
-#include "repeater_imbe_decode_fb.h"
+#include "repeater_p25_frame_assembler.h"
 #include "repeater_pipe.h"
 #include "repeater_ctcss_squelch_ff.h"
-#include "repeater_gardner_symbol_recovery_cc.h"
-#include "repeater_costas_loop_cc.h"
+#include "repeater_gardner_costas_cc.h"
+#include "rs.h"
 #include <stdexcept>
 %}
 
@@ -32,36 +31,24 @@
 
 GR_SWIG_BLOCK_MAGIC(repeater,fsk4_slicer_fb);
 
-repeater_fsk4_slicer_fb_sptr repeater_make_fsk4_slicer_fb ();
+repeater_fsk4_slicer_fb_sptr repeater_make_fsk4_slicer_fb (const std::vector<float> &slice_levels);
 
 class repeater_fsk4_slicer_fb : public gr_sync_block
 {
 private:
-  repeater_fsk4_slicer_fb ();
+  repeater_fsk4_slicer_fb (const std::vector<float> &slice_levels);
 };
 
 // ----------------------------------------------------------------
 
-GR_SWIG_BLOCK_MAGIC(repeater,p25_frame_fb);
+GR_SWIG_BLOCK_MAGIC(repeater,p25_frame_assembler);
 
-repeater_p25_frame_fb_sptr repeater_make_p25_frame_fb ();
+repeater_p25_frame_assembler_sptr repeater_make_p25_frame_assembler (const char* udp_host, int port, int debug, bool do_imbe, bool do_output, bool do_msgq, gr_msg_queue_sptr queue);
 
-class repeater_p25_frame_fb : public gr_sync_block
+class repeater_p25_frame_assembler : public gr_sync_block
 {
 private:
-  repeater_p25_frame_fb ();
-};
-
-// ----------------------------------------------------------------
-
-GR_SWIG_BLOCK_MAGIC(repeater,imbe_decode_fb);
-
-repeater_imbe_decode_fb_sptr repeater_make_imbe_decode_fb ();
-
-class repeater_imbe_decode_fb : public gr_sync_block
-{
-private:
-  repeater_imbe_decode_fb ();
+  repeater_p25_frame_assembler (const char* udp_host, int port, int debug, bool do_imbe, bool do_output, bool do_msgq, gr_msg_queue_sptr queue);
 };
 
 // ----------------------------------------------------------------
@@ -118,37 +105,12 @@ public:
 
 // ----------------------------------------------------------------
 
-GR_SWIG_BLOCK_MAGIC(repeater,gardner_symbol_recovery_cc);
+GR_SWIG_BLOCK_MAGIC(repeater,gardner_costas_cc);
 
-repeater_gardner_symbol_recovery_cc_sptr repeater_make_gardner_symbol_recovery_cc (float samples_per_symbol, float timing_error_gain);
+repeater_gardner_costas_cc_sptr repeater_make_gardner_costas_cc (float samples_per_symbol, float gain_mu, float gain_omega, float alpha, float beta, float max_freq, float min_freq);
 
-class repeater_gardner_symbol_recovery_cc : public gr_sync_block
+class repeater_gardner_costas_cc : public gr_sync_block
 {
  private:
-  repeater_gardner_symbol_recovery_cc (float samples_per_symbol, float timing_error_gain);
-};
-
-// ----------------------------------------------------------------
-
-GR_SWIG_BLOCK_MAGIC(repeater,costas_loop_cc);
-
-repeater_costas_loop_cc_sptr
-repeater_make_costas_loop_cc (float alpha, float beta, 
-			float max_freq, float min_freq,
-			int order
-			) throw (std::invalid_argument);
-
-
-class repeater_costas_loop_cc : public gr_sync_block
-{
- private:
-  repeater_costas_loop_cc (float alpha, float beta,
-		     float max_freq, float min_freq, int order);
-
- public:
-   void set_alpha(float alpha);
-   float alpha();
-   void set_beta(float beta);
-   float beta();
-   float freq();   
+  repeater_gardner_costas_cc (float samples_per_symbol, float gain_mu, float gain_omega, float alpha, float beta, float max_freq, float min_freq);
 };

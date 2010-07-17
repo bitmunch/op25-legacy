@@ -31,15 +31,15 @@
 
 class gri_mmse_fir_interpolator_cc;
 
-class repeater_gardner_symbol_recovery_cc;
-typedef boost::shared_ptr<repeater_gardner_symbol_recovery_cc> repeater_gardner_symbol_recovery_cc_sptr;
+class repeater_gardner_costas_cc;
+typedef boost::shared_ptr<repeater_gardner_costas_cc> repeater_gardner_costas_cc_sptr;
 
 // public constructor
-repeater_gardner_symbol_recovery_cc_sptr 
-repeater_make_gardner_symbol_recovery_cc (float samples_per_symbol, float timing_error_gain);
+repeater_gardner_costas_cc_sptr 
+repeater_make_gardner_costas_cc (float samples_per_symbol, float gain_mu, float gain_omega, float alpha, float beta, float max_freq, float min_freq);
 
 /*!
- * \brief Gardner based repeater gardner_symbol_recovery block with complex input, complex output.
+ * \brief Gardner based repeater gardner_costas block with complex input, complex output.
  * \ingroup sync_blk
  *
  * This implements a Gardner discrete-time error-tracking synchronizer.
@@ -48,10 +48,10 @@ repeater_make_gardner_symbol_recovery_cc (float samples_per_symbol, float timing
  *
  * includes some simplifying approximations KA1RBI
  */
-class repeater_gardner_symbol_recovery_cc : public gr_block
+class repeater_gardner_costas_cc : public gr_block
 {
  public:
-  ~repeater_gardner_symbol_recovery_cc ();
+  ~repeater_gardner_costas_cc ();
   void forecast(int noutput_items, gr_vector_int &ninput_items_required);
   int general_work (int noutput_items,
 		    gr_vector_int &ninput_items,
@@ -65,7 +65,7 @@ class repeater_gardner_symbol_recovery_cc : public gr_block
 protected:
   bool input_sample0(gr_complex, gr_complex& outp);
   bool input_sample(gr_complex, gr_complex& outp);
-  repeater_gardner_symbol_recovery_cc (float samples_per_symbol, float timing_error_gain);
+  repeater_gardner_costas_cc (float samples_per_symbol, float gain_mu, float gain_omega, float alpha, float beta, float max_freq, float min_freq);
 
  private:
 
@@ -80,13 +80,24 @@ protected:
   gr_complex			*d_dl;
   int				d_dl_index;
 
-  float				d_timing_error_gain;
   int				d_twice_sps;
 
   float				d_timing_error;
 
-  friend repeater_gardner_symbol_recovery_cc_sptr
-  repeater_make_gardner_symbol_recovery_cc (float samples_per_symbol, float timing_error_gain);
+  float				d_alpha;
+  float				d_beta;
+  uint32_t			d_interp_counter;
+
+  float				d_theta;
+  float				d_phase;
+  float				d_freq;
+  float				d_max_freq;
+
+  friend repeater_gardner_costas_cc_sptr
+  repeater_make_gardner_costas_cc (float samples_per_symbol, float gain_mu, float gain_omega, float alpha, float beta, float max_freq, float min_freq);
+
+  float phase_error_detector_qpsk(gr_complex sample);
+  void phase_error_tracking(gr_complex sample);
 
 };
 

@@ -61,14 +61,14 @@ ourlib_LTLIBRARIES = _repeater.la
 _repeater_la_SOURCES = 	repeater\
 	repeater.cc			\
 	repeater_fsk4_slicer_fb.cc	\
-	repeater_p25_frame_fb.cc	\
-	repeater_imbe_decode_fb.cc	\
+	repeater_p25_frame_assembler.cc	\
 	repeater_pipe.cc		\
 	repeater_ctcss_squelch_ff.cc	\
 	repeater_squelch_base_ff.cc	\
-	repeater_gardner_symbol_recovery_cc.cc	\
-	repeater_costas_loop_cc.cc	\
-	bch.cc
+	repeater_gardner_costas_cc.cc	\
+	p25_framer.cc			\
+	bch.cc				\
+	rs.cc
 
 # magic flags
 _repeater_la_LDFLAGS = $(NO_UNDEFINED) -module -avoid-version
@@ -85,11 +85,9 @@ repeater.cc repeater.py: repeater.i $(ALL_IFILES)
 # These headers get installed in ${prefix}/include/gnuradio
 grinclude_HEADERS =			\
 	repeater_fsk4_slicer_fb.h	\
-	repeater_p25_frame_fb.h		\
-	repeater_imbe_decode_fb.h	\
+	repeater_p25_frame_assembler.h	\
 	repeater_pipe.h			\
-	repeater_gardner_symbol_recovery_cc.h	\
-	repeater_costas_loop_cc.h	\
+	repeater_gardner_costas_cc.h	\
 	repeater_ctcss_squelch_ff.h
 
 
