@@ -66,12 +66,13 @@ _repeater_la_SOURCES = 	repeater\
 	repeater_ctcss_squelch_ff.cc	\
 	repeater_squelch_base_ff.cc	\
 	repeater_gardner_costas_cc.cc	\
+	repeater_vocoder.cc		\
 	p25_framer.cc			\
 	bch.cc				\
 	rs.cc
 
 # magic flags
-_repeater_la_LDFLAGS = $(NO_UNDEFINED) -module -avoid-version
+_repeater_la_LDFLAGS = $(NO_UNDEFINED) -module -avoid-version -L../../../imbe_vocoder/src/lib/ -limbe_vocoder
 
 # link the library against some comon swig runtime code and the 
 # c++ standard library
@@ -88,6 +89,7 @@ grinclude_HEADERS =			\
 	repeater_p25_frame_assembler.h	\
 	repeater_pipe.h			\
 	repeater_gardner_costas_cc.h	\
+	repeater_vocoder.h		\
 	repeater_ctcss_squelch_ff.h
 
 

@@ -54,6 +54,8 @@ GR_OMNITHREAD
 CFLAGS="${CFLAGS} $PTHREAD_CFLAGS"
 CXXFLAGS="${CXXFLAGS} $PTHREAD_CFLAGS"
 
+CXXFLAGS="${CXXFLAGS} -I../../../imbe_vocoder/src/lib"
+
 if test "x$CXX_FOR_BUILD" = x
 then
   CXX_FOR_BUILD=${CXX}

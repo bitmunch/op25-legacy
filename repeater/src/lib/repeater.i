@@ -15,6 +15,17 @@
 #include "repeater_gardner_costas_cc.h"
 #include "rs.h"
 #include <stdexcept>
+
+#include "repeater_vocoder.h"
+#include "typedef.h"
+#include "globals.h"
+#include "imbe.h"
+#include "dsp_sub.h"
+#include "basic_op.h"
+#include "math_sub.h"
+#include "encode.h"
+#include "decode.h"
+
 %}
 
 // ----------------------------------------------------------------
@@ -113,4 +124,16 @@ class repeater_gardner_costas_cc : public gr_sync_block
 {
  private:
   repeater_gardner_costas_cc (float samples_per_symbol, float gain_mu, float gain_omega, float alpha, float beta, float max_freq, float min_freq);
+};
+
+// ----------------------------------------------------------------
+
+GR_SWIG_BLOCK_MAGIC(repeater,vocoder);
+
+repeater_vocoder_sptr repeater_make_vocoder (bool encode_flag, bool verbose_flag, int stretch_amt, char* udp_host, int udp_port, bool raw_vectors_flag);
+
+class repeater_vocoder : public gr_block
+{
+private:
+  repeater_vocoder (bool encode_flag, bool verbose_flag, int stretch_amt, char* udp_host, int udp_port, bool raw_vectors_flag);
 };
