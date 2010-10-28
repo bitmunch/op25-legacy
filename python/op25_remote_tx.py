@@ -34,7 +34,7 @@ from gnuradio import gr, gru, audio, eng_notation, blks2, optfir
 from gnuradio.eng_option import eng_option
 from optparse import OptionParser
 
-from gnuradio import op25_imbe
+from gnuradio import repeater
 
 class app_top_block(gr.top_block):
     def __init__(self, options, queue):
@@ -58,7 +58,7 @@ class app_top_block(gr.top_block):
             self.audio_amps.append(t)
             t = gr.float_to_short()
             self.converters.append(t)
-            t = op25_imbe.vocoder(True,                 # 0=Decode,True=Encode
+            t = repeater.vocoder(True,                 # 0=Decode,True=Encode
                                   options.verbose,      # Verbose flag
                                   options.stretch,      # flex amount
                                   options.udp_addr,     # udp ip address

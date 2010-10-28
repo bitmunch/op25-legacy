@@ -2,7 +2,6 @@
 import sys
 import math
 from gnuradio import gr, gru, audio, eng_notation, blks2, optfir, fsk4, repeater
-from gnuradio import op25_imbe
 from gnuradio.eng_option import eng_option
 from optparse import OptionParser
 
@@ -36,7 +35,7 @@ class my_top_block(gr.top_block):
         msgq = gr.msg_queue(2)
         FSK4 = fsk4.demod_ff(msgq, sample_rate, symbol_rate)
         DECODE = repeater.imbe_decode_fb()
-        IMBE = op25_imbe.vocoder(False,                 # 0=Decode,True=Encode
+        IMBE = repeater.vocoder(False,                 # 0=Decode,True=Encode
                                   options.verbose,      # Verbose flag
                                   options.stretch,      # flex amount
                                   "",                   # udp ip address

@@ -39,7 +39,7 @@ running this script when using method B.
 
 """
 
-from gnuradio import gr, eng_notation, op25_imbe
+from gnuradio import gr, eng_notation, repeater
 from gnuradio import usrp
 from gnuradio import audio
 from gnuradio import blks2
@@ -197,7 +197,7 @@ class fm_tx_block(stdgui2.std_top_block):
             self.audio_amps.append(t)
             t = gr.float_to_short()
             self.converters.append(t)
-            t = op25_imbe.vocoder(True,			# 0=Decode,True=Encode
+            t = repeater.vocoder(True,			# 0=Decode,True=Encode
                                   options.verbose,	# Verbose flag
                                   options.stretch,	# flex amount
                                   "",			# udp ip address
