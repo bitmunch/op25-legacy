@@ -40,21 +40,11 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#include "typedef.h"
-#include "globals.h"
-#include "imbe.h"
-#include "dsp_sub.h"
-#include "basic_op.h"
-#include "math_sub.h"
-#include "encode.h"
-#include "decode.h"
-
+#include <imbe_vocoder.h>
 #include <repeater_vocoder.h>
 #include <op25_p25_frame.h>
 #include <op25_imbe_frame.h>
 #include <gr_io_signature.h>
-
-#include <imbe_vocoder.h>
 
 /*
  * Create a new instance of repeater_vocoder and return

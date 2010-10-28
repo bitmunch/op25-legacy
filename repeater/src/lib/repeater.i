@@ -13,18 +13,9 @@
 #include "repeater_pipe.h"
 #include "repeater_ctcss_squelch_ff.h"
 #include "repeater_gardner_costas_cc.h"
+#include "repeater_vocoder.h"
 #include "rs.h"
 #include <stdexcept>
-
-#include "repeater_vocoder.h"
-#include "typedef.h"
-#include "globals.h"
-#include "imbe.h"
-#include "dsp_sub.h"
-#include "basic_op.h"
-#include "math_sub.h"
-#include "encode.h"
-#include "decode.h"
 
 %}
 
