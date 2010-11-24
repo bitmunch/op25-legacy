@@ -35,7 +35,8 @@ class qa_repeater (gr_unittest.TestCase):
         src_data = (-3, -1, 1, 3)
         expected_result = (3, 2, 0, 1)
         src = gr.vector_source_f (src_data)
-        slicer = repeater.fsk4_slicer_fb ()
+        levels = [-2.0, 0.0, 2.0, 4.0]
+        slicer = repeater.fsk4_slicer_fb (levels)
         dst = gr.vector_sink_b ()
         self.fg.connect (src, slicer)
         self.fg.connect (slicer, dst)
