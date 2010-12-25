@@ -209,13 +209,14 @@ repeater_gardner_costas_cc::general_work (int noutput_items,
 		float error_imag = (d_last_sample.imag() - interp_samp.imag()) * interp_samp_mid.imag();
 		d_last_sample = interp_samp;	// save for next time
 		float symbol_error = error_real + error_imag; // Gardner loop error
+		if (isnan(symbol_error)) symbol_error = 0.0;
 		if (symbol_error < -1.0) symbol_error = -1.0;
 		if (symbol_error >  1.0) symbol_error =  1.0;
 
 		d_omega = d_omega + d_gain_omega * symbol_error;  // update omega based on loop error
 		d_omega = d_omega_mid + gr_branchless_clip(d_omega-d_omega_mid, d_omega_rel);   // make sure we don't walk away
 #if VERBOSE_GARDNER
-		printf("%f\t%f\t%f\n", symbol_error, d_mu, d_omega);
+		printf("%f\t%f\t%f\t%f\t%f\n", symbol_error, d_mu, d_omega, error_real, error_imag);
 #endif
 		d_mu += d_omega + d_gain_mu * symbol_error;   // update mu based on loop error
 

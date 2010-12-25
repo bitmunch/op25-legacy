@@ -30,7 +30,7 @@ class repeater_ctcss_squelch_ff;
 typedef boost::shared_ptr<repeater_ctcss_squelch_ff> repeater_ctcss_squelch_ff_sptr;
 
 repeater_ctcss_squelch_ff_sptr 
-repeater_make_ctcss_squelch_ff(int rate, float freq, float level=0.01, int len=0, int ramp=0, bool gate=false);
+repeater_make_ctcss_squelch_ff(int rate, float freq, float level, int len, int ramp, bool gate);
 
 /*!
  * \brief gate or zero output if ctcss tone not present

@@ -14,6 +14,8 @@
 #include "repeater_ctcss_squelch_ff.h"
 #include "repeater_gardner_costas_cc.h"
 #include "repeater_vocoder.h"
+#include "repeater_chan_usrp.h"
+#include "repeater_chan_usrp_rx.h"
 #include "rs.h"
 #include <stdexcept>
 
@@ -90,12 +92,12 @@ public:
 
 GR_SWIG_BLOCK_MAGIC(repeater,ctcss_squelch_ff);
 
-repeater_ctcss_squelch_ff_sptr repeater_make_ctcss_squelch_ff (int rate, float freq, float level=5.0, int len=0, int ramp=0, bool gate=false);
+repeater_ctcss_squelch_ff_sptr repeater_make_ctcss_squelch_ff (int rate, float freq, float level, int len, int ramp, bool gate);
 
 class repeater_ctcss_squelch_ff : public repeater_squelch_base_ff
 {
 private:
-  repeater_ctcss_squelch_ff ();
+  repeater_ctcss_squelch_ff (int rate, float freq, float level, int len, int ramp, bool gate);
 
 public:
   std::vector<float> squelch_range() const;
@@ -127,4 +129,29 @@ class repeater_vocoder : public gr_block
 {
 private:
   repeater_vocoder (bool encode_flag, bool verbose_flag, int stretch_amt, char* udp_host, int udp_port, bool raw_vectors_flag);
+};
+
+// ----------------------------------------------------------------
+GR_SWIG_BLOCK_MAGIC(repeater,chan_usrp);
+repeater_chan_usrp_sptr repeater_make_chan_usrp (int listen_port, bool do_imbe, bool do_complex, bool do_float, float gain, int decim, gr_msg_queue_sptr queue);
+
+class repeater_chan_usrp : public gr_block
+{
+private:
+
+  repeater_chan_usrp (int listen_port, bool do_imbe, bool do_complex, bool do_float, float gain, int decim, gr_msg_queue_sptr queue);  	// private constructor
+};
+
+// ----------------------------------------------------------------
+GR_SWIG_BLOCK_MAGIC(repeater,chan_usrp_rx);
+repeater_chan_usrp_rx_sptr repeater_make_chan_usrp_rx (const char* udp_host, int port, int debug);
+
+class repeater_chan_usrp_rx : public gr_block
+{
+private:
+
+  repeater_chan_usrp_rx (const char* udp_host, int port, int debug);  	// private constructor
+
+public:
+  void unkey(void);
 };

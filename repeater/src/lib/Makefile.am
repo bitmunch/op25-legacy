@@ -65,13 +65,16 @@ _repeater_la_SOURCES = 	repeater\
 	repeater_pipe.cc		\
 	repeater_ctcss_squelch_ff.cc	\
 	repeater_squelch_base_ff.cc	\
-	repeater_gardner_costas_cc.cc	\
 	repeater_vocoder.cc		\
+	repeater_gardner_costas_cc.cc	\
+	repeater_chan_usrp.cc		\
+	repeater_chan_usrp_rx.cc	\
 	p25_framer.cc			\
 	bch.cc				\
 	rs.cc
 
 # magic flags
+_repeater_la_CXXFLAGS = -I ../../../imbe_vocoder/src/lib
 _repeater_la_LDFLAGS = $(NO_UNDEFINED) -module -avoid-version -L../../../imbe_vocoder/src/lib/ -limbe_vocoder
 
 # link the library against some comon swig runtime code and the 
@@ -84,13 +87,7 @@ repeater.cc repeater.py: repeater.i $(ALL_IFILES)
 	$(SWIG) $(SWIGPYTHONARGS) -module repeater -o repeater.cc $<
 
 # These headers get installed in ${prefix}/include/gnuradio
-grinclude_HEADERS =			\
-	repeater_fsk4_slicer_fb.h	\
-	repeater_p25_frame_assembler.h	\
-	repeater_pipe.h			\
-	repeater_gardner_costas_cc.h	\
-	repeater_vocoder.h		\
-	repeater_ctcss_squelch_ff.h
+# grinclude_HEADERS =			
 
 
 # These swig headers get installed in ${prefix}/include/gnuradio/swig
