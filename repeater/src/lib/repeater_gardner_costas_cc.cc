@@ -82,7 +82,9 @@ void repeater_gardner_costas_cc::set_omega (float omega) {
     d_max_omega = omega*(1.0 + d_omega_rel);
     d_omega_mid = 0.5*(d_min_omega+d_max_omega);
     d_twice_sps = 2 * (int) ceilf(d_omega);
-    d_dl = new gr_complex[d_twice_sps*2];
+    int num_complex = std::max(d_twice_sps*2, 16);
+    d_dl = new gr_complex[num_complex];
+    memset(d_dl, 0, num_complex * sizeof(gr_complex));
 }
 
 repeater_gardner_costas_cc::~repeater_gardner_costas_cc ()
