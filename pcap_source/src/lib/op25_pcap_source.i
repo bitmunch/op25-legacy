@@ -23,7 +23,7 @@ GR_SWIG_BLOCK_MAGIC(op25, pcap_source);
 /*
  * Publicly-accesible constuctor function for op25_pcap_source.
  */
-op25_pcap_source_sptr op25_make_pcap_source(const char *path);
+op25_pcap_source_sptr op25_make_pcap_source(const char *path, float delay, bool repeat);
 
 /*
  * The op25_pcap_source block. Reads symbols from a tcpdump-formatted
