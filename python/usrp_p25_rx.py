@@ -2,7 +2,7 @@
 
 # -*- mode: Python -*-
 
-# Copyright 2008 Steve Glass
+# Copyright 2008-2011 Steve Glass
 # 
 # This file is part of OP25.
 # 
@@ -22,7 +22,6 @@
 # 02110-1301, USA.
 
 import os
-import pickle
 import sys
 import threading
 import wx
@@ -36,9 +35,11 @@ from math import pi
 from optparse import OptionParser
 from usrpm import usrp_dbid
 
+import pickle
+
 # Python is doing strange things to our packages
 # So we try to handle it here
-
+#
 try:
     from gnuradio import fsk4, op25
 except Exception:
@@ -275,7 +276,6 @@ class p25_rx_block (stdgui2.std_top_block):
     def __read_file_properties(self, filename):
         f = open(filename, "r")
         self.info = pickle.load(f)
-        ToDo = True
         f.close()
 
     # setup to rx from file
@@ -515,7 +515,7 @@ class p25_rx_block (stdgui2.std_top_block):
             self._set_titlebar(capture_file)
             self._set_state("RUNNING")
         except Exception, x:
-            wx.MessageBox("Cannot open capture file: " + x.message, "File Error", wx.CANCEL | wx.ICON_EXCLAMATION)
+            wx.MessageBox("Cannot open capture file: " + str(x), "File Open Error", wx.CANCEL | wx.ICON_EXCLAMATION)
 
     # Open the USRP
     #
