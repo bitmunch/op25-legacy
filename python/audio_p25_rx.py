@@ -293,9 +293,9 @@ class p25_rx_block (stdgui2.std_top_block):
         self.traffic = TrafficPane(self.notebook)
         self.notebook.AddPage(self.traffic, "Traffic")
         # Setup the decoder and report the TUN/TAP device name
-        msgq = gr.msg_queue(2)
         self.decode_watcher = decode_watcher(msgq, self.traffic)
-        self.p25_decoder = op25.decoder_ff(msgq)
+        self.p25_decoder = op25.decoder_ff()
+        self.p25_decoder.set_msgq(gr.msg_queue(2))
         self.frame.SetStatusText("TUN/TAP: " + self.p25_decoder.device_name())
 
     # read capture file properties (decimation etc.)

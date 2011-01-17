@@ -299,7 +299,8 @@ class p25_rx_block (stdgui2.std_top_block):
         # Setup the decoder and report the TUN/TAP device name
         msgq = gr.msg_queue(2)
         self.decode_watcher = decode_watcher(msgq, self.traffic)
-        self.p25_decoder = op25.decoder_ff(msgq)
+        self.p25_decoder = op25.decoder_ff()
+        self.p25_decoder.set_msgq(msgq)
         self.frame.SetStatusText("TUN/TAP: " + self.p25_decoder.device_name())
 
     # read capture file properties (decimation etc.)
@@ -612,25 +613,25 @@ class TrafficPane(wx.Panel):
 
         label = wx.StaticText(self, -1, "Source:")
         sizer.Add(label, pos=(3,1))
-        field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
+        field = wx.TextCtrl(self, -1, "", size=(144, -1), style=wx.TE_READONLY)
         sizer.Add(field, pos=(3,2))
         self.fields["source"] = field;
 
         label = wx.StaticText(self, -1, "Destination:")
         sizer.Add(label, pos=(4,1))
-        field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
+        field = wx.TextCtrl(self, -1, "", size=(144, -1), style=wx.TE_READONLY)
         sizer.Add(field, pos=(4,2))
         self.fields["dest"] = field;
 
         label = wx.StaticText(self, -1, "MFID:")
         sizer.Add(label, pos=(1,4))
-        field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
+        field = wx.TextCtrl(self, -1, "", size=(144, -1), style=wx.TE_READONLY)
         sizer.Add(field, pos=(1,5))
         self.fields["mfid"] = field;
 
         label = wx.StaticText(self, -1, "ALGID:")
         sizer.Add(label, pos=(2,4))
-        field = wx.TextCtrl(self, -1, "", size=(175, -1), style=wx.TE_READONLY)
+        field = wx.TextCtrl(self, -1, "", size=(144, -1), style=wx.TE_READONLY)
         sizer.Add(field, pos=(2,5))
         self.fields["algid"] = field;
 
