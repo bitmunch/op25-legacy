@@ -27,10 +27,9 @@
 
 using std::string;
 
-snapshot_du_handler::snapshot_du_handler(data_unit_handler_sptr next, gr_msg_queue_sptr msgq) :
+snapshot_du_handler::snapshot_du_handler(data_unit_handler_sptr next) :
    data_unit_handler(next),
-   d_data_units(0),
-   d_msgq(msgq)
+   d_data_units(0)
 {
 }
 
@@ -52,4 +51,16 @@ snapshot_du_handler::handle(data_unit_sptr du)
       }
    }
    data_unit_handler::handle(du);
+}
+
+gr_msg_queue_sptr
+snapshot_du_handler::get_msgq() const
+{
+   return d_msgq;
+}
+
+void
+snapshot_du_handler::set_msgq(gr_msg_queue_sptr msgq)
+{
+   d_msgq = msgq;
 }

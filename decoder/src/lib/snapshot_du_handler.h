@@ -45,7 +45,7 @@ public:
     * \param next The next data_unit_handler in the chain.
     * \param msgq A non-null msg_queue_sptr to the msg_queue to use.
     */
-   snapshot_du_handler(data_unit_handler_sptr next, gr_msg_queue_sptr msgq);
+   snapshot_du_handler(data_unit_handler_sptr next);
 
    /**
     * snapshot_du_handler virtual destructor.
@@ -58,6 +58,22 @@ public:
     * \param du A non-null data_unit_sptr to handle.
     */
    virtual void handle(data_unit_sptr du);
+
+   /**
+    * Accessor for the msgq attribute. Returns a pointer to the msgq
+    * if it exists.
+    *
+    * \return A (possibly NULL) gr_msg_queue_sptr pointing to the message queue.
+    */
+   gr_msg_queue_sptr get_msgq() const;
+
+   /**
+    * Accessor for the msgq attribute. Sets the msgq to point to the
+    * provided message queue object.
+    *
+    * \return A (possibly NULL) gr_msg_queue_sptr pointing to the message queue.
+    */
+   void set_msgq(gr_msg_queue_sptr msgq);
 
 private:
 
@@ -72,5 +88,7 @@ private:
    gr_msg_queue_sptr d_msgq;
 
 };
+
+
 
 #endif /* INCLUDED_SNAPSHOT_DU_HANDLER_H */

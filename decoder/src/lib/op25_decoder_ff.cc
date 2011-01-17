@@ -33,19 +33,32 @@
 #include <offline_imbe_decoder.h>
 #include <op25_decoder_ff.h>
 #include <snapshot_du_handler.h>
+#include <sniffer_du_handler.h>
 #include <voice_du_handler.h>
 #include <op25_yank.h>
 
 using namespace std;
 
 op25_decoder_ff_sptr
-op25_make_decoder_ff(gr_msg_queue_sptr msgq)
+op25_make_decoder_ff()
 {
-   return op25_decoder_ff_sptr(new op25_decoder_ff(msgq));
+   return op25_decoder_ff_sptr(new op25_decoder_ff);
 }
 
 op25_decoder_ff::~op25_decoder_ff()
 {
+}
+
+gr_msg_queue_sptr
+op25_decoder_ff::get_msgq() const
+{
+   return d_snapshot_du_handler->get_msgq();
+}
+
+void
+op25_decoder_ff::set_msgq(gr_msg_queue_sptr msgq)
+{
+   d_snapshot_du_handler->set_msgq(msgq);
 }
 
 void
@@ -109,7 +122,7 @@ op25_decoder_ff::device_name() const
    return d_sniffer_du_handler->device_name();
 }
 
-op25_decoder_ff::op25_decoder_ff(gr_msg_queue_sptr msgq) :
+op25_decoder_ff::op25_decoder_ff() :
    gr_block("decoder_ff", gr_make_io_signature(1, 1, sizeof(float)), gr_make_io_signature(0, 1, sizeof(float))),
    d_data_unit(),
    d_data_unit_handler(),
@@ -120,7 +133,8 @@ op25_decoder_ff::op25_decoder_ff(gr_msg_queue_sptr msgq) :
 {
    d_sniffer_du_handler =  new sniffer_du_handler(d_data_unit_handler);
    d_data_unit_handler = data_unit_handler_sptr(d_sniffer_du_handler);
-   d_data_unit_handler = data_unit_handler_sptr(new snapshot_du_handler(d_data_unit_handler, msgq));
+   d_snapshot_du_handler = new snapshot_du_handler(d_data_unit_handler);
+   d_data_unit_handler = data_unit_handler_sptr(d_snapshot_du_handler);
    d_data_unit_handler = data_unit_handler_sptr(new voice_du_handler(d_data_unit_handler, d_imbe));
 }
 

@@ -55,11 +55,11 @@ public:
    virtual void handle(data_unit_sptr du);
 
    /**
-    * Return a pointer to a string naming the TUN/TAP device.
+    * Returns the name of the sniffer TUN/TAP device.
     *
-    * \return A pointer to a NUL-terminated character string.
+    * \return A pointer to a NUL-terminated string.
     */
-   const char *device_name() const;
+   virtual const char *device_name() const;
 
 private:
 

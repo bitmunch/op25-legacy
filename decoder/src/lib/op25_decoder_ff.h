@@ -30,11 +30,10 @@
 #include <gr_block.h>
 #include <gr_msg_queue.h>
 #include <imbe_decoder.h>
-#include <sniffer_du_handler.h>
 
 typedef boost::shared_ptr<class op25_decoder_ff> op25_decoder_ff_sptr;
 
-op25_decoder_ff_sptr op25_make_decoder_ff(gr_msg_queue_sptr msgq);
+op25_decoder_ff_sptr op25_make_decoder_ff();
 
 /**
  * op25_decoder_ff is a GNU Radio block for decoding APCO P25
@@ -69,6 +68,22 @@ public:
     */
    const char *device_name() const;
 
+   /**
+    * Accessor for the msgq attribute. Returns a pointer to the msgq
+    * if it exists.
+    *
+    * \return A (possibly NULL) gr_msg_queue_sptr pointing to the message queue.
+    */
+   gr_msg_queue_sptr get_msgq() const;
+
+   /**
+    * Accessor for the msgq attribute. Sets the msgq to point to the
+    * provided message queue object.
+    *
+    * \return A (possibly NULL) gr_msg_queue_sptr pointing to the message queue.
+    */
+   void set_msgq(gr_msg_queue_sptr msgq);
+
 private:
 
    /**
@@ -76,12 +91,12 @@ private:
     * op25_decoder_ff and wrap it in a shared_ptr. This is effectively
     * the public constructor.
     */
-   friend op25_decoder_ff_sptr op25_make_decoder_ff(gr_msg_queue_sptr msgq);
+   friend op25_decoder_ff_sptr op25_make_decoder_ff();
 
    /**
     * op25_decoder_ff protected constructor.
     */
-   op25_decoder_ff(gr_msg_queue_sptr msgq);
+   op25_decoder_ff();
 
    /**
     * Tests whether d_frame_header correlates with the APCO P25 frame
@@ -135,11 +150,6 @@ private:
    imbe_decoder_sptr d_imbe;
 
    /**
-    * The message queue used to send snapshots to the UI.
-    */
-   gr_msg_queue_sptr d_msgq;
-
-   /**
     * Valid states for the decoder state model.
     */
    enum { SYNCHRONIZING, IDENTIFYING, READING } d_state;
@@ -147,7 +157,12 @@ private:
    /**
     * The sniffer (TUN/TAP) data unit handler.
     */
-   sniffer_du_handler *d_sniffer_du_handler;
+   class sniffer_du_handler *d_sniffer_du_handler;
+
+   /**
+    * The snapshot data unit handler.
+    */
+   class snapshot_du_handler *d_snapshot_du_handler;
 
 };
 

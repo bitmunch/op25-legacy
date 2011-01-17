@@ -21,9 +21,9 @@
 GR_SWIG_BLOCK_MAGIC(op25, decoder_ff);
 
 /*
- * Publicly-accesible constuctor function for op25_decoder_ff.
+ * Publicly-accesible default constuctor function for op25_decoder_ff.
  */
-op25_decoder_ff_sptr op25_make_decoder_ff(gr_msg_queue_sptr msgq);
+op25_decoder_ff_sptr op25_make_decoder_ff();
 
 /*
  * The op25_decoder block.
@@ -31,7 +31,9 @@ op25_decoder_ff_sptr op25_make_decoder_ff(gr_msg_queue_sptr msgq);
 class op25_decoder_ff : public gr_block
 {
 private:
-   op25_decoder_ff(gr_msg_queue_sptr msgq);
+   op25_decoder_ff();
 public:
    const char *device_name() const;
+   gr_msg_queue_sptr get_msgq() const;
+   void set_msgq(gr_msg_queue_sptr msgq);
 };
