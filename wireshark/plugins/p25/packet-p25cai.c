@@ -1598,7 +1598,7 @@ proto_register_p25cai(void)
 	static hf_register_info hf[] = {
 		{ &hf_p25cai_fs,
 			{ "Frame Synchronization", "p25cai.fs",
-			FT_BYTES, BASE_HEX, NULL, 0x0,
+			FT_BYTES, BASE_NONE, NULL, 0x0,
 			NULL, HFILL }
 		},
 		{ &hf_p25cai_nid,
@@ -1643,7 +1643,7 @@ proto_register_p25cai(void)
 		},
 		{ &hf_p25cai_mi,
 			{ "Message Indicator", "p25cai.mi",
-			FT_BYTES, BASE_HEX, NULL, 0x0,
+			FT_BYTES, BASE_NONE, NULL, 0x0,
 			NULL, HFILL }
 		},
 		{ &hf_p25cai_mfid,
@@ -1723,7 +1723,7 @@ proto_register_p25cai(void)
 		},
 		{ &hf_p25cai_imbe,
 			{ "Raw IMBE Frame", "p25cai.imbe",
-			FT_BYTES, BASE_HEX, NULL, 0x0,
+			FT_BYTES, BASE_NONE, NULL, 0x0,
 			NULL, HFILL }
 		},
 		{ &hf_p25cai_lsd,
@@ -1813,7 +1813,7 @@ proto_register_p25cai(void)
 		},
 		{ &hf_p25cai_ud,
 			{ "User Data", "p25cai.ud",
-			FT_BYTES, BASE_HEX, NULL, 0x0,
+			FT_BYTES, BASE_NONE, NULL, 0x0,
 			NULL, HFILL }
 		},
 		{ &hf_p25cai_packet_crc,
