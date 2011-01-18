@@ -24,6 +24,7 @@
 #include <arpa/inet.h>
 #include <cstdio>
 #include <cstring>
+#include <errno.h>
 #include <iomanip>
 #include <netinet/in.h>
 #include <p25cai_du_handler.h>
@@ -44,11 +45,12 @@ p25cai_du_handler::p25cai_du_handler(data_unit_handler_sptr next, const char *ad
 	inet_aton(addr, &sin.sin_addr);
 	d_cai = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	if(-1 != d_cai) {
-      if(-1 == connect(d_cai, (struct sockaddr*) &sin, sizeof(sin))) {
+      if(-1 != connect(d_cai, (struct sockaddr*) &sin, sizeof(sin))) {
          ostringstream address;
          address << addr << ":" << port;
          d_address = address.str();
       } else {
+         printf("error %d: %s\n", errno, strerror(errno));
          perror("connect(d_tap, (struct sockaddr*) &sin, sizeof(sin))");
          close(d_cai);
          d_cai = -1;

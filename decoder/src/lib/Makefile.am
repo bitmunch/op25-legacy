@@ -82,9 +82,7 @@ _op25_la_SOURCES = \
 	software_imbe_decoder.cc \
 	vc55_imbe_decoder.cc \
 	value_string.cc \
-	pickle.cc \
-	golay.cc \
-	hamming.cc
+	pickle.cc
 
 # magic flags
 _op25_la_LDFLAGS = $(NO_UNDEFINED) -module -avoid-version
