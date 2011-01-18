@@ -23,7 +23,7 @@ imbe_decoder::make()
          imbe = imbe_decoder_sptr(new dummy_imbe_decoder());
       }
    } else {
-      imbe = imbe_decoder_sptr(new dummy_imbe_decoder());
+      imbe = imbe_decoder_sptr(new software_imbe_decoder());
    }
    return imbe;
 }
