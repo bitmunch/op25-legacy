@@ -23,9 +23,7 @@
 
 #include <hdu.h>
 #include <iomanip>
-#include <iostream>
-#include <itpp/base/vec.h>
-#include <itpp/comm/reedsolomon.h>
+#include <pickle.h>
 #include <sstream>
 #include <value_string.h>
 #include <op25_yank.h>
@@ -50,61 +48,15 @@ hdu::duid_str() const
 std::string
 hdu::snapshot() const
 {
-   size_t n = 0;
-   ostringstream os;
-
-   // Begin
-   os << "(d";
-   os << "p" << n++ << endl;
-
-   // NID = NAC+DUID
-
-   // DUID
-   os << "S'duid'" << endl;
-   os << "p" << n++ << endl;
-   os << "S'" << duid_str() << "'"  << endl;
-
-   // NAC
-   os << "p" << n++ << endl;
-   os << "sS'nac'" << endl;
-   os << "p" << n++ << endl;
-   os << "S'" << nac_str() << "'" << endl;
-
-   // MFID
-   os << "p" << n++ << endl;
-   os << "sS'mfid'" << endl;
-   os << "p" << n++ << endl;
-   os << "S'" << mfid_str() << "'" << endl;
-
-   // ALGID
-   os << "p" << n++ << endl;
-   os << "sS'algid'" << endl;
-   os << "p" << n++ << endl;
-   os << "S'" << algid_str() << "'" << endl;
-
-   // KID
-   os << "p" << n++ << endl;
-   os << "sS'kid'" << endl;
-   os << "p" << n++ << endl;
-   os << "S'" << kid_str() << "'" << endl;
-
-   // MI
-   os << "p" << n++ << endl;
-   os << "sS'mi'" << endl;
-   os << "p" << n++ << endl;
-   os << "S'" << mi_str() << "'" << endl;
-
-   // TGID
-   os << "p" << n++ << endl;
-   os << "sS'tgid'" << endl;
-   os << "p" << n++ << endl;
-   os << "S'" << tgid_str() << "'" << endl;
-
-   // End
-   os << "p" << n++ << endl;
-   os << "s." << endl;
-
-   return os.str();
+   pickle p;
+   p.add("duid", duid_str());
+   p.add("nac", nac_str());
+   p.add("mfid", mfid_str());
+   p.add("algid", algid_str());
+   p.add("kid", kid_str());
+   p.add("mi", mi_str());
+   p.add("tgid", tgid_str());
+   return p.to_string();
 }
 
 void
@@ -157,8 +109,9 @@ hdu::apply_golay_correction(bit_vector& frame)
       { 762, 763, 764, 765, 766, 767, 768, 769, 770, 771, 772, 773, 774, 775, 776, 777, 778, 779 }
    };
    for(size_t i = 0; i < NOF_GOLAY_CODEWORDS; ++i) {
-//      yank(frame, GOLAY_CODEWORDS[i], GOLAY_CODEWORD_SZ, b, PAD_SZ);
-//      itpp::bvec d(golay.decode(b));
+      uint32_t cw = extract(frame, GOLAY_CODEWORDS[i], GOLAY_CODEWORD_SZ);
+//      uint32_t d = golay_decode(cw);
+//      uint32 cw = golay_encode(cw);
 //      yank_back(d, PAD_SZ, frame, GOLAY_CODEWORDS[i], GOLAY_DATA_SZ);
    }
 }
@@ -231,9 +184,6 @@ hdu::mi_str() const
       uint16_t octet = mi[i];
       os << hex << setfill('0') << setw(2) << octet;
    }
-
-//   clog << os.str() << endl; // diagnostix
-
    return os.str();
 }
 
