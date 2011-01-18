@@ -54,7 +54,7 @@ const value_string ALGIDS[] = {
    { 0x04, "SAVILLE" },
    { 0x41, "BATON (Auto Odd)" },
    /* Type III */
-   { 0x80, "Unencrypted message" },
+   { 0x80, "Plain" },
    { 0x81, "DES-OFB" },
    { 0x82, "2 key Triple DES" },
    { 0x83, "3 key Triple DES" },
