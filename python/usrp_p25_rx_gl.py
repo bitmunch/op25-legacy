@@ -301,7 +301,7 @@ class p25_rx_block (stdgui2.std_top_block):
         self.decode_watcher = decode_watcher(msgq, self.traffic)
         self.p25_decoder = op25.decoder_ff()
         self.p25_decoder.set_msgq(msgq)
-        self.frame.SetStatusText("TUN/TAP: " + self.p25_decoder.device_name())
+        self.frame.SetStatusText("Destination: " + self.p25_decoder.destination())
 
     # read capture file properties (decimation etc.)
     #
