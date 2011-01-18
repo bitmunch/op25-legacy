@@ -15,8 +15,8 @@
  * First arg is the package prefix.
  * Second arg is the name of the class minus the prefix.
  *
- * This does some behind-the-scenes magic so we can access
- * op25_decoder_ff from python as op25.decoder_ff.
+ * This does some behind-the-scenes magic so we can invoke
+ * op25_make_decoder_ff from python as op25.decoder_ff.
  */
 GR_SWIG_BLOCK_MAGIC(op25, decoder_ff);
 
@@ -33,7 +33,7 @@ class op25_decoder_ff : public gr_block
 private:
    op25_decoder_ff();
 public:
-   const char *device_name() const;
+   const char *destination() const;
    gr_msg_queue_sptr get_msgq() const;
    void set_msgq(gr_msg_queue_sptr msgq);
 };

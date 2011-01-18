@@ -1,7 +1,7 @@
 /* -*- C++ -*- */
 
 /*
- * Copyright 2008 Steve Glass
+ * Copyright 2008-2011 Steve Glass
  * 
  * This file is part of OP25.
  * 
@@ -59,14 +59,13 @@ public:
     * Process symbols into frames.
     */
    virtual int general_work(int nof_output_items, gr_vector_int& nof_input_items, gr_vector_const_void_star& input_items, gr_vector_void_star& output_items);
-
    /**
-    * Return a pointer to a string naming the device to which packets
-    * are forwarded.
+    * Return a pointer to a string identifying the destination of
+    * the received frames.
     *
     * \return A pointer to a NUL-terminated character string.
     */
-   const char *device_name() const;
+   const char *destination() const;
 
    /**
     * Accessor for the msgq attribute. Returns a pointer to the msgq
@@ -155,9 +154,9 @@ private:
    enum { SYNCHRONIZING, IDENTIFYING, READING } d_state;
 
    /**
-    * The sniffer (TUN/TAP) data unit handler.
+    * The p25cai (TUN/TAP) data unit handler.
     */
-   class sniffer_du_handler *d_sniffer_du_handler;
+   class p25cai_du_handler *d_p25cai_du_handler;
 
    /**
     * The snapshot data unit handler.

@@ -1,7 +1,7 @@
 /* -*- C++ -*- */
 
 /*
- * Copyright 2008, 2009 Steve Glass
+ * Copyright 2008-2011 Steve Glass
  * 
  * This file is part of OP25.
  * 
@@ -33,7 +33,7 @@
 #include <offline_imbe_decoder.h>
 #include <op25_decoder_ff.h>
 #include <snapshot_du_handler.h>
-#include <sniffer_du_handler.h>
+#include <p25cai_du_handler.h>
 #include <voice_du_handler.h>
 #include <op25_yank.h>
 
@@ -56,6 +56,7 @@ op25_decoder_ff::get_msgq() const
 }
 
 void
+
 op25_decoder_ff::set_msgq(gr_msg_queue_sptr msgq)
 {
    d_snapshot_du_handler->set_msgq(msgq);
@@ -117,9 +118,9 @@ op25_decoder_ff::general_work(int nof_output_items, gr_vector_int& nof_input_ite
 }
 
 const char*
-op25_decoder_ff::device_name() const
+op25_decoder_ff::destination() const
 {
-   return d_sniffer_du_handler->device_name();
+   return d_p25cai_du_handler->destination();
 }
 
 op25_decoder_ff::op25_decoder_ff() :
@@ -129,10 +130,10 @@ op25_decoder_ff::op25_decoder_ff() :
    d_frame_hdr(),
    d_imbe(imbe_decoder::make()),
    d_state(SYNCHRONIZING),
-   d_sniffer_du_handler(NULL)
+   d_p25cai_du_handler(NULL)
 {
-   d_sniffer_du_handler =  new sniffer_du_handler(d_data_unit_handler);
-   d_data_unit_handler = data_unit_handler_sptr(d_sniffer_du_handler);
+   d_p25cai_du_handler =  new p25cai_du_handler(d_data_unit_handler, "224.0.0.1", 23456);
+   d_data_unit_handler = data_unit_handler_sptr(d_p25cai_du_handler);
    d_snapshot_du_handler = new snapshot_du_handler(d_data_unit_handler);
    d_data_unit_handler = data_unit_handler_sptr(d_snapshot_du_handler);
    d_data_unit_handler = data_unit_handler_sptr(new voice_du_handler(d_data_unit_handler, d_imbe));

@@ -69,8 +69,8 @@ _op25_la_SOURCES = \
 	tsbk.cc \
 	data_unit_handler.cc \
 	logfile_du_handler.cc \
+	p25cai_du_handler.cc \
 	snapshot_du_handler.cc \
-	sniffer_du_handler.cc \
 	imbe_decoder.cc \
 	imbe_decoder_factory.cc \
 	dummy_imbe_decoder.cc \
@@ -81,7 +81,10 @@ _op25_la_SOURCES = \
 	op25_decoder_ff.cc \
 	software_imbe_decoder.cc \
 	vc55_imbe_decoder.cc \
-	value_string.cc
+	value_string.cc \
+	pickle.cc \
+	golay.cc \
+	hamming.cc
 
 # magic flags
 _op25_la_LDFLAGS = $(NO_UNDEFINED) -module -avoid-version
@@ -98,12 +101,7 @@ op25.cc op25.py: $(LOCAL_IFILES) $(ALL_IFILES)
 
 # These headers get installed in ${prefix}/include/gnuradio
 grinclude_HEADERS = \
-	op25_decoder_ff.h	\
-	op25_p25_frame.h	\
-	op25_imbe_frame.h	\
-	op25_golay.h		\
-	op25_hamming.h		\
-	op25_yank.h
+	op25_decoder_ff.h		
 
 # These swig headers get installed in ${prefix}/include/gnuradio/swig
 swiginclude_HEADERS = \
