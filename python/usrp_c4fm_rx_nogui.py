@@ -32,7 +32,7 @@ from math import pi
 
 # The P25 receiver
 #
-class p25_rx_block (gr.top_block):
+class usrp_c4fm_rx (gr.top_block):
 
     # Initialize the P25 receiver
     #
@@ -154,7 +154,7 @@ if '__main__' == __name__:
         self.options = options
         
     try:
-        rx = p25_rx_block(options.subdev_spec, options.freq, options.calibration, options.decim, options.squelch, options.gain)
+        rx = usrp_c4fm_rx(options.subdev_spec, options.freq, options.calibration, options.decim, options.squelch, options.gain)
         rx.run()
     except KeyboardInterrupt:
         pass
