@@ -21,6 +21,7 @@
 # Software Foundation, Inc., 51 Franklin Street, Boston, MA
 # 02110-1301, USA.
 
+import cPickle
 import math
 import os
 import sys
@@ -42,12 +43,12 @@ class file_c4fm_rx (gr.top_block):
 
         # open file and info
         f = open(filename + ".info", "r")
-        info = pickle.load(f)
+        info = cPickle.load(f)
         capture_rate = info["capture-rate"]
         f.close()
         file = gr.file_source(gr.sizeof_gr_complex, filename, True)
         throttle = gr.throttle(gr.sizeof_gr_complex, capture_rate)
-        self.connect([file, throttle])
+        self.connect(file, throttle)
                 
         # setup receiver attributes
         channel_rate = 125000
@@ -139,7 +140,7 @@ if '__main__' == __name__:
 
     from optparse import OptionParser
     parser = OptionParser(option_class=eng_option)
-    parser.add_option("-i", "--input-file", type="String", default=None, help="path to input file [=%default]")
+    parser.add_option("-i", "--input-file", type="string", default=None, help="path to input file [=%default]")
     parser.add_option("-c", "--calibration", type="eng_float", default=0.0, help="channel frequency offset [=%default]", metavar="Hz")
     parser.add_option("-s", "--squelch", type="eng_float", default=15.0, help="squelch threshold [=%default]", metavar="dB")
     (options, args) = parser.parse_args()
