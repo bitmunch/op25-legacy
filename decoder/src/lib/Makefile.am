@@ -78,7 +78,9 @@ _op25_la_SOURCES = \
 	voice_data_unit.cc \
 	voice_du_handler.cc \
 	op25.cc \
-	op25_decoder_ff.cc \
+	op25_decoder_bf.cc \
+	op25_fsk4_slicer_fb.cc \
+	op25_pcap_source_b.cc \
 	software_imbe_decoder.cc \
 	vc55_imbe_decoder.cc \
 	value_string.cc \
