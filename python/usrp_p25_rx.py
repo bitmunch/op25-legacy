@@ -33,7 +33,6 @@ from gnuradio.eng_option import eng_option
 from gnuradio.wxgui import stdgui2, fftsink2, scopesink2
 from math import pi
 from optparse import OptionParser
-from usrpm import usrp_dbid
 
 import pickle
 
@@ -139,6 +138,9 @@ class p25_rx_block (stdgui2.std_top_block):
         autotuneq = gr.msg_queue(2)
         self.demod_watcher = demod_watcher(autotuneq, self.adjust_channel_offset)
         demod_fsk4 = fsk4.demod_ff(autotuneq, channel_rate, self.symbol_rate)
+        # symbol slicer
+        levels = [ -2.0, 0.0, 2.0, 4.0 ]
+        slicer = op25.fsk4_slicer_fb(levels)
         # ALSA output device (if not locked)
         try:
             sink = audio.sink(8000, "plughw:0,0", True) # ToDo: get actual device from prefs
@@ -146,7 +148,7 @@ class p25_rx_block (stdgui2.std_top_block):
             sink = gr.null_sink(gr.sizeof_float)
 
         # connect it all up
-        self.__connect([[source, self.channel_filter, self.squelch, fm_demod, symbol_filter, demod_fsk4, self.p25_decoder, sink],
+        self.__connect([[source, self.channel_filter, self.squelch, fm_demod, symbol_filter, demod_fsk4, slicer, self.p25_decoder, sink],
                         [source, self.spectrum],
                         [symbol_filter, self.signal_scope],
                         [demod_fsk4, self.symbol_scope]])
@@ -267,7 +269,7 @@ class p25_rx_block (stdgui2.std_top_block):
         self.notebook.AddPage(self.traffic, "Traffic")
         # Setup the decoder and report the TUN/TAP device name
         self.decode_watcher = decode_watcher(msgq, self.traffic)
-        self.p25_decoder = op25.decoder_ff()
+        self.p25_decoder = op25.decoder_bf()
         self.p25_decoder.set_msgq(gr.msg_queue(2))
         self.frame.SetStatusText("Destination: " + self.p25_decoder.destination())
 

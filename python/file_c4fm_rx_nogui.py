@@ -26,34 +26,33 @@ import os
 import sys
 import threading
 
-from gnuradio import audio, fsk4, gr, gru, op25, usrp2
+from gnuradio import audio, fsk4, gr, gru, op25, usrp
 from gnuradio.eng_option import eng_option
 from math import pi
 
 # The P25 receiver
 #
-class usrp2_c4fm_rx (gr.top_block):
+class file_c4fm_rx (gr.top_block):
 
     # Initialize the P25 receiver
     #
-    def __init__(self, interface, address, center_freq, offset_freq, decim, squelch, gain):
+    def __init__(self, filename, offset_freq, squelch):
 
         gr.top_block.__init__(self)
 
-        # setup USRP2
-        u = usrp2.source_32fc(interface, address)
-        u.set_decim(decim)
-        capture_rate = u.adc_rate() / decim
-        u.set_center_freq(center_freq)
-        if gain is None:
-            g = u.gain_range()
-            gain = float(g[0] + g[1]) / 2
-        u.set_gain(gain)
-
-        # Setup receiver attributes
+        # open file and info
+        f = open(filename + ".info", "r")
+        info = pickle.load(f)
+        capture_rate = info["capture-rate"]
+        f.close()
+        file = gr.file_source(gr.sizeof_gr_complex, filename, True)
+        throttle = gr.throttle(gr.sizeof_gr_complex, capture_rate)
+        self.connect([file, throttle])
+                
+        # setup receiver attributes
         channel_rate = 125000
         symbol_rate = 4800
-      
+        
         # channel filter
         self.channel_offset = offset_freq
         channel_decim = capture_rate // channel_rate
@@ -62,7 +61,7 @@ class usrp2_c4fm_rx (gr.top_block):
         trans_centre = trans_width + (trans_width / 2)
         coeffs = gr.firdes.low_pass(1.0, capture_rate, trans_centre, trans_width, gr.firdes.WIN_HANN)
         self.channel_filter = gr.freq_xlating_fir_filter_ccf(channel_decim, coeffs, self.channel_offset, capture_rate)
-        self.connect(u, self.channel_filter)
+        self.connect(throttle, self.channel_filter)
 
         # power squelch
         power_squelch = gr.pwr_squelch_cc(squelch, 1e-3, 0, True)
@@ -96,7 +95,7 @@ class usrp2_c4fm_rx (gr.top_block):
         decoder = op25.decoder_bf()
         self.connect(slicer, decoder)
 
-        # try to connect audio output device
+        # try to connect default output device
         try:
             audio_sink = audio.sink(8000, "plughw:0,0", True)
             self.connect(decoder, audio_sink)
@@ -140,27 +139,17 @@ if '__main__' == __name__:
 
     from optparse import OptionParser
     parser = OptionParser(option_class=eng_option)
-    parser.add_option("-i", "--interface", type="string", default="eth0",
-                      help="select Ethernet interface, default is eth0")
-    parser.add_option("-a", "--address", type="string", default="",
-                      help="select USRP by MAC address, default is auto-select")
-    parser.add_option("-f", "--freq", type="eng_float", default=434.075e6,
-                      help="rx frequency [=%default]", metavar="Hz")
-    parser.add_option("-c", "--calibration", type="eng_float", default=0.0,
-                      help="frequency offset [=%default]", metavar="Hz")
-    parser.add_option("-d", "--decim", type="int", default=400,
-                      help="decimation factor [=%default]")
-    parser.add_option("-s", "--squelch", type="eng_float", default=15.0,
-                      help="squelch threshold [=%default]", metavar="dB")
-    parser.add_option("-g", "--gain", type="eng_float", default=None, help="gain", metavar="dB")
+    parser.add_option("-i", "--input-file", type="String", default=None, help="path to input file [=%default]")
+    parser.add_option("-c", "--calibration", type="eng_float", default=0.0, help="channel frequency offset [=%default]", metavar="Hz")
+    parser.add_option("-s", "--squelch", type="eng_float", default=15.0, help="squelch threshold [=%default]", metavar="dB")
     (options, args) = parser.parse_args()
-    if len(args) != 0:
+    if len(args) != 0 or options.input_file is None:
         parser.print_help()
         sys.exit(1)
         self.options = options
         
     try:
-        rx = usrp2_c4fm_rx(options.interface, options.address, options.freq, options.calibration, options.decim, options.squelch, options.gain)
+        rx = file_c4fm_rx(options.input_file, options.calibration, options.squelch)
         rx.run()
     except KeyboardInterrupt:
         pass

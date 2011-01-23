@@ -93,11 +93,16 @@ class usrp_c4fm_rx (gr.top_block):
         demod_fsk4 = fsk4.demod_ff(autotuneq, channel_rate, symbol_rate)
         self.connect(symbol_filter, demod_fsk4)
 
-        # Setup the decoder
-        decoder = op25.decoder_ff()
-        self.connect(demod_fsk4, decoder)
+        # symbol slicer
+        levels = [ -2.0, 0.0, 2.0, 4.0 ]
+        slicer = op25.fsk4_slicer_fb(levels)
+        self.connect(demod_fsk4, slicer)
 
-        # try to connect ALSA output device
+        # frame decoder
+        decoder = op25.decoder_bf()
+        self.connect(slicer, decoder)
+
+        # try to connect audio output device
         try:
             audio_sink = audio.sink(8000, "plughw:0,0", True)
             self.connect(decoder, audio_sink)
