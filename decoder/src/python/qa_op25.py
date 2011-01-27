@@ -37,11 +37,11 @@ class qa_op25(gr_unittest.TestCase):
         self.fg = None
 
     def test_constructor(self):
-        framing_sequence = (3, 3, 3, 3, 3, -3, 3, 3, -3, -3, 3, 3, -3, -3, -3, -3, 3, -3, 3, -3, -3, -3, -3, -3)
-        src = gr.vector_source_f(framing_sequence, False)
+        # framing_sequence = (3, 3, 3, 3, 3, -3, 3, 3, -3, -3, 3, 3, -3, -3, -3, -3, 3, -3, 3, -3, -3, -3, -3, -3)
+        # src = gr.vector_source_f(framing_sequence, False)
         msgq = gr.msg_queue()
-        p25 = op25.decoder_ff(msgq)
-        self.fg.connect(src, p25)
+        p25 = op25.decoder_bf(msgq)
+        # self.fg.connect(src, p25)
 
     # ToDo: add test cases!
         

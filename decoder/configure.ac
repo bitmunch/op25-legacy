@@ -74,7 +74,7 @@ AC_TYPE_SIZE_T
 AC_HEADER_TIME
 
 dnl Checks for library functions.
-AC_CHECK_FUNCS([])
+AC_CHECK_LIB([pcap], [pcap_open_live, pcap_open_dead, pcap_close, pcap_next, pcap_next_ex, pcap_datalink, pcap_inject, pcap_dump, pcap_geterr], , AC_MSG_ERROR([libpcap library not found.]))
 
 dnl Check for Mingw support
 GR_PWIN32

@@ -80,24 +80,8 @@ op25_decoder_bf::general_work(int nof_output_items, gr_vector_int& nof_input_ite
    try {
 
       // process input
-/*
-      const float *in = reinterpret_cast<const float*>(input_items[0]);
-*/
       const uint8_t *in = reinterpret_cast<const uint8_t*>(input_items[0]);
       for(int i = 0; i < nof_input_items[0]; ++i) {
-/*
-         dibit d;
-         if(in[i] < -2.0) {
-            d = 3;
-         } else if(in[i] <  0.0) {
-            d = 2;
-         } else if(in[i] <  2.0) {
-            d = 0;
-         } else {
-            d = 1;
-         }
-         receive_symbol(d);
-*/
          dibit d = in[i] & 0x3;
          receive_symbol(d);
       }
