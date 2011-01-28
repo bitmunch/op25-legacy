@@ -31,19 +31,17 @@ import op25
 class qa_op25(gr_unittest.TestCase):
 
     def setUp(self):
-        self.fg = gr.flow_graph ()
+        self.tb = gr.top_block()
 
     def tearDown(self):
-        self.fg = None
+        self.tb = None
 
     def test_constructor(self):
-        # framing_sequence = (3, 3, 3, 3, 3, -3, 3, 3, -3, -3, 3, 3, -3, -3, -3, -3, 3, -3, 3, -3, -3, -3, -3, -3)
-        # src = gr.vector_source_f(framing_sequence, False)
-        msgq = gr.msg_queue()
-        p25 = op25.decoder_bf(msgq)
-        # self.fg.connect(src, p25)
+        empty_sequence = ()
+        src = gr.vector_source_b(empty_sequence, False)
+        # msgq = gr.msg_queue()
+        p25 = op25.decoder_bf()
+        self.tb.connect(src, p25)
 
-    # ToDo: add test cases!
-        
 if __name__ == '__main__':
     gr_unittest.main ()
