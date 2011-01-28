@@ -31,15 +31,16 @@ import wx.wizard
 import gnuradio.wxgui.plot as plot
 import numpy
 
-from gnuradio import audio, eng_notation, fsk4, gr, gru, op25
+from gnuradio import audio, eng_notation, gr, gru
 from gnuradio.eng_option import eng_option
 from gnuradio.wxgui import stdgui2, fftsink2, scopesink2
 from math import pi
 from optparse import OptionParser
+
 try:
-  from usrpm import usrp_dbid
+    from gnuradio import fsk4, op25
 except Exception:
-  ignore = True
+    import fsk4, op25
 
 # The P25 receiver
 #
@@ -293,9 +294,10 @@ class p25_rx_block (stdgui2.std_top_block):
         self.traffic = TrafficPane(self.notebook)
         self.notebook.AddPage(self.traffic, "Traffic")
         # Setup the decoder and report the TUN/TAP device name
+        self.msgq = gr.msg_queue(2)
         self.decode_watcher = decode_watcher(self.msgq, self.traffic)
         self.p25_decoder = op25.decoder_bf()
-        self.p25_decoder.set_msgq(gr.msg_queue(2))
+        self.p25_decoder.set_msgq(msgq)
         self.frame.SetStatusText("TUN/TAP: " + self.p25_decoder.device_name())
 
     # read capture file properties (decimation etc.)
