@@ -105,13 +105,11 @@ op25_pcap_source::read_at_least(const size_t NSYMS_REQD)
    while(pcap_ && n < NSYMS_REQD) {
       const uint8_t *octets = pcap_next(pcap_, &hdr);
       if(octets) {
-         // push inter-frame silence symbols
          const float N = (prev_is_present_ ? ifs(hdr, prev_, ETHERNET_SZ) :  DELAY_);
          const uint_least32_t NSYMS = roundl(N * (1 / SYMBOLS_PER_SEC_));
          for(uint_least32_t i = 0; i < NSYMS; ++i, ++n) {
             symbols_.push_back(0);
          }
-         // push symbols from frame payload
          for(size_t i = ETHERNET_SZ; i < hdr.caplen; ++i, ++n) {
             for(int16_t j = 6; j >= 0; j -= 2) {
                dibit d = (octets[i] >> j) & 0x3;
@@ -124,7 +122,6 @@ op25_pcap_source::read_at_least(const size_t NSYMS_REQD)
          pcap_close(pcap_);
          pcap_ = NULL;
          if(repeat_) {
-            // re-open the file
             char err[PCAP_ERRBUF_SIZE];
             pcap_ = pcap_open_offline(path_.c_str(), err);
             prev_is_present_ = false;
