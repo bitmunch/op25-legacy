@@ -110,7 +110,6 @@ class p25_rx_block (stdgui2.std_top_block):
         parser = OptionParser(option_class=eng_option)
         parser.add_option("-R", "--rx-subdev-spec", type="subdev", default=(0, 0), help="select USRP Rx side A or B")
         parser.add_option("-d", "--decim", type="int", default=256, help="source decimation factor")
-#        parser.add_option("-f", "--frequency", type="eng_float", default=434.075e6, help="USRP center frequency", metavar="Hz")
         parser.add_option("-f", "--frequency", type="eng_float", default=None, help="USRP center frequency", metavar="Hz")
         parser.add_option("-g", "--gain", type="eng_float", default=None, help="set USRP gain in dB (default is midpoint)")
         parser.add_option("-i", "--input", default=None, help="input file name")
@@ -131,7 +130,7 @@ class p25_rx_block (stdgui2.std_top_block):
         if options.input:
             self.open_file(options.input)
         elif options.frequency:
-            self.open_usrp(self.options.rx_subdev_spec, self.options.decim, self.options.gain, self.options.frequency, not options.transient)
+            self.open_usrp(self.options.rx_subdev_spec, self.options.decim, self.options.gain, self.options.frequency, not self.options.transient)
         else:
             self._set_state("STOPPED")
 
@@ -457,7 +456,7 @@ class p25_rx_block (stdgui2.std_top_block):
         self.stop()
         self.wait()
         # ToDo: get open_usrp() arguments from wizard
-        self.open_usrp(self.options.rx_subdev_spec, self.options.decim, self.options.gain, self.options.frequency, not options.transient)
+        self.open_usrp(self.options.rx_subdev_spec, self.options.decim, self.options.gain, self.options.frequency, not self.options.transient)
         self.start()
 
     # Open an existing capture
