@@ -2,7 +2,7 @@
 #
 # Copyright 2005,2006,2007 Free Software Foundation, Inc.
 # 
-# Copyright 2010 KA1RBI
+# Copyright 2010, 2011 KA1RBI
 # 
 # This file is part of GNU Radio
 # 
@@ -23,7 +23,7 @@
 # 
 
 from gnuradio import gr, gru, eng_notation, optfir
-from gnuradio import usrp
+from gnuradio import usrp, fsk4
 from gnuradio import repeater
 from gnuradio import blks2
 from gnuradio.eng_option import eng_option
@@ -39,12 +39,20 @@ USRP multichannel RX app
 
 Simultaneously receives multiple p25 stations,
 decoded audio is written over multiple parallel channels to asterisk app_rpt,
-or optionally to wireshark [if -w option specified]
+or optionally to wireshark
 """
 
-# edit next two lines - set the center freq halfway between lowest and highest
-center_freq = 851.8125e6
-chans = [851.3125e6, 851.4125e6, 851.9125e6, 852.0125e6, 852.3125e6]
+channels = [
+	{'freq':430.1000e6, 'mode':'c4fm',  'port':32001},
+	{'freq':430.2000e6, 'mode':'cqpsk', 'port':32002, 'wireshark':1},
+	{'freq':430.3000e6, 'mode':'fm',    'port':32003},
+	{'freq':430.4000e6, 'mode':'fm',    'port':32004, 'ctcss':97.4}
+]
+# you must set the center frequency - such that highest and lowest (above)
+# are not more than about 500 KHz away from the center frequency
+# if you are worried about the "DC" spike in the fft, set the center
+# freq. away from any frequency in the channel list.
+center_freq = 430.2500e6
 
 WIRESHARK_PORT = 23456
 
@@ -61,11 +69,75 @@ def pick_subdevice(u):
 				usrp_dbid.DBS_RX,
                                 usrp_dbid.BASIC_RX))
 
+class rx_channel_nfm(gr.hier_block2):
+    def __init__(self, sps, channel_decim, channel_taps, options, usrp_rate, channel_rate, lo_freq, max_dev, ctcss):
+        gr.hier_block2.__init__(self, "rx_channel_nfm",
+                                gr.io_signature(1, 1, gr.sizeof_gr_complex),
+#                               gr.io_signature(0, 0, 0))
+                                gr.io_signature(1, 1, gr.sizeof_float))
+
+        output_sample_rate = 8000
+
+        chan = gr.freq_xlating_fir_filter_ccf(int(channel_decim), channel_taps, lo_freq, usrp_rate)
+
+        nphases = 32
+        frac_bw = 0.45
+        rs_taps = gr.firdes.low_pass(nphases, nphases, frac_bw, 0.5-frac_bw)
+
+        resampler = blks2.pfb_arb_resampler_ccf(
+           float(output_sample_rate)/channel_rate,
+           (rs_taps),
+           nphases
+        )
+
+        # FM Demodulator  input: complex; output: float
+        k = output_sample_rate/(2*math.pi*max_dev)
+        fm_demod = gr.quadrature_demod_cf(k)
+
+        self.connect (self, chan, resampler, fm_demod)
+        if ctcss > 0:
+            level = 5.0
+            len = 0
+            ramp = 0
+            gate = True
+            ctcss = repeater.ctcss_squelch_ff(output_sample_rate, ctcss, level, len, ramp, gate)
+            self.connect (fm_demod, ctcss, self)
+        else:
+            self.connect (fm_demod, self)
+
+class rx_channel_c4fm(gr.hier_block2):
+    def __init__(self, sps, channel_decim, channel_taps, options, usrp_rate, channel_rate, lo_freq):
+        gr.hier_block2.__init__(self, "rx_channel_fm",
+                                gr.io_signature(1, 1, gr.sizeof_gr_complex),
+                                gr.io_signature(1, 1, gr.sizeof_float))
+
+        chan = gr.freq_xlating_fir_filter_ccf(int(channel_decim), channel_taps, lo_freq, usrp_rate)
+
+        symbol_decim = 1
+        symbol_rate = 4800
+
+        self.symbol_deviation = 600.0
+        fm_demod_gain = channel_rate / (2.0 * pi * self.symbol_deviation)
+        fm_demod = gr.quadrature_demod_cf(fm_demod_gain)
+
+        symbol_coeffs = gr.firdes_root_raised_cosine(1.0,
+                                                     channel_rate,
+                                                     symbol_rate, 
+                                                     1.0,
+                                                     51)
+        symbol_filter = gr.fir_filter_fff(symbol_decim, symbol_coeffs)
+
+        # C4FM demodulator
+        autotuneq = gr.msg_queue(2)
+        demod_fsk4 = fsk4.demod_ff(autotuneq, channel_rate, symbol_rate)
+ 
+        self.connect (self, chan, fm_demod, symbol_filter, demod_fsk4, self)
+
 class rx_channel_cqpsk(gr.hier_block2):
-    def __init__(self, sps, channel_decim, channel_taps, options, usrp_rate, channel_rate, lo_freq, port):
+    def __init__(self, sps, channel_decim, channel_taps, options, usrp_rate, channel_rate, lo_freq):
         gr.hier_block2.__init__(self, "rx_channel_cqpsk",
                                 gr.io_signature(1, 1, gr.sizeof_gr_complex),
-                                gr.io_signature(0, 0, 0))
+                                gr.io_signature(1, 1, gr.sizeof_float))
 
         chan = gr.freq_xlating_fir_filter_ccf(int(channel_decim), channel_taps, lo_freq, usrp_rate)
 
@@ -89,28 +161,7 @@ class rx_channel_cqpsk(gr.hier_block2):
         # convert from radians such that signal is in -3/-1/+1/+3
         rescale = gr.multiply_const_ff( (1 / (pi / 4)) )
 
-        # reduce float symbols to binary dibits
-        levels = [ -2.0, 0.0, 2.0, 4.0 ]
-        slicer = repeater.fsk4_slicer_fb(levels)
-
-        self.connect (self, chan, agc, clock, diffdec, to_float, rescale, slicer)
-        if options.wireshark:
-            # build p25 frames from raw dibits and write to wireshark
-            msgq = gr.msg_queue(2)
-            decoder = repeater.p25_frame_assembler(options.hostname, WIRESHARK_PORT, options.debug, False, False, False, msgq)
-            self.connect (slicer, decoder)
-        else:
-            # build p25 frames from raw dibits and extract IMBE speech codewords
-            msgq = gr.msg_queue(2)
-            decoder = repeater.p25_frame_assembler('', 0, options.debug, True, True, False, msgq)
-    
-            # decode the IMBE codewords - outputs speech at 8k rate
-            imbe = repeater.vocoder(False, False, 0, "", 0, False)
-
-            # write the audio (8k, signed int16) to asterisk app_rpt via UDP
-            chan_rpt = repeater.chan_usrp_rx(options.hostname, port, options.debug)
-
-            self.connect (slicer, decoder, imbe, chan_rpt)
+        self.connect (self, chan, agc, clock, diffdec, to_float, rescale, self)
 
 class usrp_rx_block (gr.top_block):
 
@@ -120,7 +171,7 @@ class usrp_rx_block (gr.top_block):
         parser=OptionParser(option_class=eng_option)
         parser.add_option("-R", "--rx-subdev-spec", type="subdev", default=None,
                           help="select USRP Rx side A or B (default=A)")
-        parser.add_option("-C", "--costas-alpha", type="eng_float", default=0.10, help="offset frequency", metavar="Hz")
+        parser.add_option("-C", "--costas-alpha", type="eng_float", default=0.125, help="offset frequency", metavar="Hz")
         parser.add_option("-c", "--calibration", type="int", default=0,
                           help="USRP calibration offset", metavar="FREQ")
         parser.add_option("-d","--debug", type="int", default=0, help="debug level")
@@ -148,15 +199,18 @@ class usrp_rx_block (gr.top_block):
         adc_rate = self.u.adc_rate()                # 64 MS/s
         usrp_decim = 60
         self.u.set_decim_rate(usrp_decim)
-        usrp_rate = adc_rate / usrp_decim           # 1,066,667
+        usrp_rate = adc_rate / usrp_decim           # 1.0667 M
 
-        channel_decim = 50.0                        # NB: 100 causes trouble
-        channel_rate = usrp_rate / channel_decim
+        channel_decim = 50.0
+        channel_rate = usrp_rate / channel_decim    # 8K sps rate
         sps = channel_rate / 4800.0
         print "channel rate %f sps %f" % (channel_rate, sps)
 
         low_pass = 15e3
         channel_taps = gr.firdes.low_pass(1.0, usrp_rate, low_pass, low_pass * 0.1, gr.firdes.WIN_HANN)
+
+        low_pass_nfm = 7.5e3
+        channel_taps_nfm = gr.firdes.low_pass(1.0, usrp_rate, low_pass_nfm, low_pass_nfm * 0.1, gr.firdes.WIN_HANN)
 
         if options.rx_subdev_spec is None:
             options.rx_subdev_spec = pick_subdevice(self.u)
@@ -165,11 +219,55 @@ class usrp_rx_block (gr.top_block):
         self.subdev = usrp.selected_subdev(self.u, options.rx_subdev_spec)
         print "Using RX d'board %s" % (self.subdev.side_and_name(),)
 
-        for i in range(len(chans)):
-            lo_freq = center_freq - chans[i]
-            t = rx_channel_cqpsk(sps, channel_decim, channel_taps, options, usrp_rate, channel_rate, lo_freq, options.port + i)
-            self.connect(self.u, t)
-            print "attaching channel %d freq %f port %d" % (i+1, lo_freq, options.port + i)
+        for i in xrange(len(channels)):
+            freq = channels[i]['freq']
+            mode = channels[i]['mode']
+            port = channels[i]['port']
+            ctcss = 0.0
+            if 'ctcss' in channels[i]:
+                ctcss = channels[i]['ctcss']
+            wireshark = False
+            if 'wireshark' in channels[i]:
+                wireshark = True
+            lo_freq = center_freq - freq
+            if mode == 'c4fm':
+                channel = rx_channel_c4fm(sps, channel_decim, channel_taps, options, usrp_rate, channel_rate, lo_freq)
+            elif mode == 'cqpsk':
+                channel = rx_channel_cqpsk(sps, channel_decim, channel_taps, options, usrp_rate, channel_rate, lo_freq)
+            elif mode == 'fm':
+                channel = rx_channel_nfm(sps, channel_decim, channel_taps, options, usrp_rate, channel_rate, lo_freq, low_pass, ctcss)
+            elif mode == 'nfm':
+                channel = rx_channel_nfm(sps, channel_decim, channel_taps_nfm, options, usrp_rate, channel_rate, lo_freq, low_pass_nfm, ctcss)
+            # reduce float symbols to binary dibits
+            levels = [ -2.0, 0.0, 2.0, 4.0 ]
+            slicer = repeater.fsk4_slicer_fb(levels)
+
+            if wireshark:
+                # build p25 frames from raw dibits and write to wireshark
+                msgq = gr.msg_queue(2)
+                decoder = repeater.p25_frame_assembler(options.hostname, WIRESHARK_PORT, options.debug, False, False, False, msgq)
+                self.connect (self.u, channel, slicer, decoder)
+                sinks = gr.file_sink(gr.sizeof_char, "sym-%d.dat" % i)
+                self.connect (slicer, sinks)
+            else:
+                # build p25 frames from raw dibits and extract IMBE speech codewords
+                msgq = gr.msg_queue(2)
+                decoder = repeater.p25_frame_assembler('', 0, options.debug, True, True, False, msgq)
+
+                # decode the IMBE codewords - outputs speech at 8k rate
+                imbe = repeater.vocoder(False, False, 0, "", 0, False)
+
+                # write the audio (8k, signed int16) to asterisk app_rpt via UDP
+                chan_rpt = repeater.chan_usrp_rx(options.hostname, port, options.debug)
+
+                self.connect (self.u, channel, slicer, decoder, imbe, chan_rpt)
+                fsink = gr.file_sink(gr.sizeof_float, 'fm-sink-%d.dat' % port)
+                self.connect (channel, fsink)
+
+                sfn = "chan-%d.bin" % port
+                ssink = gr.file_sink(gr.sizeof_char, sfn)
+                self.connect (slicer, ssink)
+            print "attached channel %d freq %f port %d" % (i+1, lo_freq, port)
 
         if options.gain is None:
             # if no gain was specified, use the mid-point in dB
