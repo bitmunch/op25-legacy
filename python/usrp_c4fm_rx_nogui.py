@@ -108,7 +108,7 @@ class usrp_c4fm_rx (gr.top_block):
             self.connect(decoder, audio_sink)
         except Exception:
             sink = gr.null_sink(gr.sizeof_float)
-            self.connect(decoder, null);
+            self.connect(decoder, sink)
 
 
     # Adjust the channel offset

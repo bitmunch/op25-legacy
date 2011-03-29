@@ -1,7 +1,8 @@
 #
 # Copyright 2005,2006,2007 Free Software Foundation, Inc.
 #
-# OP25 4-Level Modulator Block # Copyright 2009, KA1RBI
+# OP25 4-Level Modulator Block
+# Copyright 2009, KA1RBI
 #
 # coeffs for shaping and cosine filters from Eric Ramsey thesis 
 # 
@@ -44,7 +45,7 @@ _def_log = False
 #                           modulator
 # /////////////////////////////////////////////////////////////////////////////
 
-class p25_mod(gr.hier_block2):
+class p25_mod_bf(gr.hier_block2):
 
     def __init__(self,
                  output_sample_rate=_def_output_sample_rate,
@@ -70,11 +71,11 @@ class p25_mod(gr.hier_block2):
         @type reverse: bool
         @param verbose: Print information about modulator?
         @type verbose: bool
-        @param debug: Print modualtion data to files?
+        @param debug: Print modulation data to files?
         @type debug: bool
 	"""
 
-	gr.hier_block2.__init__(self, "p25_fm_mod",
+	gr.hier_block2.__init__(self, "p25_c4fm_mod_bf",
 				gr.io_signature(1, 1, gr.sizeof_char),       # Input signature
 				gr.io_signature(1, 1, gr.sizeof_float)) # Output signature
 
@@ -151,7 +152,7 @@ class p25_mod(gr.hier_block2):
         """
         parser.add_option("", "--excess-bw", type="float", default=_def_excess_bw,
                           help="set RRC excess bandwith factor [default=%default] (PSK)")
-    add_options=staticmethod(add_options)
+        add_options=staticmethod(add_options)
 
 
     def extract_kwargs_from_options(options):
@@ -160,6 +161,7 @@ class p25_mod(gr.hier_block2):
         """
         return modulation_utils.extract_kwargs_from_options(dqpsk_mod.__init__,
                                                             ('self',), options)
+
     extract_kwargs_from_options=staticmethod(extract_kwargs_from_options)
 
 #
