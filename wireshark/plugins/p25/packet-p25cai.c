@@ -1594,7 +1594,7 @@ void
 proto_register_p25cai(void)
 {
 
-/* Setup list of fields */
+	/* Setup list of fields */
 	static hf_register_info hf[] = {
 		{ &hf_p25cai_fs,
 			{ "Frame Synchronization", "p25cai.fs",
@@ -1848,7 +1848,7 @@ proto_register_p25cai(void)
 		}
 	};
 
-/* Setup protocol subtree arrays */
+	/* Setup protocol subtree arrays */
 	static gint *ett[] = {
 		&ett_p25cai,
 		&ett_ss,
@@ -1859,14 +1859,14 @@ proto_register_p25cai(void)
 		&ett_db
 	};
 
-/* Register the protocol name and description */
+	/* Register the protocol name and description */
 	proto_p25cai = proto_register_protocol(
 		"APCO Project 25 Common Air Interface",		/* full name */
 		"P25 CAI",	/* short name */
 		"p25cai"	/* abbreviation (e.g. for filters) */
 		);
 
-/* Required function calls to register the header fields and subtrees used */
+	/* Required function calls to register the header fields and subtrees used */
 	proto_register_field_array(proto_p25cai, hf, array_length(hf));
 	proto_register_subtree_array(ett, array_length(ett));
 
@@ -1886,12 +1886,10 @@ proto_reg_handoff_p25cai(void)
 		 *  does not belong to APCO Project 25 Common Air Interface).
 		 */
 		p25cai_handle = new_create_dissector_handle(dissect_p25cai, proto_p25cai);
-		/* FIXME: Temporarily using a reserved ethertype and UDP port!  This is
-		 * a development shortcut that should be corrected later.  Perhaps we
-		 * will apply for a libpcap data link type or use other mechanisms in
-		 * the future.  Also, we can always use "decode as" in Wireshark.
+
+		/* FIXME: Temporarily using an unassigned UDP port! Application
+		 * for an IANA-assigned port number has been made.
 		 */
-		dissector_add("ethertype", 0xFFFF, p25cai_handle);
 		dissector_add("udp.port", 23456, p25cai_handle);
 
 		inited = TRUE;
