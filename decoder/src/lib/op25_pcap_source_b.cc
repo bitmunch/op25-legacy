@@ -111,7 +111,7 @@ op25_pcap_source_b::read_at_least(const size_t NSYMS_REQD)
          for(uint_least32_t i = 0; i < NSYMS; ++i, ++n) {
             symbols_.push_back(0);
          }
-         // push symbols from frame payload
+         // push symbols from frame payload MSB first
          for(size_t i = ETHERNET_SZ; i < hdr.caplen; ++i, ++n) {
             for(int16_t j = 6; j >= 0; j -= 2) {
                dibit d = (octets[i] >> j) & 0x3;

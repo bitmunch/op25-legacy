@@ -571,7 +571,8 @@ class p25_rx_block (stdgui2.std_top_block):
             self._set_titlebar("Capturing")
             self._set_state("CAPTURING")
         except Exception, x:
-            wx.MessageBox("Cannot open USRP: " + x.message, "USRP Error", wx.CANCEL | wx.ICON_EXCLAMATION)
+            wx.MessageBox("Cannot open USRP: " + x, "USRP Error", wx.CANCEL | wx.ICON_EXCLAMATION)
+            print x
 
   
     # Set the channel offset

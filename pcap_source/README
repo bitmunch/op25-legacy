@@ -1,3 +1,0 @@
-This package implements GNU Radio signal processing blocks for
-handling APCO Project 25 traffic. We have blocks to encode, decode and
-read from packet capture files.

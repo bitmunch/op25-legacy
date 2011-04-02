@@ -26,9 +26,17 @@ import os
 import sys
 import threading
 
-from gnuradio import audio, fsk4, gr, gru, op25, usrp
+from gnuradio import audio, gr, gru, usrp
 from gnuradio.eng_option import eng_option
 from math import pi
+
+# Python is putting the packages in some strange places
+# This is a workaround until we figure out WTF is going on
+try:
+    from gnuradio import fsk4, op25
+except Exception:
+    import fsk4, op25
+
 
 # The P25 receiver
 #

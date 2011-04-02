@@ -27,10 +27,16 @@ import wx
 from gnuradio import audio
 from gnuradio import eng_notation
 from gnuradio import gr
-from gnuradio import op25
-from gnuradio import op25_c4fm_mod
+from gnuradio import p25_mod_bf
 from gnuradio import usrp
 from gnuradio.eng_option import eng_option
+
+# Python is putting the packages in some strange places
+# This is a workaround until we figure out WTF is going on
+try:
+    from gnuradio import fsk4, op25
+except Exception:
+    import fsk4, op25
 
 
 """
@@ -53,7 +59,7 @@ class usrp_c4fm_tx_block(gr.top_block):
         pcap = op25.pcap_source_b(filename, delay, repeat)
         # ToDo: consider octet -> symbol unpacking in flow graph
 
-        c4fm = op25_c4fm_mod.p25_mod(output_sample_rate=channel_rate, log=False, verbose=False)
+        c4fm = p25_mod_bf.p25_mod(output_sample_rate=channel_rate, log=False, verbose=False)
         self.connect(pcap, c4fm)
 
         # setup low pass filter + interpolator
