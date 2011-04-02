@@ -556,7 +556,7 @@ class p25_rx_block (stdgui2.std_top_block):
             self._set_titlebar(capture_file)
             self._set_state("RUNNING")
         except Exception, x:
-            wx.MessageBox("Cannot open capture file: " + x.message, "File Error", wx.CANCEL | wx.ICON_EXCLAMATION)
+            wx.MessageBox("Cannot open capture file: " + x.str(), "File Error", wx.CANCEL | wx.ICON_EXCLAMATION)
 
     # Open the USRP
     #
@@ -571,7 +571,7 @@ class p25_rx_block (stdgui2.std_top_block):
             self._set_titlebar("Capturing")
             self._set_state("CAPTURING")
         except Exception, x:
-            wx.MessageBox("Cannot open USRP: " + x, "USRP Error", wx.CANCEL | wx.ICON_EXCLAMATION)
+            wx.MessageBox("Cannot open USRP: " + x.str(), "USRP Error", wx.CANCEL | wx.ICON_EXCLAMATION)
             print x
 
   
