@@ -84,7 +84,7 @@ GR_SWIG_BLOCK_MAGIC(op25, pcap_source_b);
 /*
  * Publicly-accesible constuctor function for op25_pcap_source.
  */
-op25_pcap_source_b_sptr op25_make_pcap_source_b(const char *path, float delay, bool repeat);
+op25_pcap_source_b_sptr op25_make_pcap_source_b(const char *path, float delay);
 
 /*
  * The op25_pcap_source block. Reads symbols from a tcpdump-formatted
@@ -93,7 +93,7 @@ op25_pcap_source_b_sptr op25_make_pcap_source_b(const char *path, float delay, b
 class op25_pcap_source_b : public gr_sync_block
 {
 private:
-   op25_pcap_source_b(const char *path);
+   op25_pcap_source_b(const char *path, float delay);
 };
 
 // ----------------------------------------------------------------

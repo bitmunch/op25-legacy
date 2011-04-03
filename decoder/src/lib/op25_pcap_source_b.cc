@@ -21,6 +21,8 @@
  * 02110-1301, USA.
  */
 
+#define __STDC_CONSTANT_MACROS
+
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -32,23 +34,23 @@
 #include <math.h>
 #include <op25_pcap_source_b.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <stdexcept>
 #include <strings.h>
+
+#define PCAP_DONT_INCLUDE_PCAP_BPF_H
+#include <pcap/pcap.h>
 
 using namespace std;
 
 op25_pcap_source_b_sptr
-op25_make_pcap_source_b(const char *path, float delay, bool repeat)
+op25_make_pcap_source_b(const char *path, float delay)
 {
-   return op25_pcap_source_b_sptr(new op25_pcap_source_b(path, delay, repeat));
+   return op25_pcap_source_b_sptr(new op25_pcap_source_b(path, delay));
 }
 
 op25_pcap_source_b::~op25_pcap_source_b()
 {
-   if(pcap_) {
-      pcap_close(pcap_);
-      pcap_ = NULL;
-   }
 }
 
 int
@@ -56,80 +58,58 @@ op25_pcap_source_b::work(int nof_output_items, gr_vector_const_void_star& input_
 {
    try {
       uint8_t *out = reinterpret_cast<uint8_t*>(output_items[0]);
+      const size_t SYMS_AVAIL = symbols_.size();
       const size_t SYMS_REQD = static_cast<size_t>(nof_output_items);
-      if(symbols_.size() < SYMS_REQD) {
-         read_at_least(SYMS_REQD);
+      for(size_t i = 0; i < SYMS_REQD; ++i) {
+         out[i] = symbols_[loc_++];
+         loc_ %= SYMS_AVAIL;
       }
-      const size_t SYMS_AVAIL = min(symbols_.size(), SYMS_REQD);
-      copy(symbols_.begin(), symbols_.begin() + SYMS_AVAIL, out);
-      symbols_.erase(symbols_.begin(), symbols_.begin() + SYMS_AVAIL);
-      fill(out + SYMS_AVAIL, out + SYMS_REQD, 0);
-      return(0 == SYMS_AVAIL ? -1 : SYMS_REQD);
+      return SYMS_REQD;
    } catch(const std::exception& x) {
       cerr << x.what() << endl;
-      exit(1);
+      exit(EXIT_FAILURE);
    } catch(...) {
       cerr << "unhandled exception" << endl;
-      exit(2);
+      exit(EXIT_FAILURE);
    }
 
 }
-op25_pcap_source_b::op25_pcap_source_b(const char *path, float delay, bool repeat) :
+
+op25_pcap_source_b::op25_pcap_source_b(const char *path, float delay) :
    gr_sync_block ("pcap_source_b", gr_make_io_signature (0, 0, 0), gr_make_io_signature (1, 1, sizeof(uint8_t))),
-   path_(path),
-   DELAY_(delay),
-   repeat_(repeat),
-   pcap_(NULL),
-   prev_is_present_(false),
-   SYMBOLS_PER_SEC_(4800.0)
+   loc_(0),
+   SYMBOLS_PER_SEC_(4800.0),
+   symbols_(delay * SYMBOLS_PER_SEC_, 0)
 {
+   pcap_t *pcap;
    char err[PCAP_ERRBUF_SIZE];
-   pcap_ = pcap_open_offline(path_.c_str(), err);
-}
-
-float
-op25_pcap_source_b::ifs(const struct pcap_pkthdr& NOW, const struct pcap_pkthdr& PREV, const size_t HEADER_SZ) const
-{
-   double t1 = (PREV.ts.tv_usec / 1e6);
-   double adj = (NOW.len - HEADER_SZ) * 4.0 / SYMBOLS_PER_SEC_;
-   double t2 = (NOW.ts.tv_sec - PREV.ts.tv_sec) + (NOW.ts.tv_usec / 1e6);
-   return static_cast<float>(t2 - adj - t1);
-}
-
-uint_least32_t
-op25_pcap_source_b::read_at_least(const size_t NSYMS_REQD)
-{
-   size_t n = 0;
-   struct pcap_pkthdr hdr;
-   const size_t ETHERNET_SZ = 14;
-   while(pcap_ && n < NSYMS_REQD) {
-      const uint8_t *octets = pcap_next(pcap_, &hdr);
-      if(octets) {
-         // push inter-frame silence symbols
-         const float N = (prev_is_present_ ? ifs(hdr, prev_, ETHERNET_SZ) :  DELAY_);
-         const uint_least32_t NSYMS = roundl(N * (1 / SYMBOLS_PER_SEC_));
-         for(uint_least32_t i = 0; i < NSYMS; ++i, ++n) {
-            symbols_.push_back(0);
-         }
-         // push symbols from frame payload MSB first
-         for(size_t i = ETHERNET_SZ; i < hdr.caplen; ++i, ++n) {
-            for(int16_t j = 6; j >= 0; j -= 2) {
-               dibit d = (octets[i] >> j) & 0x3;
-               symbols_.push_back(d);
+   pcap = pcap_open_offline(path, err);
+   if(pcap) {
+      struct pcap_pkthdr hdr;
+      for(const uint8_t *octets; octets = pcap_next(pcap, &hdr);) {
+         const size_t ETHERNET_SZ = 14;
+         const size_t IP_SZ = 20;
+         const size_t UDP_SZ = 8;
+         const size_t P25CAI_OFS = ETHERNET_SZ + IP_SZ + UDP_SZ;
+         if(P25CAI_OFS < hdr.caplen) {
+            const size_t FRAME_SZ = hdr.caplen - P25CAI_OFS;
+            // push some zero symbols to separate frames
+            const size_t SILENCE_SYMS = 48;
+            symbols_.resize(symbols_.size() + SILENCE_SYMS, 0);
+            // push symbols from frame payload MSB first
+            symbols_.reserve(symbols_.capacity() + ((hdr.caplen - P25CAI_OFS) * 4));
+            for(size_t i = 0; i < FRAME_SZ; ++i) {
+               for(int16_t j = 6; j >= 0; j -= 2) {
+                  dibit d = (octets[P25CAI_OFS + i] >> j) & 0x3;
+                  symbols_.push_back(d);
+               }
             }
          }
-         prev_ = hdr;
-         prev_is_present_ = true;
-      } else {
-         pcap_close(pcap_);
-         pcap_ = NULL;
-         if(repeat_) {
-            // re-open the file
-            char err[PCAP_ERRBUF_SIZE];
-            pcap_ = pcap_open_offline(path_.c_str(), err);
-            prev_is_present_ = false;
-         }
       }
+      pcap_close(pcap);
+   } else {
+      cerr << "error: failed to open " << path;
+      cerr << " (" << err << ")" << endl;
+      exit(EXIT_FAILURE);
    }
-   return n;
 }
