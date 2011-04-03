@@ -98,7 +98,7 @@ Simple tx-from-pcap-file utility.
 """
 class usrp_c4fm_tx_block(gr.top_block):
 
-    def __init__(self, subdev_spec, freq, subdev_gain, filename, delay, repeat):
+    def __init__(self, subdev_spec, freq, subdev_gain, filename, delay):
 
         gr.top_block.__init__ (self)
 
@@ -106,17 +106,16 @@ class usrp_c4fm_tx_block(gr.top_block):
         dac_rate = 128e6
         usrp_interp = 400
         usrp_rate = dac_rate / usrp_interp # 320KS/s
-        sw_interp = 10
-        channel_rate = usrp_rate / sw_interp  # 32 kS/s
+        interp_factor = 10
+        channel_rate = usrp_rate / interp_factor  # 32 kS/s
 
         # open the pcap source
-        pcap = op25.pcap_source_b(filename, delay, repeat)
+        pcap = op25.pcap_source_b(filename, delay)
 
         # modulator
         c4fm = p25_mod_bf(output_sample_rate=channel_rate)
 
         # setup low pass filter + interpolator
-        interp_factor = usrp_rate / channel_rate
         low_pass = 2.88e3
         interp_taps = gr.firdes.low_pass(1.0, usrp_rate, low_pass, low_pass * 0.1, gr.firdes.WIN_HANN)
         interpolator = gr.interp_fir_filter_fff (int(interp_factor), interp_taps)
@@ -145,7 +144,7 @@ class usrp_c4fm_tx_block(gr.top_block):
         u.tune(self.db.which(), self.db, freq)
         self.db.set_enable(True)
 
-        self.connect(pcap,c4fm, interpolator, fm, gain, u)
+        self.connect(pcap, c4fm, interpolator, fm, gain, u)
 
 # inject frames
 #
@@ -163,15 +162,13 @@ if __name__ == '__main__':
                       help="packet capture file [required]")
     parser.add_option("-d", "--delay", type="int", default=0,
                       help="delay before TX of first symbol [default=%default]")
-    parser.add_option("-r","--repeat", action="store_true", default=False,
-                      help="continuously replay input file [default=%default]")
     (options, args) = parser.parse_args ()
     if options.freq is None:
         parser.print_help()
         sys.exit(1)
     
     try:
-        rx = usrp_c4fm_tx_block(options.subdev_spec, options.freq, options.gain, options.pcap_file, options.delay, options.repeat)
+        rx = usrp_c4fm_tx_block(options.subdev_spec, options.freq, options.gain, options.pcap_file, options.delay)
         rx.run()
     except KeyboardInterrupt:
         rx.db.set_enable(False)
