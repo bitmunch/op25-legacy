@@ -36,7 +36,7 @@ op25_pcap_source_b_sptr op25_make_pcap_source_b(const char *path, float delay);
 
 /**
  * op25_pcap_source_b is a GNU Radio block for reading from a
- * tcpdump-formatted capture file and producing a stream of dibit symbols.
+ * tcpdump-formatted capture file and producing a stream of octets.
  */
 class op25_pcap_source_b : public gr_sync_block
 {
@@ -75,24 +75,14 @@ private:
 private:
 
    /**
-    * Define dibit type
+    * The next octet to be read from the input file.
     */
-   typedef uint8_t dibit;
-
-  /**
-   * The next symbol to be read from the input file.
-   */
-  size_t loc_;
+   size_t loc_;
 
    /**
-    * The number of symbols/s produced by this block.
+    * Symbols from the input file.
     */
-   const float SYMBOLS_PER_SEC_;
-
-  /**
-   * Symbols from the input file.
-   */
-  std::vector<dibit> symbols_;
+   std::vector<uint8_t> octets_;
 
 };
 

@@ -58,13 +58,13 @@ op25_pcap_source_b::work(int nof_output_items, gr_vector_const_void_star& input_
 {
    try {
       uint8_t *out = reinterpret_cast<uint8_t*>(output_items[0]);
-      const size_t SYMS_AVAIL = symbols_.size();
-      const size_t SYMS_REQD = static_cast<size_t>(nof_output_items);
-      for(size_t i = 0; i < SYMS_REQD; ++i) {
-         out[i] = symbols_[loc_++];
-         loc_ %= SYMS_AVAIL;
+      const size_t OCTETS_AVAIL = octets_.size();
+      const size_t OCTETS_REQD = static_cast<size_t>(nof_output_items);
+      for(size_t i = 0; i < OCTETS_REQD; ++i) {
+         out[i] = octets_[loc_++];
+         loc_ %= OCTETS_AVAIL;
       }
-      return SYMS_REQD;
+      return OCTETS_REQD;
    } catch(const std::exception& x) {
       cerr << x.what() << endl;
       exit(EXIT_FAILURE);
@@ -76,14 +76,14 @@ op25_pcap_source_b::work(int nof_output_items, gr_vector_const_void_star& input_
 }
 
 op25_pcap_source_b::op25_pcap_source_b(const char *path, float delay) :
-   gr_sync_block ("pcap_source_b", gr_make_io_signature (0, 0, 0), gr_make_io_signature (1, 1, sizeof(uint8_t))),
+   gr_sync_block ("pcap_source_b",
+                  gr_make_io_signature (0, 0, 0),
+                  gr_make_io_signature (1, 1, sizeof(uint8_t))),
    loc_(0),
-   SYMBOLS_PER_SEC_(4800.0),
-   symbols_(delay * SYMBOLS_PER_SEC_, 0)
+   octets_(delay * 1200, 0)
 {
-   pcap_t *pcap;
    char err[PCAP_ERRBUF_SIZE];
-   pcap = pcap_open_offline(path, err);
+   pcap_t *pcap = pcap_open_offline(path, err);
    if(pcap) {
       struct pcap_pkthdr hdr;
       for(const uint8_t *octets; octets = pcap_next(pcap, &hdr);) {
@@ -93,16 +93,13 @@ op25_pcap_source_b::op25_pcap_source_b(const char *path, float delay) :
          const size_t P25CAI_OFS = ETHERNET_SZ + IP_SZ + UDP_SZ;
          if(P25CAI_OFS < hdr.caplen) {
             const size_t FRAME_SZ = hdr.caplen - P25CAI_OFS;
-            // push some zero symbols to separate frames
-            const size_t SILENCE_SYMS = 48;
-            symbols_.resize(symbols_.size() + SILENCE_SYMS, 0);
-            // push symbols from frame payload MSB first
-            symbols_.reserve(symbols_.capacity() + ((hdr.caplen - P25CAI_OFS) * 4));
+            // push some zero octets to separate frames
+            const size_t SILENCE_OCTETS = 48;
+            octets_.resize(octets_.size() + SILENCE_OCTETS, 0);
+            // push octets from frame payload into local buffer
+            octets_.reserve(octets_.capacity() + hdr.caplen - P25CAI_OFS);
             for(size_t i = 0; i < FRAME_SZ; ++i) {
-               for(int16_t j = 6; j >= 0; j -= 2) {
-                  dibit d = (octets[P25CAI_OFS + i] >> j) & 0x3;
-                  symbols_.push_back(d);
-               }
+               octets_.push_back(octets[P25CAI_OFS + i]);
             }
          }
       }

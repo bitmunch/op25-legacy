@@ -112,6 +112,10 @@ class usrp_c4fm_tx_block(gr.top_block):
         # open the pcap source
         pcap = op25.pcap_source_b(filename, delay)
 
+        # convert octets into dibits
+        bits_per_symbol = 2
+        unpack = gr.packed_to_unpacked_bb(bits_per_symbol, gr.GR_MSB_FIRST)
+
         # modulator
         c4fm = p25_mod_bf(output_sample_rate=channel_rate)
 
@@ -144,7 +148,7 @@ class usrp_c4fm_tx_block(gr.top_block):
         u.tune(self.db.which(), self.db, freq)
         self.db.set_enable(True)
 
-        self.connect(pcap, c4fm, interpolator, fm, gain, u)
+        self.connect(pcap, unpack, c4fm, interpolator, fm, gain, u)
 
 # inject frames
 #
