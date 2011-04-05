@@ -26,6 +26,20 @@ AM_CONFIG_HEADER(config.h)
 AC_CANONICAL_TARGET([])
 AM_INIT_AUTOMAKE(op25,0.0.1)
 
+# this macro is used to get the arguments supplied to the configure
+# script (./configure --enable-debug) Check if we have enable debug
+# support.
+AC_MSG_CHECKING(enable debug)
+debug_default="yes"
+AC_ARG_ENABLE(debug, [--enable-debug=[no/yes] turn on debugging [default=$debug_default]],, enable_debug=$debug_default)
+if test "x$enable_debug" = "xyes"; then
+	CXXFLAGS="$CXXFLAGS -g -DDEBUG -O0"
+	AC_MSG_RESULT(yes)
+else
+   CXXFLAGS="$CXXFLAGS -O3"
+	AC_MSG_RESULT(no)
+fi
+
 GR_X86_64
 dnl LF_CONFIGURE_CC
 LF_CONFIGURE_CXX
