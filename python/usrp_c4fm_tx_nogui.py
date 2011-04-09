@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 #
+# Copyright 2009 KA1RBI
 # Copyright 2011 Steve Glass.
 # 
 # This file is part of GNU Radio and part of OP25
@@ -25,6 +26,7 @@ import sys
 import wx
 
 from gnuradio import audio
+from gnuradio import blks2
 from gnuradio import eng_notation
 from gnuradio import gr
 from gnuradio import gru
@@ -51,27 +53,19 @@ typically either 32000 (USRP TX chain) or 48000 (sound card)
 
 @param output_sample_rate: output sample rate
 @type output_sample_rate: integer
-@param excess_bw: Root-raised cosine filter excess bandwidth
-@type excess_bw: float
-@param reverse: reverse polarity flag
-@type reverse: bool
-@param verbose: Print information about modulator?
-@type verbose: bool
-@param debug: Print modulation data to files?
-@type debug: bool
 """
 class p25_mod_bf(gr.hier_block2):
 
-    def __init__(self, output_sample_rate):
+    def __init__(self, output_rate):
 
 	gr.hier_block2.__init__(self, "p25_c4fm_mod_bf",
 				gr.io_signature(1, 1, gr.sizeof_char),  # Input signature
 				gr.io_signature(1, 1, gr.sizeof_float)) # Output signature
 
-        input_sample_rate = 4800   # P25 baseband symbol rate
-        lcm = gru.lcm(input_sample_rate, output_sample_rate)
-        self._interp_factor = int(lcm // input_sample_rate)
-        self._decimation = int(lcm // output_sample_rate)
+        symbol_rate = 4800   # P25 baseband symbol rate
+        lcm = gru.lcm(symbol_rate, output_rate)
+        self._interp_factor = int(lcm // symbol_rate)
+        self._decimation = int(lcm // output_rate)
         self._excess_bw =0.2
 
         mod_map = [1.0/3.0, 1.0, -(1.0/3.0), -1.0]
@@ -81,7 +75,7 @@ class p25_mod_bf(gr.hier_block2):
         rrc_taps = gr.firdes.root_raised_cosine(
             self._interp_factor, # gain (since we're interpolating by sps)
             lcm,                 # sampling rate
-            input_sample_rate,   # symbol rate
+            symbol_rate,
             self._excess_bw,     # excess bandwidth (roll-off factor)
             ntaps)
 
@@ -91,7 +85,13 @@ class p25_mod_bf(gr.hier_block2):
         shaping_coeffs = [-0.018, 0.0347, 0.0164, -0.0064, -0.0344, -0.0522, -0.0398, 0.0099, 0.0798, 0.1311, 0.121, 0.0322, -0.113, -0.2499, -0.3007, -0.2137, -0.0043, 0.2825, 0.514, 0.604, 0.514, 0.2825, -0.0043, -0.2137, -0.3007, -0.2499, -0.113, 0.0322, 0.121, 0.1311, 0.0798, 0.0099, -0.0398, -0.0522, -0.0344, -0.0064, 0.0164, 0.0347, -0.018]
         self.shaping_filter = gr.fir_filter_fff(1, shaping_coeffs)
 
-        self.connect(self, self.C2S, self.rrc_filter, self.shaping_filter, self)
+        # generate output at appropriate rate
+        self.decimator = blks2.rational_resampler_fff(1, self._decimation)
+
+        self.connect(self, self.C2S, self.rrc_filter, self.shaping_filter, self.decimator, self)
+
+    def forecast(noutput, ninput_reqd):
+        ninput_reqd[0] = noutput * 26.7
 
 """
 Simple tx-from-pcap-file utility.
@@ -102,26 +102,30 @@ class usrp_c4fm_tx_block(gr.top_block):
 
         gr.top_block.__init__ (self)
 
+        # data sink and sink rate
+        u = usrp.sink_c()
+
         # important vars (to be calculated from USRP when available
-        dac_rate = 128e6
-        usrp_interp = 400
-        usrp_rate = dac_rate / usrp_interp # 320KS/s
-        interp_factor = 10
-        channel_rate = usrp_rate / interp_factor  # 32 kS/s
+        dac_rate = u.dac_rate()
+        usrp_rate = 320e3
+        usrp_interp = int(dac_rate // usrp_rate)
+        channel_rate = 32e3
+        interp_factor = int(usrp_rate // channel_rate)
 
         # open the pcap source
         pcap = op25.pcap_source_b(filename, delay)
+#        pcap = gr.glfsr_source_b(16)
 
         # convert octets into dibits
         bits_per_symbol = 2
         unpack = gr.packed_to_unpacked_bb(bits_per_symbol, gr.GR_MSB_FIRST)
 
         # modulator
-        c4fm = p25_mod_bf(output_sample_rate=channel_rate)
+        c4fm = p25_mod_bf(output_rate=channel_rate)
 
         # setup low pass filter + interpolator
         low_pass = 2.88e3
-        interp_taps = gr.firdes.low_pass(1.0, usrp_rate, low_pass, low_pass * 0.1, gr.firdes.WIN_HANN)
+        interp_taps = gr.firdes.low_pass(1.0, channel_rate, low_pass, low_pass * 0.1, gr.firdes.WIN_HANN)
         interpolator = gr.interp_fir_filter_fff (int(interp_factor), interp_taps)
 
         # frequency modulator
@@ -134,12 +138,12 @@ class usrp_c4fm_tx_block(gr.top_block):
         gain = gr.multiply_const_cc(4000)
 
         # configure USRP
-        u = usrp.sink_c()
         if subdev_spec is None:
             subdev_spec = usrp.pick_tx_subdevice(u)
         u.set_mux(usrp.determine_tx_mux_value(u, subdev_spec))
         self.db = usrp.selected_subdev(u, subdev_spec)
         print "Using TX d'board %s" % (self.db.side_and_name(),)
+        u.set_interp_rate(usrp_interp)
 
         if gain is None:
             g = self.db.gain_range()
