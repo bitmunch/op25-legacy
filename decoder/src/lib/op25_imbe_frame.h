@@ -7,6 +7,7 @@
 #include <op25_yank.h>
 #include <op25_golay.h>
 #include <op25_hamming.h>
+#include <stdio.h>
 
 typedef std::vector<bool> voice_codeword;
 typedef const std::vector<bool> const_bit_vector;
