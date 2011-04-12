@@ -65,7 +65,7 @@ class pipeline(gr.hier_block2):
                                 gr.io_signature(0, 0, 0),                    # Input signature
                                 gr.io_signature(1, 1, gr.sizeof_gr_complex)) # Output signature
 
-        c4fm = op25_c4fm_mod.p25_mod(output_sample_rate=audio_rate,
+        c4fm = op25_c4fm_mod.p25_mod_bf(output_sample_rate=audio_rate,
                                  log=False,
                                  verbose=True)
         interp_factor = if_rate / audio_rate
