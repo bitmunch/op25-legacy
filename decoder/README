@@ -1,3 +1,0 @@
-This package implements an APCO P25 decoder as a GNU Radio signal
-processing block. It is intended to be used with the Radio Rausch
-4-Level FSK demodulator.
