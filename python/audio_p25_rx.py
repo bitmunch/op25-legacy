@@ -38,9 +38,9 @@ from math import pi
 from optparse import OptionParser
 
 try:
-    from gnuradio import fsk4, op25
+    from gnuradio import op25
 except Exception:
-    import fsk4, op25
+    import op25
 
 # The P25 receiver
 #
@@ -148,21 +148,21 @@ class p25_rx_block (stdgui2.std_top_block):
 
         # C4FM demodulator
         autotuneq = gr.msg_queue(2)
-        demod_fsk4 = fsk4.demod_ff(autotuneq, channel_rate, self.symbol_rate)
+        demod_fsk4 = op25.fsk4_demod_ff(autotuneq, channel_rate, self.symbol_rate)
         # for now no audio output
         sink = gr.null_sink(gr.sizeof_float)
         # connect it all up
         if self.baseband_input:
             self.rescaler = gr.multiply_const_ff(1)
             sinkx = gr.file_sink(gr.sizeof_float, "rx.dat")
-            self.__connect([[source, self.rescaler, self.symbol_filter, demod_fsk4, self.p25_decoder, sink],
+            self.__connect([[source, self.rescaler, self.symbol_filter, demod_fsk4, self.slicer, self.p25_decoder, sink],
                         [self.symbol_filter, self.signal_scope],
                         [demod_fsk4, sinkx],
                         [demod_fsk4, self.symbol_scope]])
             self.connect_data_scope(not self.datascope_raw_input)
         else:
             self.demod_watcher = demod_watcher(autotuneq, self.adjust_channel_offset)
-            self.__connect([[source, self.channel_filter, self.squelch, fm_demod, self.symbol_filter, demod_fsk4, self.p25_decoder, sink],
+            self.__connect([[source, self.channel_filter, self.squelch, fm_demod, self.symbol_filter, demod_fsk4, self.slicer, self.p25_decoder, sink],
                         [source, self.spectrum],
                         [self.symbol_filter, self.signal_scope],
                         [demod_fsk4, self.symbol_scope]])
@@ -293,12 +293,15 @@ class p25_rx_block (stdgui2.std_top_block):
         # Traffic snapshot
         self.traffic = TrafficPane(self.notebook)
         self.notebook.AddPage(self.traffic, "Traffic")
+        # symbol slicer
+        levels = [ -2.0, 0.0, 2.0, 4.0 ]
+        self.slicer = op25.fsk4_slicer_fb(levels)
         # Setup the decoder and report the TUN/TAP device name
         self.msgq = gr.msg_queue(2)
         self.decode_watcher = decode_watcher(self.msgq, self.traffic)
         self.p25_decoder = op25.decoder_bf()
         self.p25_decoder.set_msgq(msgq)
-        self.frame.SetStatusText("TUN/TAP: " + self.p25_decoder.device_name())
+        self.frame.SetStatusText("TUN/TAP: " + self.p25_decoder.destination())
 
     # read capture file properties (decimation etc.)
     #

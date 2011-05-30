@@ -27,7 +27,7 @@ import wx
 import wx.html
 import wx.wizard
 
-from gnuradio import audio, eng_notation, fsk4, gr, gru, op25
+from gnuradio import audio, eng_notation, gr, gru, op25
 from gnuradio.eng_option import eng_option
 from gnuradio.wxgui import stdgui2, fftsink2, scopesink2
 from math import pi
@@ -123,12 +123,12 @@ class p25_rx_block (stdgui2.std_top_block):
         # C4FM demodulator
         autotuneq = gr.msg_queue(2)
         self.demod_watcher = demod_watcher(autotuneq, self.adjust_channel_offset)
-        demod_fsk4 = fsk4.demod_ff(autotuneq, channel_rate, self.symbol_rate)
+        demod_fsk4 = op25.fsk4_demod_ff(autotuneq, channel_rate, self.symbol_rate)
         reverser = gr.multiply_const_ff(-1.0)
         # for now no audio output
         sink = gr.null_sink(gr.sizeof_float)
         # connect it all up
-        self.__connect([[source, self.channel_filter, self.squelch, fm_demod, symbol_filter, demod_fsk4, reverser, self.p25_decoder, sink],
+        self.__connect([[source, self.channel_filter, self.squelch, fm_demod, symbol_filter, demod_fsk4, reverser, self.slicer, self.p25_decoder, sink],
                         [source, self.spectrum],
                         [symbol_filter, self.signal_scope],
                         [demod_fsk4, self.symbol_scope]])
@@ -243,11 +243,14 @@ class p25_rx_block (stdgui2.std_top_block):
         # Traffic snapshot
         self.traffic = TrafficPane(self.notebook)
         self.notebook.AddPage(self.traffic, "Traffic")
+		# Symbol slicer
+        levels = [ -2.0, 0.0, 2.0, 4.0 ]
+        self.slicer = op25.fsk4_slicer_fb(levels)
         # Setup the decoder and report the TUN/TAP device name
         self.decode_watcher = decode_watcher(msgq, self.traffic)
-        self.p25_decoder = op25.decoder_ff()
+        self.p25_decoder = op25.decoder_bf()
         self.p25_decoder.set_msgq(gr.msg_queue(2))
-        self.frame.SetStatusText("TUN/TAP: " + self.p25_decoder.device_name())
+        self.frame.SetStatusText("TUN/TAP: " + self.p25_decoder.destination())
 
     # read capture file properties (decimation etc.)
     #

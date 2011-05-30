@@ -40,9 +40,9 @@ from usrpm import usrp_dbid
 # Python is putting the packages in some strange places
 # This is a workaround until we figure out WTF is going on
 try:
-    from gnuradio import fsk4, op25
+    from gnuradio import op25
 except Exception:
-    import fsk4, op25
+    import op25
 
 non_GL = False
 
@@ -168,7 +168,7 @@ class p25_rx_block (stdgui2.std_top_block):
         # C4FM demodulator
         autotuneq = gr.msg_queue(2)
         self.demod_watcher = demod_watcher(autotuneq, self.adjust_channel_offset)
-        demod_fsk4 = fsk4.demod_ff(autotuneq, channel_rate, self.symbol_rate)
+        demod_fsk4 = op25.fsk4_demod_ff(autotuneq, channel_rate, self.symbol_rate)
         # symbol slicer
         levels = [ -2.0, 0.0, 2.0, 4.0 ]
         slicer = op25.fsk4_slicer_fb(levels)

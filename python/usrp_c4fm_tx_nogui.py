@@ -36,9 +36,9 @@ from gnuradio.eng_option import eng_option
 # Python is putting the packages in some strange places
 # This is a workaround until we figure out WTF is going on
 try:
-    from gnuradio import fsk4, op25
+    from gnuradio import op25
 except Exception:
-    import fsk4, op25
+    import op25
 
 
 """

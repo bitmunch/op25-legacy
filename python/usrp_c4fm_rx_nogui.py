@@ -33,9 +33,9 @@ from math import pi
 # Python is putting the packages in some strange places
 # This is a workaround until we figure out WTF is going on
 try:
-    from gnuradio import fsk4, op25
+    from gnuradio import op25
 except Exception:
-    import fsk4, op25
+    import op25
 
 
 # The P25 receiver
@@ -98,7 +98,7 @@ class usrp_c4fm_rx (gr.top_block):
         # C4FM demodulator
         autotuneq = gr.msg_queue(2)
         self.demod_watcher = demod_watcher(autotuneq, self.adjust_channel_offset)
-        demod_fsk4 = fsk4.demod_ff(autotuneq, channel_rate, symbol_rate)
+        demod_fsk4 = op25.fsk4_demod_ff(autotuneq, channel_rate, symbol_rate)
         self.connect(symbol_filter, demod_fsk4)
 
         # symbol slicer

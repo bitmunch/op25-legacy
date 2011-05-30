@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import sys
 import math
-from gnuradio import gr, gru, audio, eng_notation, blks2, optfir, fsk4, repeater
+from gnuradio import gr, gru, audio, eng_notation, blks2, optfir, repeater
 from gnuradio.eng_option import eng_option
 from optparse import OptionParser
 # import cqpsk
@@ -43,7 +43,7 @@ class my_top_block(gr.top_block):
         SYMBOL_FILTER = gr.fir_filter_fff (symbol_decim, symbol_coeffs)
         self.msgq = gr.msg_queue(2)
 
-        FSK4 = fsk4.demod_ff(self.msgq, sample_rate, symbol_rate)
+        FSK4 = op25.fsk4_demod_ff(self.msgq, sample_rate, symbol_rate)
 
         levels = [ -2.0, 0.0, 2.0, 4.0 ]
         SLICER = repeater.fsk4_slicer_fb(levels)
