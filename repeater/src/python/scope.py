@@ -296,34 +296,11 @@ class p25_rx_block (stdgui2.std_top_block):
                     p = b
         self.cnxns = []
 
-    def freq_slider_chg(self, evt):
-        val = self.freq_control.GetValue()
-        self.freq_field.SetValue(str(val))
-        self.lo.set_frequency(val)
-
     def set_speed(self, new_speed):
      # assumes that lock is held, or that we are in init
         self.disconnect_demods()
         self.current_speed = new_speed
         self.connect_fsk4_demod()
-
-    def set_speed_old(self, new_speed):
-        global speeds
-     # assumes that lock is held, or that we are in init
-        if new_speed == self.current_speed:
-            return
-        print "set new speed %d current %d" % (speeds[new_speed], self.current_speed)
-
-        if self.baseband_input:
-            self.disconnect(self.baseband_amp, self.float_resamplers[self.current_speed], self.symbol_filter)
-            self.connect(self.baseband_amp, self.float_resamplers[new_speed], self.symbol_filter)
-        else:
-            self.disconnect(self.arb_resampler, self.resamplers[self.current_speed], self.agc)
-            self.disconnect(self.resamplers[self.current_speed], self.fm_demod)
-            self.connect(self.arb_resampler, self.resamplers[new_speed], self.agc)
-            self.connect(self.resamplers[new_speed], self.fm_demod)
-
-        self.current_speed = new_speed
 
     def set_connection(self,
                          cscope=False,
