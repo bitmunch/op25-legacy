@@ -510,10 +510,11 @@ class p25_rx_block (stdgui2.std_top_block):
 
         self.myform = myform = form.form()
         hbox = wx.BoxSizer(wx.HORIZONTAL)
-        myform['freq'] = form.float_field(
-            parent=self.panel, sizer=hbox, label="Frequency", weight=0,
-            callback=myform.check_input_and_call(_form_set_freq, self._set_status_msg))
-        myform['freq'].set_value(self.options.frequency)
+        if not self.baseband_input:
+            myform['freq'] = form.float_field(
+                parent=self.panel, sizer=hbox, label="Frequency", weight=0,
+                callback=myform.check_input_and_call(_form_set_freq, self._set_status_msg))
+            myform['freq'].set_value(self.options.frequency)
         if self.baseband_input:
             min_gain = 0
             max_gain = 200
