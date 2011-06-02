@@ -107,6 +107,7 @@ class p25_rx_block (stdgui2.std_top_block):
         for i in xrange(len(speeds)):
             if speeds[i] == _default_speed:
                 self.current_speed = i
+                self.default_speed_idx = i
 
         # initialize the UI
         # 
@@ -304,7 +305,7 @@ class p25_rx_block (stdgui2.std_top_block):
      # assumes that lock is held, or that we are in init
         self.disconnect_demods()
         self.current_speed = new_speed
-        self.connect_demods()
+        self.connect_fsk4_demod()
 
     def set_speed_old(self, new_speed):
         global speeds
@@ -395,8 +396,11 @@ class p25_rx_block (stdgui2.std_top_block):
             self.connect_demods()
             self.set_connection(fscope=1)
         if sel == 5:   # correlation
-            self.set_connection(corr=1)
+            self.disconnect_demods()
+            self.current_speed = self.default_speed_idx # reset speed for corr
+            self.data_scope.win.radio_box_speed.SetSelection(self.current_speed)
             self.connect_fsk4_demod()
+            self.set_connection(corr=1)
         self.unlock()
 
     # initialize the UI
@@ -968,7 +972,6 @@ class p25_rx_block (stdgui2.std_top_block):
 
     def speed_select(self, evt):
         new_speed = self.data_scope.win.radio_box_speed.GetSelection()
-        print "new_speed %d " % new_speed
         self.lock()
         self.set_speed(new_speed)
         self.unlock()
