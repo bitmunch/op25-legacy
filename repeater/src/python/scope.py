@@ -43,6 +43,8 @@ import gnuradio.wxgui.plot as plot
 
 speeds = [300, 600, 900, 1200, 1440, 1800, 1920, 2400, 2880, 3200, 3600, 3840, 4000, 4800, 6400, 7200, 8000, 9600, 14400, 19200]
 
+WIRESHARK_PORT = 23456
+
 # The P25 receiver
 #
 class p25_rx_block (stdgui2.std_top_block):
@@ -56,16 +58,18 @@ class p25_rx_block (stdgui2.std_top_block):
         # command line argument parsing
         parser = OptionParser(option_class=eng_option)
         parser.add_option("-a", "--audio", action="store_true", default=False, help="use direct audio input")
+        parser.add_option("-A", "--audio-if", action="store_true", default=False, help="soundcard IF mode (use --calibration to set IF freq)")
         parser.add_option("-I", "--audio-input", type="string", default="", help="pcm input device name.  E.g., hw:0,0 or /dev/dsp")
         parser.add_option("-i", "--input", default=None, help="input file name")
-        parser.add_option("-b", "--excess-bw", type="eng_float", default=0.2, help="offset frequency", metavar="Hz")
+        parser.add_option("-b", "--excess-bw", type="eng_float", default=0.2, help="for RRC filter", metavar="Hz")
         parser.add_option("-c", "--calibration", type="eng_float", default=0.0, help="offset frequency", metavar="Hz")
-        parser.add_option("-o", "--offset", type="eng_float", default=0.0, help="offset frequency", metavar="Hz")
-        parser.add_option("-C", "--costas-alpha", type="eng_float", default=0.10, help="offset frequency", metavar="Hz")
+        parser.add_option("-C", "--costas-alpha", type="eng_float", default=0.125, help="offset frequency", metavar="Hz")
         parser.add_option("-f", "--frequency", type="eng_float", default=0.0, help="USRP center frequency", metavar="Hz")
         parser.add_option("-d", "--decim", type="int", default=200, help="source decimation factor")
         parser.add_option("-v", "--verbosity", type="int", default=10, help="message debug level")
-        parser.add_option("-w", "--wait", action="store_true", default=False, help="block on startup")
+        parser.add_option("-p", "--pause", action="store_true", default=False, help="block on startup")
+        parser.add_option("-w", "--wireshark", action="store_true", default=False, help="output data to Wireshark")
+        parser.add_option("-W", "--wireshark-host", type="string", default="127.0.0.1", help="Wireshark host")
         parser.add_option("-R", "--rx-subdev-spec", type="subdev", default=(0, 0), help="select USRP Rx side A or B (default=A)")
         parser.add_option("-g", "--gain", type="eng_float", default=None, help="set USRP gain in dB (default is midpoint) (or audio gain)")
         parser.add_option("-G", "--gain-mu", type="eng_float", default=0.025, help="gardner gain")
@@ -89,6 +93,9 @@ class p25_rx_block (stdgui2.std_top_block):
         if options.audio:
             self.channel_rate = 48000
             self.baseband_input = True
+
+        if options.audio_if:
+            self.channel_rate = 96000
 
         # setup (read-only) attributes
         self.symbol_rate = 4800
@@ -114,7 +121,7 @@ class p25_rx_block (stdgui2.std_top_block):
         self.__init_gui(frame, panel, vbox)
 
         # wait for gdb
-        if options.wait:
+        if options.pause:
             print 'Ready for GDB to attach (pid = %d)' % (os.getpid(),)
             raw_input("Press 'Enter' to continue...")
 
@@ -123,7 +130,10 @@ class p25_rx_block (stdgui2.std_top_block):
             self.open_file(options.input)
         elif options.frequency:
             self._set_state("CAPTURING")
-            self.open_usrp(options.rx_subdev_spec, options.decim, options.gain, options.frequency + options.offset, True)
+            self.open_usrp(options.rx_subdev_spec, options.decim, options.gain, options.frequency, True)
+        elif options.audio_if:
+            self._set_state("CAPTURING")
+            self.open_audio_c(self.channel_rate, options.gain, options.audio_input)
         elif options.audio:
             self._set_state("CAPTURING")
             self.open_audio(self.channel_rate, options.gain, options.audio_input)
@@ -136,6 +146,7 @@ class p25_rx_block (stdgui2.std_top_block):
     #
     def __build_graph(self, source, capture_rate):
         global speeds
+        global WIRESHARK_PORT
         # tell the scope the source rate
         self.spectrum.set_sample_rate(capture_rate)
         # channel filter
@@ -163,7 +174,10 @@ class p25_rx_block (stdgui2.std_top_block):
         self.buffer = gr.copy(gr.sizeof_float)
 
         msgq = gr.msg_queue(2)
-        self.sink_s = repeater.p25_frame_assembler('', 0, self.options.verbosity, 0, 0, 0, msgq)
+        udp_port = 0
+        if self.options.wireshark:
+            udp_port = WIRESHARK_PORT
+        self.sink_s = repeater.p25_frame_assembler(self.options.wireshark_host, udp_port, self.options.verbosity, 0, 0, 0, msgq)
 
         if self.baseband_input:
             gain = 50.0
@@ -202,7 +216,10 @@ class p25_rx_block (stdgui2.std_top_block):
             self.channel_filter = gr.freq_xlating_fir_filter_ccf(channel_decim, coeffs, 0.0, capture_rate)
             self.set_channel_offset(0.0, 0, "")
             # local osc
-            self.lo = gr.sig_source_c (channel_rate, gr.GR_SIN_WAVE, 0.0, 1.0, 0)
+            self.lo_freq = 0.0
+            if self.options.audio_if:
+                self.lo_freq = self.options.calibration
+            self.lo = gr.sig_source_c (channel_rate, gr.GR_SIN_WAVE, self.lo_freq, 1.0, 0)
             self.mixer = gr.multiply_cc()
             self.decim_sink = gr.file_sink(gr.sizeof_gr_complex, "32k-complex.dat")
             lpf_coeffs = gr.firdes.low_pass(1.0, self.channel_rate, 12000, 1200, gr.firdes.WIN_HANN)
@@ -212,11 +229,10 @@ class p25_rx_block (stdgui2.std_top_block):
 
             nphases = 64
             frac_bw = 0.25
-            samp_rate = 320e3
             rs_taps = gr.firdes.low_pass(nphases, nphases, frac_bw, 0.5-frac_bw)
 
             self.arb_resampler = blks2.pfb_arb_resampler_ccf(
-               float(self.basic_rate)/samp_rate,
+               float(self.basic_rate)/float(capture_rate),
                (rs_taps),
                nphases,
             )
@@ -232,12 +248,11 @@ class p25_rx_block (stdgui2.std_top_block):
                 ntaps)
 
             self.symbol_filter_c = gr.interp_fir_filter_ccf(1, rrc_taps)
-            samp_rate = self.symbol_rate
             self.resamplers = []
 
             for speed in speeds:
                 resampler = blks2.pfb_arb_resampler_ccf(
-                   float(speed)/float(samp_rate),
+                   float(speed)/float(self.symbol_rate),
                    (rs_taps),
                    nphases,
                 )
@@ -325,9 +340,11 @@ class p25_rx_block (stdgui2.std_top_block):
         if cscope != self.cscope_state:
             self.cscope_state = cscope
             if cscope == 0:
-                self.disconnect(self.diffdec, self.complex_scope)
+                # self.disconnect(self.diffdec, self.complex_scope)
+                self.disconnect(self.clock, self.complex_scope)
             else:
-                self.connect(self.diffdec, self.complex_scope)
+                # self.connect(self.diffdec, self.complex_scope)
+                self.connect(self.clock, self.complex_scope)
 
         if fscope != self.fscope_state:
             self.fscope_state = fscope
@@ -529,7 +546,7 @@ class p25_rx_block (stdgui2.std_top_block):
 
     def set_freq_tune(self, val):
         self.myform['freq_tune'].set_value(val)
-        self.lo.set_frequency(val)
+        self.lo.set_frequency(val + self.lo_freq)
 
     def set_freq(self, target_freq):
         """
@@ -828,6 +845,22 @@ class p25_rx_block (stdgui2.std_top_block):
             self._set_state("RUNNING")
         except Exception, x:
             wx.MessageBox("Cannot open capture file: " + x.message, "File Error", wx.CANCEL | wx.ICON_EXCLAMATION)
+
+    def open_audio_c(self, capture_rate, gain, audio_input_filename):
+        self.info = {
+                "capture-rate": capture_rate,
+                "center-freq": 0,
+                "source-dev": "AUDIO",
+                "source-decim": 1 }
+        self.audio_source = audio.source(capture_rate, audio_input_filename)
+        self.audio_cvt = gr.float_to_complex()
+        self.connect((self.audio_source, 0), (self.audio_cvt, 0))
+        self.connect((self.audio_source, 1), (self.audio_cvt, 1))
+        self.source = gr.multiply_const_cc(gain)
+        self.connect(self.audio_cvt, self.source)
+        self.__set_rx_from_audio(capture_rate)
+        self._set_titlebar("Capturing")
+        self._set_state("CAPTURING")
 
     def open_audio(self, capture_rate, gain, audio_input_filename):
             self.info = {
@@ -1596,7 +1629,7 @@ class constellation_plot_graph_window (plot.PlotCanvas):
 
         self.flag = False
 
-    def format_data (self, evt):
+    def format_data_orig (self, evt):
         if not self.info.running:
             return
 
@@ -1633,7 +1666,7 @@ class constellation_plot_graph_window (plot.PlotCanvas):
         y_range = (-1.0, 1.0)
         self.Draw (graphics, xAxis=x_range, yAxis=y_range)
 
-    def format_data_pop (self, evt):
+    def format_data (self, evt):
         if not self.info.running:
             return
 
