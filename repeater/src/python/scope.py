@@ -68,8 +68,8 @@ class p25_rx_block (stdgui2.std_top_block):
         parser.add_option("-I", "--audio-input", type="string", default="", help="pcm input device name.  E.g., hw:0,0 or /dev/dsp")
         parser.add_option("-i", "--input", default=None, help="input file name")
         parser.add_option("-b", "--excess-bw", type="eng_float", default=0.2, help="for RRC filter", metavar="Hz")
-        parser.add_option("-c", "--calibration", type="eng_float", default=0.0, help="offset frequency", metavar="Hz")
-        parser.add_option("-C", "--costas-alpha", type="eng_float", default=0.125, help="offset frequency", metavar="Hz")
+        parser.add_option("-c", "--calibration", type="eng_float", default=0.0, help="USRP offset or audio IF frequency", metavar="Hz")
+        parser.add_option("-C", "--costas-alpha", type="eng_float", default=0.125, help="value of alpha for Costas loop", metavar="Hz")
         parser.add_option("-f", "--frequency", type="eng_float", default=0.0, help="USRP center frequency", metavar="Hz")
         parser.add_option("-d", "--decim", type="int", default=200, help="source decimation factor")
         parser.add_option("-v", "--verbosity", type="int", default=10, help="message debug level")
@@ -77,7 +77,7 @@ class p25_rx_block (stdgui2.std_top_block):
         parser.add_option("-w", "--wireshark", action="store_true", default=False, help="output data to Wireshark")
         parser.add_option("-W", "--wireshark-host", type="string", default="127.0.0.1", help="Wireshark host")
         parser.add_option("-R", "--rx-subdev-spec", type="subdev", default=(0, 0), help="select USRP Rx side A or B (default=A)")
-        parser.add_option("-g", "--gain", type="eng_float", default=None, help="set USRP gain in dB (default is midpoint) (or audio gain)")
+        parser.add_option("-g", "--gain", type="eng_float", default=None, help="set USRP gain in dB (default is midpoint) or set audio gain")
         parser.add_option("-G", "--gain-mu", type="eng_float", default=0.025, help="gardner gain")
         (options, args) = parser.parse_args()
         if len(args) != 0:
@@ -167,7 +167,7 @@ class p25_rx_block (stdgui2.std_top_block):
         sps = int(self.basic_rate // self.symbol_rate)
 
         symbol_decim = 1
-        ntaps = 11 * 10
+        ntaps = 11 * sps
 #       rrc_coeffs = gr.firdes.root_raised_cosine(1.0, self.basic_rate, self.basic_rate * 0.1, 0.2, ntaps)
         rrc_coeffs = (1.0/sps,)*sps
         self.symbol_filter = gr.fir_filter_fff(symbol_decim, rrc_coeffs)
@@ -248,7 +248,7 @@ class p25_rx_block (stdgui2.std_top_block):
 
             rrc_taps = gr.firdes.root_raised_cosine(
                 1.0, # gain  (sps since we're interpolating by 
-                10, # sampling rate
+                sps, # sampling rate
                 1.0,                      # symbol rate
                 self.options.excess_bw,   # excess bandwidth (roll-off factor)
                 ntaps)
@@ -267,7 +267,7 @@ class p25_rx_block (stdgui2.std_top_block):
             theta = pi
 
             gain_mu= self.options.gain_mu
-            omega = 10
+            omega = float(sps)
             gain_omega = 0.1  * gain_mu * gain_mu
 
             alpha = self.options.costas_alpha
@@ -275,7 +275,7 @@ class p25_rx_block (stdgui2.std_top_block):
             fmin = -0.025
             fmax =  0.025
 
-            self.clock = repeater.gardner_costas_cc(10.0, gain_mu, gain_omega, alpha,  beta, fmax, fmin)
+            self.clock = repeater.gardner_costas_cc(omega, gain_mu, gain_omega, alpha,  beta, fmax, fmin)
 
             self.agc = gr.feedforward_agc_cc(16, 1.0)
 
