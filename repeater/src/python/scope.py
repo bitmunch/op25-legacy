@@ -189,7 +189,7 @@ class p25_rx_block (stdgui2.std_top_block):
         self.sink_s = repeater.p25_frame_assembler(self.options.wireshark_host, udp_port, self.options.verbosity, 0, 0, 0, msgq)
 
         if self.baseband_input:
-            gain = 50.0
+            gain = self.options.gain
         else:
             gain = 1.0
         self.baseband_amp = gr.multiply_const_ff(gain)
