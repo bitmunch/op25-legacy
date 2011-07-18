@@ -195,8 +195,6 @@ class p25_rx_block (stdgui2.std_top_block):
         self.baseband_amp = gr.multiply_const_ff(gain)
         self.real_amp = gr.multiply_const_ff(0.2)
 
-        self.sinkf = gr.file_sink(gr.sizeof_float, "sinkf.dat")
-
 #       self.connect_data_scope(True)
 
         self.fft_state  = False
@@ -230,7 +228,6 @@ class p25_rx_block (stdgui2.std_top_block):
                 self.lo_freq = self.options.calibration
             self.lo = gr.sig_source_c (channel_rate, gr.GR_SIN_WAVE, self.lo_freq, 1.0, 0)
             self.mixer = gr.multiply_cc()
-            self.decim_sink = gr.file_sink(gr.sizeof_gr_complex, "32k-complex.dat")
             lpf_coeffs = gr.firdes.low_pass(1.0, self.channel_rate, 12000, 1200, gr.firdes.WIN_HANN)
             self.lpf = gr.fir_filter_ccf(1, lpf_coeffs)
 
@@ -2080,7 +2077,7 @@ class correlation_plot_graph_window (plot.PlotCanvas):
 # following code copied from radiorausch file facsink.py
 # source: http://sites.google.com/site/radiorausch/
 #
-# modified Jul. 2011 to current GR KA1RBI (to fix error messages)
+# KA1RBI modified Jul. 2011 to current GR (to fix error messages)
 #
 # Copyright 2003,2004,2005,2006 Free Software Foundation, Inc.
 # 

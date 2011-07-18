@@ -115,7 +115,7 @@ repeater_p25_frame_assembler::general_work (int noutput_items,
   for (int i = 0; i < noutput_items; i++){
     if(framer->rx_sym(in[i])) {   // complete frame was detected
 		if (d_debug >= 10) {
-			fprintf (stderr, "NAC 0x%X DUID 0x%X len %ld errs %d ", framer->nac, framer->duid, framer->frame_size >> 1, framer->bch_errors);
+			fprintf (stderr, "NAC 0x%X DUID 0x%X len %d errs %d ", framer->nac, framer->duid, framer->frame_size >> 1, framer->bch_errors);
 		}
 		if (d_debug >= 10 && framer->duid == 0x00) {
 			ProcHDU(framer->frame_body);

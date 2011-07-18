@@ -34,6 +34,7 @@
 #include <repeater_s2v.h>
 #include <gr_io_signature.h>
 #include <stdio.h>
+#include <string.h>
 
 /*
  * Create a new instance of repeater_s2v and return
@@ -93,8 +94,6 @@ repeater_s2v::general_work (int noutput_items,
   }
 
   consume_each(amt_move);
-
-  // fprintf(stderr, "d_acct %ld rc %ld amt_left %ld amt_move %ld d_buf_len %ld\n", d_acct, rc, amt_left, amt_move, d_buf_len);
 
   // Tell runtime system how many output items we produced.
   return rc;
