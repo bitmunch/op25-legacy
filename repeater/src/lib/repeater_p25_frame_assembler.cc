@@ -114,26 +114,20 @@ repeater_p25_frame_assembler::general_work (int noutput_items,
 
   for (int i = 0; i < noutput_items; i++){
     if(framer->rx_sym(in[i])) {   // complete frame was detected
-		if (d_debug > 0 && framer->duid == 0x00) {
+		if (d_debug >= 10) {
+			fprintf (stderr, "NAC 0x%X DUID 0x%X len %ld errs %d ", framer->nac, framer->duid, framer->frame_size >> 1, framer->bch_errors);
+		}
+		if (d_debug >= 10 && framer->duid == 0x00) {
 			ProcHDU(framer->frame_body);
+		} else if (d_debug > 10 && framer->duid == 0x05) {
+			ProcLDU1(framer->frame_body);
+		} else if (d_debug >= 10 && framer->duid == 0x0a) {
+			ProcLDU2(framer->frame_body);
+		} else if (d_debug > 10 && framer->duid == 0x0f) {
+			ProcTDU(framer->frame_body);
 		}
-		if (d_debug > 10) {
-			fprintf (stderr, "NAC 0x%X DUID 0x%X symbols %d BCH errors %d\n", framer->nac, framer->duid, framer->frame_size >> 1, framer->bch_errors);
-			switch(framer->duid) {
-			case 0x00:	// Header DU
-				// see above ProcHDU(framer->frame_body); 
-				break;
-			case 0x05:	// LDU 1
-				ProcLDU1(framer->frame_body);
-				break;
-			case 0x0a:	// LDU 2
-				ProcLDU2(framer->frame_body);
-				break;
-			case 0x0f:	// LDU 2
-				ProcTDU(framer->frame_body);
-				break;
-			}
-		}
+		if (d_debug >= 10)
+			fprintf(stderr, "\n");
 		if (d_do_imbe && (framer->duid == 0x5 || framer->duid == 0xa)) {  // if voice - ldu1 or ldu2
 			for(size_t i = 0; i < nof_voice_codewords; ++i) {
 				voice_codeword cw(voice_codeword_sz);

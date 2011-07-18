@@ -61,6 +61,7 @@ ourlib_LTLIBRARIES = _repeater.la
 _repeater_la_SOURCES = 	repeater\
 	repeater.cc			\
 	repeater_fsk4_slicer_fb.cc	\
+	repeater_s2v.cc			\
 	repeater_p25_frame_assembler.cc	\
 	repeater_pipe.cc		\
 	repeater_ctcss_squelch_ff.cc	\

@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 
+# Copyright 2008-2011 Steve Glass
+# 
 # Copyright 2011 KA1RBI
+# 
+# Copyright 2003,2004,2005,2006 Free Software Foundation, Inc.
+#         (from radiorausch)
 # 
 # This file is part of OP25 and part of GNU Radio
 # 
@@ -30,6 +35,7 @@ import math
 import numpy
 import time
 import re
+import Numeric
 
 from gnuradio import audio, eng_notation, fsk4, gr, gru, repeater
 from gnuradio import blks2
@@ -88,6 +94,7 @@ class p25_rx_block (stdgui2.std_top_block):
             self.usrp = usrp.source_c()
             self.channel_rate = self.usrp.adc_freq() / options.decim
         except Exception:
+            print "USRP source_c creation failure"
             ignore = True
 
         if options.audio:
@@ -108,6 +115,8 @@ class p25_rx_block (stdgui2.std_top_block):
 
         self.datascope_raw_input = False
         self.data_scope_connected = False
+
+        self.constellation_scope_connected = False
 
         self.options = options
 
@@ -192,9 +201,9 @@ class p25_rx_block (stdgui2.std_top_block):
 
         self.fft_state  = False
         self.c4fm_state = False
-        self.cscope_state = False
         self.fscope_state = False
         self.corr_state = False
+        self.fac_state = False
         self.fsk4_demod_connected = False
         self.psk_demod_connected = False
         self.fsk4_demod_mode = True
@@ -318,12 +327,18 @@ class p25_rx_block (stdgui2.std_top_block):
         self.connect_fsk4_demod()
 
     def set_connection(self,
-                         cscope=False,
                          fscope=False,
                          fft=False,
                          corr=False,
+                         fac=False,
                          c4fm=False):
      # assumes that lock is held, or that we are in init
+        if fac != self.fac_state:
+            self.fac_state = fac
+            if fac:
+                self.connect(self.mixer, self.fac_scope)
+            else:
+                self.disconnect(self.mixer, self.fac_scope)
         if corr != self.corr_state:
             self.corr_state = corr
             if corr:
@@ -336,15 +351,6 @@ class p25_rx_block (stdgui2.std_top_block):
                     self.disconnect(self.arb_resampler, self.to_real, self.real_amp, self.correlation_scope)
                 else:
                     self.disconnect(self.symbol_filter, self.correlation_scope)
-
-        if cscope != self.cscope_state:
-            self.cscope_state = cscope
-            if cscope == 0:
-                # self.disconnect(self.diffdec, self.complex_scope)
-                self.disconnect(self.clock, self.complex_scope)
-            else:
-                # self.connect(self.diffdec, self.complex_scope)
-                self.connect(self.clock, self.complex_scope)
 
         if fscope != self.fscope_state:
             self.fscope_state = fscope
@@ -371,30 +377,36 @@ class p25_rx_block (stdgui2.std_top_block):
         sel = self.notebook.GetSelection()
         self.lock()
         self.disconnect_data_scope()
+        self.disconnect_constellation_scope()
         if sel == 0:   # spectrum
             if not self.baseband_input:
                 self.set_connection(fft=1)
                 self.disconnect_demods()
-        if sel == 1:   # c4fm
+        elif sel == 1:   # c4fm
             self.set_connection(c4fm=1)
             self.connect_fsk4_demod()
-        if sel == 2:   # datascope
+        elif sel == 2:   # datascope
             self.set_connection()
             self.connect_fsk4_demod()
             self.connect_data_scope()
-        if sel == 3:   # constellation (complex)
+        elif sel == 3:   # constellation (complex)
             if not self.baseband_input:
-                self.set_connection(cscope=1)
+                self.set_connection()
                 self.connect_psk_demod()
-        if sel == 4:   # demodulated symbols
+                self.connect_constellation_scope()
+        elif sel == 4:   # demodulated symbols
             self.connect_demods()
             self.set_connection(fscope=1)
-        if sel == 5:   # correlation
+        elif sel == 5:   # correlation
             self.disconnect_demods()
             self.current_speed = self.default_speed_idx # reset speed for corr
             self.data_scope.win.radio_box_speed.SetSelection(self.current_speed)
             self.connect_fsk4_demod()
             self.set_connection(corr=1)
+        elif sel == 6:   # fac - fast auto correlation
+            if not self.baseband_input:
+                self.set_connection(fac=1)
+                self.disconnect_demods()
         self.unlock()
 
     # initialize the UI
@@ -467,13 +479,19 @@ class p25_rx_block (stdgui2.std_top_block):
         self.vbox.Add(self.notebook, 1, wx.EXPAND)       
         # add spectrum scope
         self.spectrum = fftsink2.fft_sink_c(self.notebook, sample_rate = self.channel_rate, fft_size=512, fft_rate=2, average=False, peak_hold=False)
-        self.spectrum_plotter = self.spectrum.win.plotter
-        self.spectrum_plotter.enable_point_label(False)
+        try:
+            self.spectrum_plotter = self.spectrum.win.plotter
+        except:
+            self.spectrum_plotter = self.spectrum.win.plot
+        #self.spectrum_plotter.enable_point_label(False)
         self.spectrum_plotter.Bind(wx.EVT_LEFT_DOWN, self._on_spectrum_left_click)
         self.notebook.AddPage(self.spectrum.win, "RF Spectrum")
         # add C4FM scope
         self.signal_scope = scopesink2.scope_sink_f(self.notebook, sample_rate = self.basic_rate, v_scale=5, t_scale=0.001)
-        self.signal_plotter = self.signal_scope.win.plotter
+        try:
+            self.signal_plotter = self.signal_scope.win.plotter
+        except:
+            self.signal_plotter = self.signal_scope.win.graph
         self.notebook.AddPage(self.signal_scope.win, "C4FM Signal")
         # add datascope
         self.data_scope = datascope_sink_f(self.notebook, samples_per_symbol = 10, num_plots = 100)
@@ -485,19 +503,27 @@ class p25_rx_block (stdgui2.std_top_block):
         # add complex scope
         self.complex_scope = constellation_plot_c(self.notebook, title="Constellation", num_plots=250)
         self.notebook.AddPage(self.complex_scope.win, "Constellation")
+        wx.EVT_RADIOBOX(self.complex_scope.win.radio_box_source, 11108, self.source_select)
         # add float scope
         self.float_scope = scopesink2.scope_sink_f(self.notebook, frame_decim=1, sample_rate=self.symbol_rate, v_scale=1, t_scale=0.05)
-        self.float_plotter = self.float_scope.win.plotter
-        self.float_scope.win['marker_1'] = 3.0	# set type = large dots
+        try:	#gl
+            self.float_plotter = self.float_scope.win.plotter
+            self.float_scope.win['marker_1'] = 3.0	# set type = large dots
+        except:	#nongl
+            self.float_plotter = self.float_scope.win.graph
+            self.float_scope.win.set_format_plus()
         self.notebook.AddPage(self.float_scope.win, "Demodulated Symbols")
         # Traffic snapshot
         # self.traffic = TrafficPane(self.notebook)
         # self.notebook.AddPage(self.traffic, "Traffic")
-        # add float scope
+        # add corr scope
         self.correlation_scope = correlation_plot_f(self.notebook, frame_decim=4, sps=10, v_scale=1, t_scale=0.05)
         # self.correlation_plotter = self.correlation_scope.win.plotter
         wx.EVT_RADIOBOX(self.correlation_scope.win.radio_box_corr, 11105, self.corr_select)
         self.notebook.AddPage(self.correlation_scope.win, "Correlation")
+        # add fac scope
+        self.fac_scope = fac_sink_c(self.notebook, fac_size=32768, sample_rate=self.channel_rate, title="Auto Correlation")
+        self.notebook.AddPage(self.fac_scope.win, "Auto Correlation")
         # Setup the decoder and report the TUN/TAP device name
         msgq = gr.msg_queue(2)
         # self.decode_watcher = decode_watcher(msgq, self.traffic)
@@ -943,6 +969,22 @@ class p25_rx_block (stdgui2.std_top_block):
             else:
                 self.connect_psk_demod()
 
+    def disconnect_constellation_scope(self):
+        if self.constellation_scope_connected:
+            self.disconnect(self.constellation_scope_input, self.complex_scope)
+        self.constellation_scope_connected = False
+        self.constellation_scope_input = None
+
+    def connect_constellation_scope(self):
+        self.disconnect_constellation_scope()
+        sel = self.complex_scope.win.radio_box_source.GetSelection()
+        if sel:
+            self.constellation_scope_input = self.diffdec
+        else:
+            self.constellation_scope_input = self.clock
+        self.constellation_scope_connected = True
+        self.connect(self.constellation_scope_input, self.complex_scope)
+
     def disconnect_data_scope(self):
         if self.data_scope_connected:
             self.disconnect(self.data_scope_input, self.data_scope)
@@ -978,6 +1020,11 @@ class p25_rx_block (stdgui2.std_top_block):
         else:
             self.corr_i_chan = False
         self.set_connection(corr=True)
+        self.unlock()
+
+    def source_select(self, evt):
+        self.lock()
+        self.connect_constellation_scope()
         self.unlock()
 
     def speed_select(self, evt):
@@ -1553,21 +1600,22 @@ class constellation_plot_input_watcher (threading.Thread):
 
 class constellation_plot_window (wx.Panel):
 
+    constellation_window_size = wx.DefaultSize
     def __init__ (self, info, parent, id = -1,
                   num_plots=100,
-                  pos = wx.DefaultPosition, size = wx.DefaultSize, name = ""):
+                  pos = wx.DefaultPosition, size = constellation_window_size, name = ""):
         wx.Panel.__init__ (self, parent, -1)
         self.info = info
 
-        vbox = wx.BoxSizer (wx.VERTICAL)
+        hbox = wx.BoxSizer (wx.HORIZONTAL)
 
         self.graph = constellation_plot_graph_window (info, self, -1, num_plots=num_plots)
 
-        vbox.Add (self.graph, 1, wx.EXPAND)
-        vbox.Add (self.make_control_box(), 0, wx.EXPAND)
-        vbox.Add (self.make_control2_box(), 0, wx.EXPAND)
+        hbox.Add (self.graph, 1, wx.SHAPED)
+        hbox.Add (self.make_control_box(), 0, wx.EXPAND)
+        hbox.Add (self.make_control2_box(), 0, wx.EXPAND)
 
-        self.sizer = vbox
+        self.sizer = hbox
         self.SetSizer (self.sizer)
         self.SetAutoLayout (True)
         self.sizer.Fit (self)
@@ -1591,10 +1639,20 @@ class constellation_plot_window (wx.Panel):
         wx.EVT_BUTTON (self, 11102, self.run_stop)
         ctrlbox.Add (run_stop, 0, wx.EXPAND)
 
-        self.radio_box = wx.RadioBox(self, 11103, "Viewpoint", style=wx.RA_SPECIFY_ROWS,
-                        choices = ["Raw", "Filtered"] )
-        self.radio_box.SetToolTipString("Viewpoint Before Or After Symbol Filter")
-        ctrlbox.Add (self.radio_box, 0, wx.EXPAND)
+        # self.radio_box.SetToolTipString("Viewpoint Before Or After Symbol Filter")
+
+        self.radio_box_mode = wx.RadioBox(self, 11106, "Mode", style=wx.RA_SPECIFY_ROWS,
+                        choices = ["Standard", "Population"] )
+        ctrlbox.Add (self.radio_box_mode, 0, wx.EXPAND)
+
+        self.radio_box_color = wx.RadioBox(self, 11107, "Color", style=wx.RA_SPECIFY_ROWS,
+                        choices = ["Mono", "2 Color"] )
+        ctrlbox.Add (self.radio_box_color, 0, wx.EXPAND)
+        wx.EVT_RADIOBOX(self.radio_box_color, 11107, self.color_select)
+
+        self.radio_box_source = wx.RadioBox(self, 11108, "Source", style=wx.RA_SPECIFY_ROWS,
+                        choices = ["Direct", "Differential"] )
+        ctrlbox.Add (self.radio_box_source, 0, wx.EXPAND)
 
         ctrlbox.Add ((10, 0) ,1)            # stretchy space
 
@@ -1602,6 +1660,15 @@ class constellation_plot_window (wx.Panel):
     
     def run_stop (self, evt):
         self.info.running = not self.info.running
+
+    def color_select(self, evt):
+        sel = self.radio_box_color.GetSelection()
+        if sel:
+            self.graph.color1 = 'red'
+            self.graph.color2 = 'green'
+        else:
+            self.graph.color1 = 'blue'
+            self.graph.color2 = 'blue'
 
 class constellation_plot_graph_window (plot.PlotCanvas):
 
@@ -1618,6 +1685,7 @@ class constellation_plot_graph_window (plot.PlotCanvas):
         # self.SetBackgroundColour ('black')
         
         self.info = info;
+        self.plot_window = parent
 
         self.total_points = 0
 
@@ -1629,10 +1697,18 @@ class constellation_plot_graph_window (plot.PlotCanvas):
 
         self.flag = False
 
-    def format_data_orig (self, evt):
+        self.color1 = 'blue'
+        self.color2 = 'blue'
+
+    def format_data (self, evt):
         if not self.info.running:
             return
+        if self.plot_window.radio_box_mode.GetSelection():
+            self.format_data_pop(evt)
+        else:
+            self.format_data_std(evt)
 
+    def format_data_std (self, evt):
         info = self.info
         records = evt.data
         nchannels = len (records)
@@ -1655,18 +1731,18 @@ class constellation_plot_graph_window (plot.PlotCanvas):
                 p0.append(p)
             self.flag = not self.flag
 
-        objects.append (plot.PolyMarker (p0, marker='plus', colour='blue'))
-        objects.append (plot.PolyMarker (p1, marker='plus', colour='blue'))
+        objects.append (plot.PolyMarker (p0, marker='plus', colour=self.color1))
+        objects.append (plot.PolyMarker (p1, marker='plus', colour=self.color2))
 
         graphics = plot.PlotGraphics (objects,
-                                      title='Data Scope',
+                                      title='Constellation',
                                       xLabel = 'I', yLabel = 'Q')
 
         x_range = (-1.0, 1.0)
         y_range = (-1.0, 1.0)
         self.Draw (graphics, xAxis=x_range, yAxis=y_range)
 
-    def format_data (self, evt):
+    def format_data_pop (self, evt):
         if not self.info.running:
             return
 
@@ -1679,7 +1755,6 @@ class constellation_plot_graph_window (plot.PlotCanvas):
         self.SetXUseScopeTicks (True)   # use 10 divisions, no labels
 
         objects = []
-        colors = ['red','orange','yellow','green','blue','violet','cyan','magenta','brown','black']
 
         r = records[0]  # input data
         l = len(r) / 2
@@ -1732,13 +1807,11 @@ class constellation_plot_graph_window (plot.PlotCanvas):
                 sp = p
             p1.append(p)
         p1.append(sp)
-        # objects.append (plot.PolyMarker (p0, marker='point', colour='red'))
-        # objects.append (plot.PolyMarker (p1, marker='point', colour='green'))
-        objects.append (plot.PolyLine (p0, colour='red', legend=''))
-        objects.append (plot.PolyLine (p1, colour='green', legend=''))
+        objects.append (plot.PolyLine (p0, colour=self.color1, legend=''))
+        objects.append (plot.PolyLine (p1, colour=self.color2, legend=''))
 
         graphics = plot.PlotGraphics (objects,
-                                      title='Data Scope',
+                                      title='Constellation',
                                       xLabel = 'I', yLabel = 'Q')
 
         x_range = (-2.5, 2.5)
@@ -2002,6 +2075,459 @@ class correlation_plot_graph_window (plot.PlotCanvas):
         x_range = (0, len(res))
         y_range = (-800.0, 800.0)
         self.Draw (graphics, xAxis=x_range, yAxis=y_range)
+
+#
+# following code copied from radiorausch file facsink.py
+# source: http://sites.google.com/site/radiorausch/
+#
+# modified Jul. 2011 to current GR KA1RBI (to fix error messages)
+#
+# Copyright 2003,2004,2005,2006 Free Software Foundation, Inc.
+# 
+# This file is part of GNU Radio
+# 
+# GNU Radio is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+# 
+# GNU Radio is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with GNU Radio; see the file COPYING.  If not, write to
+# the Free Software Foundation, Inc., 51 Franklin Street,
+# Boston, MA 02110-1301, USA.
+# 
+
+# default_facsink_size = (640,240)
+default_facsink_size = wx.DefaultSize
+default_fac_rate = gr.prefs().get_long('wxgui', 'fac_rate', 3) # was 15
+
+class fac_sink_base(object):
+    def __init__(self, input_is_real=False, baseband_freq=0, y_per_div=10, ref_level=50,
+                 sample_rate=1, fac_size=512,	
+                 fac_rate=default_fac_rate,
+                 average=False, avg_alpha=None, title='', peak_hold=False):
+
+        # initialize common attributes
+        self.baseband_freq = baseband_freq
+        self.y_divs = 8
+        self.y_per_div=y_per_div
+        self.ref_level = ref_level
+        self.sample_rate = sample_rate
+        self.fac_size = fac_size
+        self.fac_rate = fac_rate
+        self.average = average
+        if avg_alpha is None:
+            self.avg_alpha = 0.20 / fac_rate	# averaging needed to be slowed down for very slow rates
+        else:
+            self.avg_alpha = avg_alpha
+        self.title = title
+        self.peak_hold = peak_hold
+        self.input_is_real = input_is_real
+        self.msgq = gr.msg_queue(2)         # queue that holds a maximum of 2 messages
+
+    def set_y_per_div(self, y_per_div):
+        self.y_per_div = y_per_div
+
+    def set_ref_level(self, ref_level):
+        self.ref_level = ref_level
+
+    def set_average(self, average):
+        self.average = average
+        if average:
+            self.avg.set_taps(self.avg_alpha)
+            self.set_peak_hold(False)
+        else:
+            self.avg.set_taps(1.0)
+
+    def set_peak_hold(self, enable):
+        self.peak_hold = enable
+        if enable:
+            self.set_average(False)
+        self.win.set_peak_hold(enable)
+
+    def set_avg_alpha(self, avg_alpha):
+        self.avg_alpha = avg_alpha
+
+    def set_baseband_freq(self, baseband_freq):
+        self.baseband_freq = baseband_freq
+
+    def set_sample_rate(self, sample_rate):
+        self.sample_rate = sample_rate
+        self._set_n()
+
+    def _set_n(self):
+        self.one_in_n.set_n(max(1, int(self.sample_rate/self.fac_size/self.fac_rate)))
+        
+
+class fac_sink_f(gr.hier_block2, fac_sink_base):
+    def __init__(self, parent, baseband_freq=0,
+                 y_per_div=10, ref_level=50, sample_rate=1, fac_size=512,
+                 fac_rate=default_fac_rate, 
+                 average=False, avg_alpha=None,
+                 title='', size=default_facsink_size, peak_hold=False):
+
+        fac_sink_base.__init__(self, input_is_real=True, baseband_freq=baseband_freq,
+                               y_per_div=y_per_div, ref_level=ref_level,
+                               sample_rate=sample_rate, fac_size=fac_size,
+                               fac_rate=fac_rate,  
+                               average=average, avg_alpha=avg_alpha, title=title,
+                               peak_hold=peak_hold)
+                               
+        s2p = gr.stream_to_vector(gr.sizeof_float, self.fac_size)
+        self.one_in_n = gr.keep_one_in_n(gr.sizeof_float * self.fac_size,
+                                         max(1, int(self.sample_rate/self.fac_size/self.fac_rate)))
+
+
+	# windowing removed... 
+
+        fac = gr.fft_vfc(self.fac_size, True, ())
+            
+        c2mag = gr.complex_to_mag(self.fac_size)
+        self.avg = gr.single_pole_iir_filter_ff(1.0, self.fac_size)
+
+	#
+	fac_fac   = gr.fft_vfc(self.fac_size, True, ())
+        fac_c2mag = gr.complex_to_mag(fac_size)
+
+
+        # FIXME  We need to add 3dB to all bins but the DC bin
+        log = gr.nlog10_ff(20, self.fac_size,
+                           -20*math.log10(self.fac_size) )
+        sink = gr.message_sink(gr.sizeof_float * self.fac_size, self.msgq, True)
+
+        self.connect(self, s2p, self.one_in_n, fac, c2mag,  fac_fac, fac_c2mag, self.avg, log, sink)
+        # gr.hier_block.__init__(self, fg, s2p, sink)
+        gr.hier_block2.__init__(self, "fac_sink_f", 
+            gr.io_signature(1, 1, gr.sizeof_float),
+            gr.io_signature(0, 0, 0))
+
+        self.win = fac_window(self, parent, size=size)
+        self.set_average(self.average)
+
+
+
+class fac_sink_c(gr.hier_block2, fac_sink_base):
+    def __init__(self, parent, baseband_freq=0,
+                 y_per_div=10, ref_level=90, sample_rate=1, fac_size=512,
+                 fac_rate=default_fac_rate, 
+                 average=False, avg_alpha=None,
+                 title='', size=default_facsink_size, peak_hold=False):
+
+        fac_sink_base.__init__(self, input_is_real=False, baseband_freq=baseband_freq,
+                               y_per_div=y_per_div, ref_level=ref_level,
+                               sample_rate=sample_rate, fac_size=fac_size,
+                               fac_rate=fac_rate, 
+                               average=average, avg_alpha=avg_alpha, title=title,
+                               peak_hold=peak_hold)
+        gr.hier_block2.__init__(self, "fac_sink_c", 
+            gr.io_signature(1, 1, gr.sizeof_gr_complex),
+            gr.io_signature(0, 0, 0))
+
+        #s2p = gr.stream_to_vector(gr.sizeof_gr_complex, self.fac_size)
+        s2p = repeater.s2v(gr.sizeof_gr_complex, self.fac_size)
+        self.one_in_n = gr.keep_one_in_n(gr.sizeof_gr_complex * self.fac_size,
+                                         max(1, int(self.sample_rate/self.fac_size/self.fac_rate)))
+
+
+	# windowing removed ...
+     
+        fac = gr.fft_vcc(self.fac_size, True, ())
+        c2mag = gr.complex_to_mag(fac_size)
+
+        # Things go off into the weeds if we try for an inverse FFT so a forward FFT will have to do...
+	fac_fac   = gr.fft_vfc(self.fac_size, True, ())
+        fac_c2mag = gr.complex_to_mag(fac_size)
+
+
+        self.avg = gr.single_pole_iir_filter_ff(1.0, fac_size)
+
+        log = gr.nlog10_ff(20, self.fac_size, 
+                           -20*math.log10(self.fac_size)  ) #  - 20*math.log10(norm) ) # - self.avg[0] )
+        sink = gr.message_sink(gr.sizeof_float * fac_size, self.msgq, True)
+
+        self.connect(self, s2p, self.one_in_n, fac, c2mag,  fac_fac, fac_c2mag, self.avg)
+	self.connect(self.avg, log, sink)
+
+        # gr.hier_block.__init__(self, fg, s2p, sink)
+
+        self.win = fac_window(self, parent, size=size)
+        self.set_average(self.average)
+
+
+# ------------------------------------------------------------------------
+
+fac_myDATA_EVENT = wx.NewEventType()
+fac_EVT_DATA_EVENT = wx.PyEventBinder (fac_myDATA_EVENT, 0)
+
+
+class fac_DataEvent(wx.PyEvent):
+    def __init__(self, data):
+        wx.PyEvent.__init__(self)
+        self.SetEventType (fac_myDATA_EVENT)
+        self.data = data
+
+    def Clone (self): 
+        self.__class__ (self.GetId())
+
+
+class fac_input_watcher (threading.Thread):
+    def __init__ (self, msgq, fac_size, event_receiver, **kwds):
+        threading.Thread.__init__ (self, **kwds)
+        self.setDaemon (1)
+        self.msgq = msgq
+        self.fac_size = fac_size
+        self.event_receiver = event_receiver
+        self.keep_running = True
+        self.start ()
+
+    def run (self):
+        while (self.keep_running):
+            msg = self.msgq.delete_head()  # blocking read of message queue
+            itemsize = int(msg.arg1())
+            nitems = int(msg.arg2())
+
+            s = msg.to_string()            # get the body of the msg as a string
+
+            # There may be more than one fac frame in the message.
+            # If so, we take only the last one
+            if nitems > 1:
+                start = itemsize * (nitems - 1)
+                s = s[start:start+itemsize]
+
+            complex_data = Numeric.fromstring (s, Numeric.Float32)
+            de = fac_DataEvent (complex_data)
+            wx.PostEvent (self.event_receiver, de)
+            del de
+    
+
+class fac_window (plot.PlotCanvas):
+    def __init__ (self, facsink, parent, id = -1,
+                  pos = wx.DefaultPosition, size = wx.DefaultSize,
+                  style = wx.DEFAULT_FRAME_STYLE, name = ""):
+        plot.PlotCanvas.__init__ (self, parent, id, pos, size, style, name)
+
+        self.y_range = None
+        self.facsink = facsink
+        self.peak_hold = False
+        self.peak_vals = None
+
+        self.SetEnableGrid (True)
+        # self.SetEnableZoom (True)
+        # self.SetBackgroundColour ('black')
+        
+        self.build_popup_menu()
+        
+        fac_EVT_DATA_EVENT (self, self.set_data)
+        wx.EVT_CLOSE (self, self.on_close_window)
+        self.Bind(wx.EVT_RIGHT_UP, self.on_right_click)
+
+        self.input_watcher = fac_input_watcher(facsink.msgq, facsink.fac_size, self)
+
+
+    def on_close_window (self, event):
+        print "fac_window:on_close_window"
+        self.keep_running = False
+
+
+    def set_data (self, evt):
+        dB = evt.data
+        L = len (dB)
+
+        if self.peak_hold:
+            if self.peak_vals is None:
+                self.peak_vals = dB
+            else:
+                self.peak_vals = Numeric.maximum(dB, self.peak_vals)
+                dB = self.peak_vals
+
+        x = max(abs(self.facsink.sample_rate), abs(self.facsink.baseband_freq))
+        sf = 1000.0
+        units = "ms"
+
+        x_vals = ((Numeric.arrayrange (L/2)
+                       * ( (sf / self.facsink.sample_rate  ) )) )
+        points = Numeric.zeros((len(x_vals), 2), Numeric.Float64)
+        points[:,0] = x_vals
+        points[:,1] = dB[0:L/2]
+
+
+        lines = plot.PolyLine (points, colour='DARKRED')
+
+
+        graphics = plot.PlotGraphics ([lines],
+                                      title=self.facsink.title,
+                                      xLabel = units, yLabel = "dB")
+
+        self.Draw (graphics, xAxis=None, yAxis=self.y_range)
+        self.update_y_range ()
+
+    def set_peak_hold(self, enable):
+        self.peak_hold = enable
+        self.peak_vals = None
+
+    def update_y_range (self):
+        ymax = self.facsink.ref_level
+        ymin = self.facsink.ref_level - self.facsink.y_per_div * self.facsink.y_divs
+        self.y_range = self._axisInterval ('min', ymin, ymax)
+
+    def on_average(self, evt):
+        # print "on_average"
+        self.facsink.set_average(evt.IsChecked())
+
+    def on_peak_hold(self, evt):
+        # print "on_peak_hold"
+        self.facsink.set_peak_hold(evt.IsChecked())
+
+    def on_incr_ref_level(self, evt):
+        # print "on_incr_ref_level"
+        self.facsink.set_ref_level(self.facsink.ref_level
+                                   + self.facsink.y_per_div)
+
+    def on_decr_ref_level(self, evt):
+        # print "on_decr_ref_level"
+        self.facsink.set_ref_level(self.facsink.ref_level
+                                   - self.facsink.y_per_div)
+
+    def on_incr_y_per_div(self, evt):
+        # print "on_incr_y_per_div"
+        self.facsink.set_y_per_div(next_up(self.facsink.y_per_div, (1,2,5,10,20)))
+
+    def on_decr_y_per_div(self, evt):
+        # print "on_decr_y_per_div"
+        self.facsink.set_y_per_div(next_down(self.facsink.y_per_div, (1,2,5,10,20)))
+
+    def on_y_per_div(self, evt):
+        # print "on_y_per_div"
+        Id = evt.GetId()
+        if Id == self.id_y_per_div_1:
+            self.facsink.set_y_per_div(1)
+        elif Id == self.id_y_per_div_2:
+            self.facsink.set_y_per_div(2)
+        elif Id == self.id_y_per_div_5:
+            self.facsink.set_y_per_div(5)
+        elif Id == self.id_y_per_div_10:
+            self.facsink.set_y_per_div(10)
+        elif Id == self.id_y_per_div_20:
+            self.facsink.set_y_per_div(20)
+
+        
+    def on_right_click(self, event):
+        menu = self.popup_menu
+        for id, pred in self.checkmarks.items():
+            item = menu.FindItemById(id)
+            item.Check(pred())
+        self.PopupMenu(menu, event.GetPosition())
+
+
+    def build_popup_menu(self):
+        self.id_incr_ref_level = wx.NewId()
+        self.id_decr_ref_level = wx.NewId()
+        self.id_incr_y_per_div = wx.NewId()
+        self.id_decr_y_per_div = wx.NewId()
+        self.id_y_per_div_1 = wx.NewId()
+        self.id_y_per_div_2 = wx.NewId()
+        self.id_y_per_div_5 = wx.NewId()
+        self.id_y_per_div_10 = wx.NewId()
+        self.id_y_per_div_20 = wx.NewId()
+        self.id_average = wx.NewId()
+        self.id_peak_hold = wx.NewId()
+
+        self.Bind(wx.EVT_MENU, self.on_average, id=self.id_average)
+        self.Bind(wx.EVT_MENU, self.on_peak_hold, id=self.id_peak_hold)
+        self.Bind(wx.EVT_MENU, self.on_incr_ref_level, id=self.id_incr_ref_level)
+        self.Bind(wx.EVT_MENU, self.on_decr_ref_level, id=self.id_decr_ref_level)
+        self.Bind(wx.EVT_MENU, self.on_incr_y_per_div, id=self.id_incr_y_per_div)
+        self.Bind(wx.EVT_MENU, self.on_decr_y_per_div, id=self.id_decr_y_per_div)
+        self.Bind(wx.EVT_MENU, self.on_y_per_div, id=self.id_y_per_div_1)
+        self.Bind(wx.EVT_MENU, self.on_y_per_div, id=self.id_y_per_div_2)
+        self.Bind(wx.EVT_MENU, self.on_y_per_div, id=self.id_y_per_div_5)
+        self.Bind(wx.EVT_MENU, self.on_y_per_div, id=self.id_y_per_div_10)
+        self.Bind(wx.EVT_MENU, self.on_y_per_div, id=self.id_y_per_div_20)
+
+
+        # make a menu
+        menu = wx.Menu()
+        self.popup_menu = menu
+        menu.AppendCheckItem(self.id_average, "Average")
+        menu.AppendCheckItem(self.id_peak_hold, "Peak Hold")
+        menu.Append(self.id_incr_ref_level, "Incr Ref Level")
+        menu.Append(self.id_decr_ref_level, "Decr Ref Level")
+        # menu.Append(self.id_incr_y_per_div, "Incr dB/div")
+        # menu.Append(self.id_decr_y_per_div, "Decr dB/div")
+        menu.AppendSeparator()
+        # we'd use RadioItems for these, but they're not supported on Mac
+        menu.AppendCheckItem(self.id_y_per_div_1, "1 dB/div")
+        menu.AppendCheckItem(self.id_y_per_div_2, "2 dB/div")
+        menu.AppendCheckItem(self.id_y_per_div_5, "5 dB/div")
+        menu.AppendCheckItem(self.id_y_per_div_10, "10 dB/div")
+        menu.AppendCheckItem(self.id_y_per_div_20, "20 dB/div")
+
+        self.checkmarks = {
+            self.id_average : lambda : self.facsink.average,
+            self.id_peak_hold : lambda : self.facsink.peak_hold,
+            self.id_y_per_div_1 : lambda : self.facsink.y_per_div == 1,
+            self.id_y_per_div_2 : lambda : self.facsink.y_per_div == 2,
+            self.id_y_per_div_5 : lambda : self.facsink.y_per_div == 5,
+            self.id_y_per_div_10 : lambda : self.facsink.y_per_div == 10,
+            self.id_y_per_div_20 : lambda : self.facsink.y_per_div == 20,
+            }
+
+
+def next_up(v, seq):
+    """
+    Return the first item in seq that is > v.
+    """
+    for s in seq:
+        if s > v:
+            return s
+    return v
+
+def next_down(v, seq):
+    """
+    Return the last item in seq that is < v.
+    """
+    rseq = list(seq[:])
+    rseq.reverse()
+
+    for s in rseq:
+        if s < v:
+            return s
+    return v
+
+
+# ----------------------------------------------------------------
+#          	      Deprecated interfaces
+# ----------------------------------------------------------------
+
+# returns (block, win).
+#   block requires a single input stream of float
+#   win is a subclass of wxWindow
+
+def make_fac_sink_f(fg, parent, title, fac_size, input_rate, ymin = 0, ymax=50):
+    
+    block = fac_sink_f(fg, parent, title=title, fac_size=fac_size, sample_rate=input_rate,
+                       y_per_div=(ymax - ymin)/8, ref_level=ymax)
+    return (block, block.win)
+
+# returns (block, win).
+#   block requires a single input stream of gr_complex
+#   win is a subclass of wxWindow
+
+def make_fac_sink_c(fg, parent, title, fac_size, input_rate, ymin=0, ymax=50):
+    block = fac_sink_c(fg, parent, title=title, fac_size=fac_size, sample_rate=input_rate,
+                       y_per_div=(ymax - ymin)/8, ref_level=ymax)
+    return (block, block.win)
+
+
+# ----------------------------------------------------------------
+# Standalone test app - deleted
+# ----------------------------------------------------------------
+
 
 ############################################################################
 

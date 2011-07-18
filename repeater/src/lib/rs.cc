@@ -493,7 +493,7 @@ uint32_t ALGID = (HB[40] & 15) * 16 + (HB[41] >> 2);
 uint32_t KID = (HB[41] & 3) * 16384 + HB[42] * 256 + HB[43] * 4 + (HB[44] >> 4);
 uint32_t TGID = (HB[44] & 15) * 4096 + HB[45] * 64 + HB[46];
 
-fprintf (stderr, "HDU: rc %d mfid %x alg %x kid %x tgid %d\n", ec, MFID, ALGID, KID, TGID);
+fprintf (stderr, " HDU: rc %d mfid %x alg %x kid %x tgid %d", ec, MFID, ALGID, KID, TGID);
 
 }
 
@@ -518,7 +518,7 @@ void ProcLC(uint8_t HB[]) {
 	int pb = HB[39] >> 5;
 	int sf = (HB[39] & 16) >> 4;
 	int lco = (HB[39] and 15) * 4 + (HB[40] >> 4);
-	fprintf(stderr, "LC: rc %d pb %d sf %d lco %d\n", ec, pb, sf, lco);
+	fprintf(stderr, " LC: rc %d pb %d sf %d lco %d", ec, pb, sf, lco);
 }
 
 void ProcLDU1(const_bit_vector A) {
@@ -537,11 +537,11 @@ void ProcLDU2(const_bit_vector A) {
 	uint32_t ALGID = HB[51] * 4 + (HB[52] >> 4);
 	uint32_t KID = (HB[52] & 15) * 4096 + HB[53] * 64 + HB[54];
 
-	fprintf(stderr, "LDU2: rc %d ALGID %x KID %x MI ", ec, ALGID, KID);
+	fprintf(stderr, " LDU2: rc %d ALGID %x KID %x MI ", ec, ALGID, KID);
 	for (int i = 39; i <= 50; i++) {
 		fprintf(stderr, "%02x ", HB[ i ]);
 	}
-	fprintf(stderr, "\n");
+	// fprintf(stderr, "\n");
 }
 
 void ProcTDU(const_bit_vector A) {

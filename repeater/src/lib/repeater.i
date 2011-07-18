@@ -9,6 +9,7 @@
 #include "gnuradio_swig_bug_workaround.h"	// mandatory bug fix
 #include "repeater_squelch_base_ff.h"
 #include "repeater_fsk4_slicer_fb.h"
+#include "repeater_s2v.h"
 #include "repeater_p25_frame_assembler.h"
 #include "repeater_pipe.h"
 #include "repeater_ctcss_squelch_ff.h"
@@ -155,3 +156,14 @@ private:
 public:
   void unkey(void);
 };
+
+GR_SWIG_BLOCK_MAGIC(repeater,s2v);
+
+repeater_s2v_sptr repeater_make_s2v (size_t item_size, size_t nitems_per_block);
+
+class repeater_s2v : public gr_block
+{
+private:
+  repeater_s2v (size_t item_size, size_t nitems_per_block);
+};
+
