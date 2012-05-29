@@ -68,6 +68,8 @@ _repeater_la_SOURCES = 	repeater\
 	repeater_squelch_base_ff.cc	\
 	repeater_vocoder.cc		\
 	repeater_gardner_costas_cc.cc	\
+	repeater_tdetect_cc.cc		\
+	cic_filter.cc			\
 	repeater_chan_usrp.cc		\
 	repeater_chan_usrp_rx.cc	\
 	p25_framer.cc			\

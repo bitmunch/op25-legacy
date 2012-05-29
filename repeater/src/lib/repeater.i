@@ -14,6 +14,8 @@
 #include "repeater_pipe.h"
 #include "repeater_ctcss_squelch_ff.h"
 #include "repeater_gardner_costas_cc.h"
+#include "repeater_tdetect_cc.h"
+#include "cic_filter.h"
 #include "repeater_vocoder.h"
 #include "repeater_chan_usrp.h"
 #include "repeater_chan_usrp_rx.h"
@@ -118,6 +120,18 @@ class repeater_gardner_costas_cc : public gr_sync_block
 {
  private:
   repeater_gardner_costas_cc (float samples_per_symbol, float gain_mu, float gain_omega, float alpha, float beta, float max_freq, float min_freq);
+};
+
+// ----------------------------------------------------------------
+
+GR_SWIG_BLOCK_MAGIC(repeater,tdetect_cc);
+
+repeater_tdetect_cc_sptr repeater_make_tdetect_cc (int samples_per_symbol, float step_size, int theta, int cic_length);
+
+class repeater_tdetect_cc : public gr_sync_block
+{
+ private:
+  repeater_tdetect_cc (int samples_per_symbol, float step_size, int theta, int cic_length);
 };
 
 // ----------------------------------------------------------------
