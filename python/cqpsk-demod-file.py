@@ -34,10 +34,11 @@ class my_top_block(gr.top_block):
         parser.add_option("-g", "--gain", type="eng_float", default=1.0)
         parser.add_option("-i", "--input-file", type="string", default="in.dat", help="specify the input file")
         parser.add_option("-I", "--imbe", action="store_true", default=False, help="output IMBE codewords")
-        parser.add_option("-L", "--low-pass", type="eng_float", default=12.5e3, help="low pass cut-off", metavar="Hz")
+        parser.add_option("-L", "--low-pass", type="eng_float", default=6.5e3, help="low pass cut-off", metavar="Hz")
         parser.add_option("-o", "--output-file", type="string", default="out.dat", help="specify the output file")
         parser.add_option("-p", "--polarity", action="store_true", default=False, help="use reversed polarity")
         parser.add_option("-s", "--sample-rate", type="int", default=96000, help="input sample rate")
+        parser.add_option("-t", "--tone-detect", action="store_true", default=False, help="use experimental tone detect algorithm")
         parser.add_option("-v", "--verbose", action="store_true", default=False, help="additional output")
         (options, args) = parser.parse_args()
  
@@ -61,20 +62,27 @@ class my_top_block(gr.top_block):
 
         lpf_taps = gr.firdes.low_pass(1.0, sample_rate, options.low_pass, options.low_pass * 0.1, gr.firdes.WIN_HANN)
 
-        # decim by 2 to get 48k rate
-        DECIM = gr.fir_filter_ccf (2, lpf_taps)
-        sample_rate /= 2	# for DECIM
-        samples_per_symbol /= 2	# for DECIM
-
-        # create Gardner/Costas loop
-        # the loop will not work if the sample levels aren't normalized (above)
-        timing_error_gain = 0.025   # loop error gain
-        gain_omega = 0.25 * timing_error_gain * timing_error_gain
-        alpha = options.costas_alpha
-        beta = 0.125 * alpha * alpha
-        fmin = -0.025   # fmin and fmax are in radians/s
-        fmax =  0.025
-        GARDNER_COSTAS = repeater.gardner_costas_cc(samples_per_symbol, timing_error_gain, gain_omega, alpha, beta, fmax, fmin)
+        decim_amt = 1
+        if options.tone_detect:
+            step_size = 7.5e-8
+            theta = -4	# optimum timing sampling point
+            cic_length = 48
+            DEMOD = repeater.tdetect_cc(samples_per_symbol, step_size, theta, cic_length)
+        else:
+            # decim by 2 to get 48k rate
+            samples_per_symbol /= 2	# for DECIM
+            sample_rate /= 2	# for DECIM
+            decim_amt = 2
+            # create Gardner/Costas loop
+            # the loop will not work if the sample levels aren't normalized (above)
+            timing_error_gain = 0.025   # loop error gain
+            gain_omega = 0.25 * timing_error_gain * timing_error_gain
+            alpha = options.costas_alpha
+            beta = 0.125 * alpha * alpha
+            fmin = -0.025   # fmin and fmax are in radians/s
+            fmax =  0.025
+            DEMOD = repeater.gardner_costas_cc(samples_per_symbol, timing_error_gain, gain_omega, alpha, beta, fmax, fmin)
+        DECIM = gr.fir_filter_ccf (decim_amt, lpf_taps)
 
         # probably too much phase noise etc to attempt coherent demodulation
         # so we use differential
@@ -117,7 +125,7 @@ class my_top_block(gr.top_block):
         else:
             self.connect(IN, (MIXER, 0))
         self.connect(LO, (MIXER, 1))
-        self.connect(MIXER, AMP, DECIM, GARDNER_COSTAS, DIFF, TOFLOAT, RESCALE, POLARITY, SLICER, DECODER, OUT)
+        self.connect(MIXER, AMP, DECIM, DEMOD, DIFF, TOFLOAT, RESCALE, POLARITY, SLICER, DECODER, OUT)
 
         if options.debug:
             print 'Ready for GDB to attach (pid = %d)' % (os.getpid(),)
