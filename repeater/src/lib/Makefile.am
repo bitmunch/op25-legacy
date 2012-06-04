@@ -77,7 +77,8 @@ _repeater_la_SOURCES = 	repeater\
 	rs.cc
 
 # magic flags
-_repeater_la_CXXFLAGS = -I ../../../imbe_vocoder/src/lib
+_repeater_la_CXXFLAGS = -I ../../../imbe_vocoder/src/lib \
+			-I ../../../blocks/src/lib
 _repeater_la_LDFLAGS = $(NO_UNDEFINED) -module -avoid-version -L../../../imbe_vocoder/src/lib/ -limbe_vocoder
 
 # link the library against some comon swig runtime code and the 
