@@ -68,6 +68,7 @@ private:
 	float Olduw[256];
 	float psi1;
 	float phi[57][2];
+	uint32_t u[211];
 
 	int Old;
 	int New;
@@ -84,6 +85,7 @@ private:
 
 	uint32_t pngen15(uint32_t& pn);
 	uint32_t pngen23(uint32_t& pn);
+	uint32_t next_t(uint32_t u);
 	void decode_audio(uint8_t *);
 	void decode_spectral_amplitudes(int, int );
 	void decode_vuv(int );
