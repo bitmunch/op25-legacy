@@ -85,7 +85,7 @@ private:
 
 	uint32_t pngen15(uint32_t& pn);
 	uint32_t pngen23(uint32_t& pn);
-	uint32_t next_t(uint32_t u);
+	uint32_t next_u(uint32_t u);
 	void decode_audio(uint8_t *);
 	void decode_spectral_amplitudes(int, int );
 	void decode_vuv(int );
