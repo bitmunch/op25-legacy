@@ -2,6 +2,10 @@
 
 %feature("autodoc", "1");
 
+%{
+#include <stddef.h>
+%}
+
 %include "exception.i"
 %import "gnuradio.i"
 
