@@ -26,6 +26,9 @@ grincludedir   = $(includedir)/gnuradio
 # swig includes 
 swigincludedir = $(grincludedir)/swig
 
+# gruel includes
+gruelincludedir = $(includedir)/gruel
+
 # Install this stuff in the appropriate subdirectory
 # This usually ends up at:
 #   ${prefix}/lib/python${python_version}/site-packages/gnuradio
@@ -35,4 +38,4 @@ grpyexecdir = $(pyexecdir)/gnuradio
 
 # swig flags
 SWIGPYTHONFLAGS = -fvirtual -python -modern
-SWIGGRFLAGS = -I$(GNURADIO_CORE_INCLUDEDIR)/swig -I$(GNURADIO_CORE_INCLUDEDIR)
+SWIGGRFLAGS = -I$(GNURADIO_CORE_INCLUDEDIR)/swig -I$(GNURADIO_CORE_INCLUDEDIR) -I$(gruelincludedir)/swig
