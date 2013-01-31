@@ -1,0 +1,66 @@
+diff -Naur a/configure.in b/configure.in
+--- a/configure.in	2013-01-30 04:26:30.000000000 +1000
++++ b/configure.in	2013-01-31 21:49:06.000000000 +1000
+@@ -2103,6 +2103,7 @@
+   plugins/m2m/Makefile
+   plugins/mate/Makefile
+   plugins/opcua/Makefile
++  plugins/p25/Makefile
+   plugins/profinet/Makefile
+   plugins/stats_tree/Makefile
+   plugins/unistim/Makefile
+diff -Naur a/Makefile.am b/Makefile.am
+--- a/Makefile.am	2012-11-29 09:16:34.000000000 +1000
++++ b/Makefile.am	2013-01-31 21:49:06.000000000 +1000
+@@ -281,6 +281,7 @@
+ 	-dlopen plugins/m2m/m2m.la \
+ 	-dlopen plugins/mate/mate.la \
+ 	-dlopen plugins/opcua/opcua.la \
++	-dlopen plugins/p25/p25cai.la \
+ 	-dlopen plugins/profinet/profinet.la \
+ 	-dlopen plugins/stats_tree/stats_tree.la \
+ 	-dlopen plugins/unistim/unistim.la \
+diff -Naur a/packaging/nsis/Makefile.nmake b/packaging/nsis/Makefile.nmake
+--- a/packaging/nsis/Makefile.nmake	2012-07-28 09:36:21.000000000 +1000
++++ b/packaging/nsis/Makefile.nmake	2013-01-31 21:49:06.000000000 +1000
+@@ -53,6 +53,7 @@
+ 	../../plugins/m2m/m2m.dll \
+ 	../../plugins/mate/mate.dll \
+ 	../../plugins/opcua/opcua.dll \
++	../../plugins/p25/p25.dll \
+ 	../../plugins/profinet/profinet.dll \
+ 	../../plugins/stats_tree/stats_tree.dll \
+ 	../../plugins/unistim/unistim.dll \
+diff -Naur a/packaging/nsis/wireshark.nsi b/packaging/nsis/wireshark.nsi
+--- a/packaging/nsis/wireshark.nsi	2012-09-24 06:28:33.000000000 +1000
++++ b/packaging/nsis/wireshark.nsi	2013-01-31 21:49:52.000000000 +1000
+@@ -825,6 +825,7 @@
+ File "${STAGING_DIR}\plugins\${VERSION}\irda.dll"
+ File "${STAGING_DIR}\plugins\${VERSION}\m2m.dll"
+ File "${STAGING_DIR}\plugins\${VERSION}\opcua.dll"
++File "${STAGING_DIR}\plugins\${VERSION}\p25.dll"
+ File "${STAGING_DIR}\plugins\${VERSION}\profinet.dll"
+ File "${STAGING_DIR}\plugins\${VERSION}\unistim.dll"
+ File "${STAGING_DIR}\plugins\${VERSION}\wimax.dll"
+diff -Naur a/plugins/Makefile.am b/plugins/Makefile.am
+--- a/plugins/Makefile.am	2012-09-27 21:45:19.000000000 +1000
++++ b/plugins/Makefile.am	2013-01-31 21:49:06.000000000 +1000
+@@ -31,6 +31,7 @@
+ 	m2m \
+ 	mate \
+ 	opcua \
++	p25 \
+ 	profinet \
+ 	stats_tree \
+ 	unistim \
+diff -Naur a/plugins/Makefile.nmake b/plugins/Makefile.nmake
+--- a/plugins/Makefile.nmake	2012-06-06 02:33:17.000000000 +1000
++++ b/plugins/Makefile.nmake	2013-01-31 21:49:06.000000000 +1000
+@@ -15,6 +15,7 @@
+ 	m2m         \
+ 	mate        \
+ 	opcua       \
++	p25         \
+ 	profinet    \
+ 	stats_tree  \
+ 	unistim     \
