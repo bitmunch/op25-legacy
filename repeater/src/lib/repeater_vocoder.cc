@@ -308,11 +308,14 @@ repeater_vocoder::forecast(int nof_output_items, gr_vector_int &nof_input_items_
    /* When encoding, this block consumes 8000 symbols/s and produces 4800
     * samples/s. That's a sampling rate of 5/3 or 1.66667.
     *
-    * When decoding, this block consumes 4800 symbols/s and produces 8000
-    * samples/s. That's a sampling rate of 3/5 or 0.6.
+    * When decoding, the block consumes one line of text per voice codeword.
+    * Each line of text is exactly 32 bytes.  It outputs 160 samples for each 
+    * codeword; the ratio is thus 32/160 = 0.2.
+    *
+    * Thanks to Matt Mills for catching a bug where this value wasn't set correctly
     */
    const size_t nof_inputs = nof_input_items_reqd.size();
-   const int nof_samples_reqd = (opt_encode_flag) ? (1.66667 * nof_output_items) : (0.6 * nof_output_items);
+   const int nof_samples_reqd = (opt_encode_flag) ? (1.66667 * nof_output_items) : (0.2 * nof_output_items);
    std::fill(&nof_input_items_reqd[0], &nof_input_items_reqd[nof_inputs], nof_samples_reqd);
 }
 
