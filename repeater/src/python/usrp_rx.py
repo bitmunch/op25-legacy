@@ -23,7 +23,7 @@
 # 
 
 from gnuradio import gr, gru, eng_notation, optfir
-from gnuradio import usrp, fsk4
+from gnuradio import usrp, op25
 from gnuradio import repeater
 from gnuradio import blks2
 from gnuradio.eng_option import eng_option
@@ -129,7 +129,7 @@ class rx_channel_c4fm(gr.hier_block2):
 
         # C4FM demodulator
         autotuneq = gr.msg_queue(2)
-        demod_fsk4 = fsk4.demod_ff(autotuneq, channel_rate, symbol_rate)
+        demod_fsk4 = op25.fsk4_demod_ff(autotuneq, channel_rate, symbol_rate)
  
         self.connect (self, chan, fm_demod, symbol_filter, demod_fsk4, self)
 

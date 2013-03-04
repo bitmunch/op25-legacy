@@ -37,7 +37,7 @@ import time
 import re
 import Numeric
 
-from gnuradio import audio, eng_notation, fsk4, gr, gru, repeater
+from gnuradio import audio, eng_notation, op25, gr, gru, repeater
 from gnuradio import blks2
 from gnuradio.eng_option import eng_option
 from gnuradio.wxgui import stdgui2, fftsink2, scopesink2, form
@@ -173,7 +173,7 @@ class p25_rx_block (stdgui2.std_top_block):
         self.symbol_filter = gr.fir_filter_fff(symbol_decim, rrc_coeffs)
 
         autotuneq = gr.msg_queue(2)
-        self.fsk4_demod = fsk4.demod_ff(autotuneq, self.basic_rate, self.symbol_rate)
+        self.fsk4_demod = op25.fsk4_demod_ff(autotuneq, self.basic_rate, self.symbol_rate)
 
         self.null_sym = gr.null_sink(gr.sizeof_float)
 
