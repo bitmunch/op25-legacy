@@ -167,4 +167,4 @@ class p25_mod_bf(gr.hier_block2):
 #
 # Add these to the mod/demod registry
 #
-modulation_utils.add_type_1_mod('op25_c4fm', p25_mod)
+modulation_utils.add_type_1_mod('op25_c4fm', p25_mod_bf)
