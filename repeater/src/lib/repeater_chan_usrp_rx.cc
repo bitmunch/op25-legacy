@@ -99,7 +99,7 @@ repeater_chan_usrp_rx::~repeater_chan_usrp_rx ()
 	delete [] write_buf;
 }
 
-static int sends, samps;
+// static int sends, samps;
 
 int 
 repeater_chan_usrp_rx::general_work (int noutput_items,
@@ -134,7 +134,7 @@ repeater_chan_usrp_rx::general_work (int noutput_items,
 			memcpy(bufhdrp->eye, "USRP", 4);
 			bufhdrp->seq = htonl(d_sendseq++);
 			bufhdrp->keyup = htonl(1);
-			int rc = sendto(write_sock, write_buf, sizeof(struct _chan_usrp_bufhdr) + d_buf_data_size, 0, (struct sockaddr *)&write_sock_addr, sizeof(write_sock_addr));
+			/* int rc = */  (void) sendto(write_sock, write_buf, sizeof(struct _chan_usrp_bufhdr) + d_buf_data_size, 0, (struct sockaddr *)&write_sock_addr, sizeof(write_sock_addr));  // fixme: check rc
 //			gettimeofday(&tv, NULL);
 //			fprintf(stderr, "rc %d sends %d samps %u sec %lu usec %lu\n", rc, sends++, samps, tv.tv_sec, tv.tv_usec);
 			break;
