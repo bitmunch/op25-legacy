@@ -163,13 +163,13 @@ private:
 
 // ----------------------------------------------------------------
 GR_SWIG_BLOCK_MAGIC(repeater,chan_usrp_rx);
-repeater_chan_usrp_rx_sptr repeater_make_chan_usrp_rx (const char* udp_host, int port, int debug);
+repeater_chan_usrp_rx_sptr repeater_make_chan_usrp_rx (const char* udp_host, int port, int debug, int input_size);
 
 class repeater_chan_usrp_rx : public gr_block
 {
 private:
 
-  repeater_chan_usrp_rx (const char* udp_host, int port, int debug);  	// private constructor
+  repeater_chan_usrp_rx (const char* udp_host, int port, int debug, int input_size);  	// private constructor
 
 public:
   void unkey(void);

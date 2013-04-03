@@ -57,7 +57,7 @@ typedef std::deque<uint8_t> dibit_queue;
  * constructor is private.  repeater_make_chan_usrp_rx is the public
  * interface for creating new instances.
  */
-repeater_chan_usrp_rx_sptr repeater_make_chan_usrp_rx (const char* udp_host, int port, int debug);
+repeater_chan_usrp_rx_sptr repeater_make_chan_usrp_rx (const char* udp_host, int port, int debug, int input_size);
 
 class repeater_chan_usrp_rx : public gr_block
 {
@@ -67,9 +67,9 @@ private:
 
   void init_sock(const char* udp_host, int udp_port);
 
-  friend repeater_chan_usrp_rx_sptr repeater_make_chan_usrp_rx (const char* udp_host, int port, int debug);
+  friend repeater_chan_usrp_rx_sptr repeater_make_chan_usrp_rx (const char* udp_host, int port, int debug, int input_size);
 
-  repeater_chan_usrp_rx (const char* udp_host, int port, int debug);
+  repeater_chan_usrp_rx (const char* udp_host, int port, int debug, int input_size);
   // internal functions
 
   // internal data
@@ -83,7 +83,12 @@ private:
   unsigned int d_sampbuf_ct;
   unsigned int d_sendseq;
 
-  char write_buf[ sizeof(struct _chan_usrp_bufhdr) + USRP_VOICE_FRAME_SIZE*sizeof(int16_t) ];
+//  char write_buf[ sizeof(struct _chan_usrp_bufhdr) + USRP_VOICE_FRAME_SIZE*sizeof(int16_t) ];
+  char *write_buf;
+
+  int d_input_size;
+  int d_buf_data_size;
+  unsigned int d_max_sampbuf_ct;
 
  public:
   ~repeater_chan_usrp_rx ();	// public destructor
