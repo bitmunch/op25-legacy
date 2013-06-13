@@ -71,11 +71,14 @@ class p25_rx_block (stdgui2.std_top_block):
         parser.add_option("-c", "--calibration", type="eng_float", default=0.0, help="USRP offset or audio IF frequency", metavar="Hz")
         parser.add_option("-C", "--costas-alpha", type="eng_float", default=0.125, help="value of alpha for Costas loop", metavar="Hz")
         parser.add_option("-f", "--frequency", type="eng_float", default=0.0, help="USRP center frequency", metavar="Hz")
+        parser.add_option("-F", "--ifile", type="string", default=None, help="read input from complex capture file")
+        parser.add_option("-s", "--seek", type="int", default=0, help="ifile seek in K")
         parser.add_option("-d", "--decim", type="int", default=200, help="source decimation factor")
         parser.add_option("-v", "--verbosity", type="int", default=10, help="message debug level")
         parser.add_option("-p", "--pause", action="store_true", default=False, help="block on startup")
         parser.add_option("-w", "--wireshark", action="store_true", default=False, help="output data to Wireshark")
         parser.add_option("-W", "--wireshark-host", type="string", default="127.0.0.1", help="Wireshark host")
+        parser.add_option("-r", "--raw-symbols", type="string", default=None, help="dump decoded symbols to file")
         parser.add_option("-R", "--rx-subdev-spec", type="subdev", default=(0, 0), help="select USRP Rx side A or B (default=A)")
         parser.add_option("-g", "--gain", type="eng_float", default=None, help="set USRP gain in dB (default is midpoint) or set audio gain")
         parser.add_option("-G", "--gain-mu", type="eng_float", default=0.025, help="gardner gain")
@@ -103,6 +106,9 @@ class p25_rx_block (stdgui2.std_top_block):
 
         if options.audio_if:
             self.channel_rate = 96000
+
+        if options.ifile:
+            self.channel_rate = 96000	# TODO: fixme
 
         # setup (read-only) attributes
         self.symbol_rate = 4800
@@ -148,6 +154,9 @@ class p25_rx_block (stdgui2.std_top_block):
             self.open_audio(self.channel_rate, options.gain, options.audio_input)
             # skip past unused FFT spectrum plot
             self.notebook.AdvanceSelection()
+        elif options.ifile:
+            self._set_state("CAPTURING")
+            self.open_ifile(self.channel_rate, options.gain, options.ifile, options.seek)
         else:
             self._set_state("STOPPED")
 
@@ -186,6 +195,8 @@ class p25_rx_block (stdgui2.std_top_block):
         udp_port = 0
         if self.options.wireshark:
             udp_port = WIRESHARK_PORT
+        if self.options.raw_symbols:
+            self.sink_sf = gr.file_sink(gr.sizeof_char, self.options.raw_symbols)
         self.sink_s = repeater.p25_frame_assembler(self.options.wireshark_host, udp_port, self.options.verbosity, 0, 0, 0, msgq)
 
         if self.baseband_input:
@@ -224,7 +235,7 @@ class p25_rx_block (stdgui2.std_top_block):
             self.set_channel_offset(0.0, 0, "")
             # local osc
             self.lo_freq = 0.0
-            if self.options.audio_if:
+            if self.options.audio_if or self.options.ifile:
                 self.lo_freq = self.options.calibration
             self.lo = gr.sig_source_c (channel_rate, gr.GR_SIN_WAVE, self.lo_freq, 1.0, 0)
             self.mixer = gr.multiply_cc()
@@ -869,6 +880,20 @@ class p25_rx_block (stdgui2.std_top_block):
         except Exception, x:
             wx.MessageBox("Cannot open capture file: " + x.message, "File Error", wx.CANCEL | wx.ICON_EXCLAMATION)
 
+    def open_ifile(self, capture_rate, gain, input_filename, file_seek):
+        speed = 96000 # TODO: fixme
+        ifile = gr.file_source(gr.sizeof_gr_complex, input_filename, 1)
+        if file_seek > 0:
+            rc = ifile.seek(file_seek*1024, gr.SEEK_SET)
+            assert rc == True
+            #print "seek: %d, rc = %d" % (file_seek, rc)
+        throttle = gr.throttle(gr.sizeof_gr_complex, speed)
+        self.source = gr.multiply_const_cc(gain)
+        self.connect(ifile, throttle, self.source)
+        self.__set_rx_from_audio(speed)
+        self._set_titlebar("Playing")
+        self._set_state("PLAYING")
+
     def open_audio_c(self, capture_rate, gain, audio_input_filename):
         self.info = {
                 "capture-rate": capture_rate,
@@ -934,9 +959,13 @@ class p25_rx_block (stdgui2.std_top_block):
             else:
                 self.disconnect(self.mixer, self.lpf, self.arb_resampler, self.resamplers[idx], self.fm_demod, self.baseband_amp, self.symbol_filter)
             self.disconnect(self.symbol_filter, self.fsk4_demod, self.buffer, self.slicer, self.sink_s)
+            if self.options.raw_symbols:
+                self.disconnect(self.slicer, self.sink_sf)
             self.fsk4_demod_connected = False
         if self.psk_demod_connected:
             self.disconnect(self.mixer, self.lpf, self.arb_resampler, self.resamplers[idx], self.agc, self.symbol_filter_c, self.clock, self.diffdec, self.to_float, self.rescale, self.buffer, self.slicer, self.sink_s)
+            if self.options.raw_symbols:
+                self.disconnect(self.slicer, self.sink_sf)
             self.psk_demod_connected = False
 
     def connect_psk_demod(self):
@@ -944,6 +973,8 @@ class p25_rx_block (stdgui2.std_top_block):
         self.disconnect_demods()
         idx = self.current_speed
         self.connect(self.mixer, self.lpf, self.arb_resampler, self.resamplers[idx], self.agc, self.symbol_filter_c, self.clock, self.diffdec, self.to_float, self.rescale, self.buffer, self.slicer, self.sink_s)
+        if self.options.raw_symbols:
+            self.connect(self.slicer, self.sink_sf)
         self.psk_demod_connected = True
 
     def connect_fsk4_demod(self):
@@ -955,6 +986,8 @@ class p25_rx_block (stdgui2.std_top_block):
         else:
             self.connect(self.mixer, self.lpf, self.arb_resampler, self.resamplers[idx], self.fm_demod, self.baseband_amp, self.symbol_filter)
         self.connect(self.symbol_filter, self.fsk4_demod, self.buffer, self.slicer, self.sink_s)
+        if self.options.raw_symbols:
+            self.connect(self.slicer, self.sink_sf)
         self.fsk4_demod_connected = True
 
     def connect_demods(self):
