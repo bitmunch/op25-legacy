@@ -28,6 +28,7 @@ class my_top_block(gr.top_block):
         parser = OptionParser(option_class=eng_option)
 
         parser.add_option("-1", "--one-channel", action="store_true", default=False, help="software synthesized Q channel")
+        parser.add_option("-a", "--agc", action="store_true", default=False, help="automatic gain control (overrides --gain)")
         parser.add_option("-c", "--calibration", type="eng_float", default=0, help="freq offset")
         parser.add_option("-d", "--debug", action="store_true", default=False, help="allow time at init to attach gdb")
         parser.add_option("-C", "--costas-alpha", type="eng_float", default=0.125, help="Costas alpha")
@@ -37,13 +38,18 @@ class my_top_block(gr.top_block):
         parser.add_option("-L", "--low-pass", type="eng_float", default=6.5e3, help="low pass cut-off", metavar="Hz")
         parser.add_option("-o", "--output-file", type="string", default="out.dat", help="specify the output file")
         parser.add_option("-p", "--polarity", action="store_true", default=False, help="use reversed polarity")
+        parser.add_option("-r", "--raw-symbols", type="string", default=None, help="dump decoded symbols to file")
         parser.add_option("-s", "--sample-rate", type="int", default=96000, help="input sample rate")
         parser.add_option("-t", "--tone-detect", action="store_true", default=False, help="use experimental tone detect algorithm")
         parser.add_option("-v", "--verbose", action="store_true", default=False, help="additional output")
+        parser.add_option("-6", "--k6k", action="store_true", default=False, help="use 6K symbol rate")
         (options, args) = parser.parse_args()
  
         sample_rate = options.sample_rate
-        symbol_rate = 4800
+        if options.k6k:
+            symbol_rate = 6000
+        else:
+            symbol_rate = 4800
         samples_per_symbol = sample_rate // symbol_rate
 
         IN = gr.file_source(gr.sizeof_gr_complex, options.input_file)
@@ -57,8 +63,10 @@ class my_top_block(gr.top_block):
         MIXER = gr.multiply_cc()
 
         # get signal into normalized range (-1.0 - +1.0)
-        # FIXME: add AGC
-        AMP = gr.multiply_const_cc(options.gain)
+        if options.agc:
+            AMP = gr.feedforward_agc_cc(16, 1.0)
+        else:
+            AMP = gr.multiply_const_cc(options.gain)
 
         lpf_taps = gr.firdes.low_pass(1.0, sample_rate, options.low_pass, options.low_pass * 0.1, gr.firdes.WIN_HANN)
 
@@ -129,6 +137,10 @@ class my_top_block(gr.top_block):
             self.connect(IN, (MIXER, 0))
         self.connect(LO, (MIXER, 1))
         self.connect(MIXER, AMP, DECIM, DEMOD, DIFF, TOFLOAT, RESCALE, POLARITY, SLICER, DECODER, OUT)
+
+        if options.raw_symbols:
+            SINKC = gr.file_sink(gr.sizeof_char, options.raw_symbols)
+            self.connect(SLICER, SINKC)
 
         if options.debug:
             print 'Ready for GDB to attach (pid = %d)' % (os.getpid(),)
