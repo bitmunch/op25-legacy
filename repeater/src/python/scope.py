@@ -2008,8 +2008,15 @@ class correlation_plot_window (wx.Panel):
         self.signatures = []
         r = re.compile(r'^[13]+$')
         path = "corr"
+        # another hack, add support for 6000 symbol rate in correlation sigs
+        sps_6k = int((self.info.sps * 4800) / 6000)
         for fn in os.listdir(path):
-            if not r.match(fn):
+            sps = self.info.sps
+            fn_check = fn
+            if fn.endswith("-6k"):
+                sps = sps_6k
+                fn_check = fn_check.replace("-6k", "")
+            if not r.match(fn_check):
                 continue
             f = open("%s/%s" % (path, fn))
             line = f.readline()
@@ -2024,7 +2031,7 @@ class correlation_plot_window (wx.Panel):
                     frame_sync.append(-1)
 	    correlation = []
             for symbol in frame_sync:
-                for i in xrange(self.info.sps):
+                for i in xrange(sps):
                     correlation.append(symbol)
             correlation.reverse()	# reverse order for convolve()
             self.signatures.append(correlation)
