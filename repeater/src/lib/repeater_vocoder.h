@@ -32,6 +32,9 @@ typedef std::vector<bool> bit_vector;
 
 #include <imbe_vocoder.h>
 
+#include <imbe_decoder.h>
+#include <software_imbe_decoder.h>
+
 class repeater_vocoder;
 
 /*
@@ -115,6 +118,8 @@ private:
 	uint8_t save_l;
 	bit_vector f_body;
 	imbe_vocoder vocoder;
+	software_imbe_decoder software_decoder;
+	bool d_software_imbe_decoder;
 
 	std::deque<uint8_t> output_queue;
 	std::deque<uint16_t> output_queue_decode;

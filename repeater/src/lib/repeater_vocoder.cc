@@ -225,6 +225,12 @@ repeater_vocoder::repeater_vocoder (bool encode_flag, bool verbose_flag, int str
 		init_sock(udp_host, opt_udp_port);
 
 	clear_bits(f_body);
+
+	const char *p = getenv("IMBE");
+	if (p && strcasecmp(p, "soft") == 0)
+		d_software_imbe_decoder = true;
+	else
+		d_software_imbe_decoder = false;
 }
 
 /*
@@ -313,14 +319,26 @@ void repeater_vocoder::rxchar(char c)
 			rxbuf[rxbufp] = 0;
 			sscanf(rxbuf, "%x %x %x %x %x %x %x %x", &u[0], &u[1], &u[2], &u[3], &u[4], &u[5], &u[6], &u[7]);
 			rxbufp = 0;
-			for (int i=0; i < 8; i++) {
-				frame_vector[i] = u[i];
-			}
-	/* TEST*/	frame_vector[7] >>= 1;
 			// decode 88 bits, outputs 160 sound samples (8000 rate)
-			vocoder.imbe_decode(frame_vector, snd);
+			if (d_software_imbe_decoder) {
+				voice_codeword cw;
+				imbe_header_encode(cw, u[0], u[1], u[2], u[3], u[4], u[5], u[6], u[7]);
+				software_decoder.decode(cw);
+				audio_samples *samples = software_decoder.audio();
+				assert (samples->size() == FRAME);
+				for (int i=0; i < FRAME; i++) {
+					snd[i] = (int16_t)(samples->front() * 32768.0);
+					samples->pop_front();
+				}
+			} else {
+				for (int i=0; i < 8; i++) {
+					frame_vector[i] = u[i];
+				}
+		/* TEST*/	frame_vector[7] >>= 1;
+				vocoder.imbe_decode(frame_vector, snd);
+			}
 			if (opt_udp_port > 0) {
-				sendto(write_sock, snd, FRAME * sizeof(uint16_t), 0, (struct sockaddr*)&write_sock_addr, sizeof(write_sock_addr));
+				sendto(write_sock, snd, FRAME * sizeof(int16_t), 0, (struct sockaddr*)&write_sock_addr, sizeof(write_sock_addr));
 			} else {
 				// add generated samples to output queue
 				for (int i = 0; i < FRAME; i++) {

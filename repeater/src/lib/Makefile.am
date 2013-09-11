@@ -85,7 +85,9 @@ _repeater_la_LDFLAGS = $(NO_UNDEFINED) -module -avoid-version -L../../../imbe_vo
 # c++ standard library
 _repeater_la_LIBADD = 			\
 	$(PYTHON_LDFLAGS)		\
-	-lstdc++			
+	-lstdc++			\
+	../../../blocks/src/lib/software_imbe_decoder.lo	\
+	../../../blocks/src/lib/imbe_decoder.lo
 
 repeater.cc repeater.py: repeater.i $(ALL_IFILES)
 	$(SWIG) $(SWIGPYTHONARGS) -module repeater -o repeater.cc $<

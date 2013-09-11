@@ -27,7 +27,7 @@ grincludedir   = $(includedir)/gnuradio
 swigincludedir = $(grincludedir)/swig
 
 # gruel includes
-gruelincludedir = $(includedir)/gruel
+gruelincludedir = $(GRUEL_INCLUDEDIR)/gruel
 
 # Install this stuff in the appropriate subdirectory
 # This usually ends up at:
