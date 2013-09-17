@@ -321,14 +321,17 @@ void repeater_vocoder::rxchar(char c)
 			rxbufp = 0;
 			// decode 88 bits, outputs 160 sound samples (8000 rate)
 			if (d_software_imbe_decoder) {
-				voice_codeword cw;
+				voice_codeword cw(voice_codeword_sz);
 				imbe_header_encode(cw, u[0], u[1], u[2], u[3], u[4], u[5], u[6], u[7]);
 				software_decoder.decode(cw);
 				audio_samples *samples = software_decoder.audio();
-				assert (samples->size() == FRAME);
 				for (int i=0; i < FRAME; i++) {
-					snd[i] = (int16_t)(samples->front() * 32768.0);
-					samples->pop_front();
+					if (samples->size() > 0) {
+						snd[i] = (int16_t)(samples->front() * 32768.0);
+						samples->pop_front();
+					} else {
+						snd[i] = 0;
+					}
 				}
 			} else {
 				for (int i=0; i < 8; i++) {
