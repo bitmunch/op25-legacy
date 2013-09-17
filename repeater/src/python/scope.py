@@ -2,7 +2,7 @@
 
 # Copyright 2008-2011 Steve Glass
 # 
-# Copyright 2011 KA1RBI
+# Copyright 2011, 2012, 2013 KA1RBI
 # 
 # Copyright 2003,2004,2005,2006 Free Software Foundation, Inc.
 #         (from radiorausch)
@@ -35,7 +35,10 @@ import math
 import numpy
 import time
 import re
-import Numeric
+try:
+    import Numeric
+except:
+    pass
 
 from gnuradio import audio, eng_notation, op25, gr, gru, repeater
 from gnuradio import blks2
@@ -43,7 +46,6 @@ from gnuradio.eng_option import eng_option
 from gnuradio.wxgui import stdgui2, fftsink2, scopesink2, form
 from math import pi
 from optparse import OptionParser
-from usrpm import usrp_dbid
 
 import gnuradio.wxgui.plot as plot
 
@@ -63,6 +65,8 @@ class p25_rx_block (stdgui2.std_top_block):
 
         # command line argument parsing
         parser = OptionParser(option_class=eng_option)
+        parser.add_option("--args", type="string", default="", help="device args")
+        parser.add_option("--antenna", type="string", default="", help="select antenna")
         parser.add_option("-a", "--audio", action="store_true", default=False, help="use direct audio input")
         parser.add_option("-A", "--audio-if", action="store_true", default=False, help="soundcard IF mode (use --calibration to set IF freq)")
         parser.add_option("-I", "--audio-input", type="string", default="", help="pcm input device name.  E.g., hw:0,0 or /dev/dsp")
@@ -73,8 +77,11 @@ class p25_rx_block (stdgui2.std_top_block):
         parser.add_option("-f", "--frequency", type="eng_float", default=0.0, help="USRP center frequency", metavar="Hz")
         parser.add_option("-F", "--ifile", type="string", default=None, help="read input from complex capture file")
         parser.add_option("-s", "--seek", type="int", default=0, help="ifile seek in K")
-        parser.add_option("-d", "--decim", type="int", default=200, help="source decimation factor")
+        parser.add_option("-S", "--sample-rate", type="int", default=320e3, help="source samp rate")
+        parser.add_option("-t", "--tone-detect", action="store_true", default=False, help="use experimental tone detect algorithm")
         parser.add_option("-v", "--verbosity", type="int", default=10, help="message debug level")
+        parser.add_option("-V", "--vocoder", action="store_true", default=False, help="voice codec")
+        parser.add_option("-o", "--offset", type="eng_float", default=0.0, help="tuning offset frequency [to circumvent DC offset]", metavar="Hz")
         parser.add_option("-p", "--pause", action="store_true", default=False, help="block on startup")
         parser.add_option("-w", "--wireshark", action="store_true", default=False, help="output data to Wireshark")
         parser.add_option("-W", "--wireshark-host", type="string", default="127.0.0.1", help="Wireshark host")
@@ -90,15 +97,17 @@ class p25_rx_block (stdgui2.std_top_block):
         self.channel_rate = 0
         self.baseband_input = False
 
-        # do we have a USRP?
+        # check if osmocom is accessible
         try:
-            self.usrp = None
-            from gnuradio import usrp
-            self.usrp = usrp.source_c()
-            self.channel_rate = self.usrp.adc_freq() / options.decim
+            self.src = None
+            import osmosdr
+            self.src = osmosdr.source_c(options.args)
+            self.channel_rate = options.sample_rate
         except Exception:
-            print "USRP source_c creation failure"
+            print "osmosdr source_c creation failure"
             ignore = True
+
+        print 'gain names ', self.src.get_gain_names()
 
         if options.audio:
             self.channel_rate = 48000
@@ -145,7 +154,7 @@ class p25_rx_block (stdgui2.std_top_block):
             self.open_file(options.input)
         elif options.frequency:
             self._set_state("CAPTURING")
-            self.open_usrp(options.rx_subdev_spec, options.decim, options.gain, options.frequency, True)
+            self.open_usrp()
         elif options.audio_if:
             self._set_state("CAPTURING")
             self.open_audio_c(self.channel_rate, options.gain, options.audio_input)
@@ -169,7 +178,7 @@ class p25_rx_block (stdgui2.std_top_block):
         self.spectrum.set_sample_rate(capture_rate)
         # channel filter
         self.channel_offset = 0.0
-        channel_decim = capture_rate // self.channel_rate
+        channel_decim = int(capture_rate // self.channel_rate)
         channel_rate = capture_rate // channel_decim
         trans_width = 12.5e3 / 2;
         trans_centre = trans_width + (trans_width / 2)
@@ -197,8 +206,17 @@ class p25_rx_block (stdgui2.std_top_block):
             udp_port = WIRESHARK_PORT
         if self.options.raw_symbols:
             self.sink_sf = gr.file_sink(gr.sizeof_char, self.options.raw_symbols)
-        self.sink_s = repeater.p25_frame_assembler(self.options.wireshark_host, udp_port, self.options.verbosity, 0, 0, 0, msgq)
-
+        do_imbe = 1
+        do_output = 1
+        self.sink_s = repeater.p25_frame_assembler(self.options.wireshark_host, udp_port, self.options.verbosity, do_imbe, do_output, 0, msgq)
+        if self.options.vocoder:
+            self.sink_imbe = repeater.vocoder(0, 0, 0, '', 0, 0)
+            self.audio_s2f = gr.short_to_float()
+            self.audio_scaler = gr.multiply_const_ff(1 / 32768.0)
+            self.audio_output = audio.sink(8000, "pulse", True)
+            self.connect(self.sink_imbe, self.audio_s2f, self.audio_scaler, self.audio_output)
+        else:
+            self.sink_imbe = gr.null_sink(gr.sizeof_char)
         if self.baseband_input:
             gain = self.options.gain
         else:
@@ -234,9 +252,9 @@ class p25_rx_block (stdgui2.std_top_block):
             self.channel_filter = gr.freq_xlating_fir_filter_ccf(channel_decim, coeffs, 0.0, capture_rate)
             self.set_channel_offset(0.0, 0, "")
             # local osc
-            self.lo_freq = 0.0
+            self.lo_freq = self.options.offset
             if self.options.audio_if or self.options.ifile:
-                self.lo_freq = self.options.calibration
+                self.lo_freq += self.options.calibration
             self.lo = gr.sig_source_c (channel_rate, gr.GR_SIN_WAVE, self.lo_freq, 1.0, 0)
             self.mixer = gr.multiply_cc()
             lpf_coeffs = gr.firdes.low_pass(1.0, self.channel_rate, 12000, 1200, gr.firdes.WIN_HANN)
@@ -249,10 +267,7 @@ class p25_rx_block (stdgui2.std_top_block):
             rs_taps = gr.firdes.low_pass(nphases, nphases, frac_bw, 0.5-frac_bw)
 
             self.arb_resampler = blks2.pfb_arb_resampler_ccf(
-               float(self.basic_rate)/float(capture_rate),
-               (rs_taps),
-               nphases,
-            )
+               float(self.basic_rate)/float(capture_rate))
 
             fm_demod_gain = self.basic_rate / (2.0 * pi * self.symbol_deviation)
             self.fm_demod = gr.quadrature_demod_cf(fm_demod_gain)
@@ -264,29 +279,31 @@ class p25_rx_block (stdgui2.std_top_block):
                 self.options.excess_bw,   # excess bandwidth (roll-off factor)
                 ntaps)
 
-            self.symbol_filter_c = gr.interp_fir_filter_ccf(1, rrc_taps)
+            #self.symbol_filter_c = gr.interp_fir_filter_ccf(1, rrc_taps)
+            self.symbol_filter_c = gr.multiply_const_cc(1.0)
             self.resamplers = []
 
             for speed in speeds:
                 resampler = blks2.pfb_arb_resampler_ccf(
-                   float(speed)/float(self.symbol_rate),
-                   (rs_taps),
-                   nphases,
-                )
+                   float(speed)/float(self.symbol_rate))
                 self.resamplers.append(resampler)
 
-            theta = pi
+            if self.options.tone_detect:
+                step_size = 7.5e-8
+                theta = -2
+                cic_length = 48
+                self.clock = repeater.tdetect_cc(sps, step_size, theta, cic_length)
+            else:
+                gain_mu= self.options.gain_mu
+                omega = float(sps)
+                gain_omega = 0.1  * gain_mu * gain_mu
 
-            gain_mu= self.options.gain_mu
-            omega = float(sps)
-            gain_omega = 0.1  * gain_mu * gain_mu
+                alpha = self.options.costas_alpha
+                beta = 0.125 * alpha * alpha
+                fmin = -0.025
+                fmax =  0.025
 
-            alpha = self.options.costas_alpha
-            beta = 0.125 * alpha * alpha
-            fmin = -0.025
-            fmax =  0.025
-
-            self.clock = repeater.gardner_costas_cc(omega, gain_mu, gain_omega, alpha,  beta, fmax, fmin)
+                self.clock = repeater.gardner_costas_cc(omega, gain_mu, gain_omega, alpha,  beta, fmax, fmin)
 
             self.agc = gr.feedforward_agc_cc(16, 1.0)
 
@@ -303,6 +320,7 @@ class p25_rx_block (stdgui2.std_top_block):
             self.__connect([[source, (self.mixer, 0)],
                             [self.lo, (self.mixer, 1)]])
             self.set_connection(fft=1)
+            self.connect_fsk4_demod()
 
     # Connect up the flow graph
     #
@@ -389,7 +407,7 @@ class p25_rx_block (stdgui2.std_top_block):
         if sel == 0:   # spectrum
             if not self.baseband_input:
                 self.set_connection(fft=1)
-                self.disconnect_demods()
+                self.connect_demods()
         elif sel == 1:   # c4fm
             self.set_connection(c4fm=1)
             self.connect_fsk4_demod()
@@ -414,7 +432,7 @@ class p25_rx_block (stdgui2.std_top_block):
         elif sel == 6:   # fac - fast auto correlation
             if not self.baseband_input:
                 self.set_connection(fac=1)
-                self.disconnect_demods()
+                self.connect_demods()
         self.unlock()
 
     # initialize the UI
@@ -594,7 +612,7 @@ class p25_rx_block (stdgui2.std_top_block):
         the result of that operation and our target_frequency to
         determine the value for the digital down converter.
         """
-        r = self.usrp.tune(0, self.subdev, target_freq + self.options.calibration)
+        r = self.src.set_center_freq(target_freq + self.options.calibration + self.options.offset)
         
         if r:
             self.myform['freq'].set_value(target_freq)     # update displayed va
@@ -648,22 +666,15 @@ class p25_rx_block (stdgui2.std_top_block):
 
     # setup to rx from USRP
     #
-    def __set_rx_from_usrp(self, subdev_spec, decimation_rate, gain, frequency, preserve):
-        from gnuradio import usrp
-        # setup USRP
-        self.usrp.set_decim_rate(decimation_rate)
-        if subdev_spec is None:
-            subdev_spec = usrp.pick_rx_subdevice(self.usrp)
-        self.usrp.set_mux(usrp.determine_rx_mux_value(self.usrp, subdev_spec))
-        self.subdev = usrp.selected_subdev(self.usrp, subdev_spec)
-        capture_rate = self.usrp.adc_freq() / self.usrp.decim_rate()
+    def __set_rx_from_osmosdr(self):
+        # setup osmosdr
+        capture_rate = self.src.set_sample_rate(self.options.sample_rate)
+        if self.options.antenna:
+            self.src.set_antenna(self.options.antenna)
         self.info["capture-rate"] = capture_rate
-        if gain is None:
-            g = self.subdev.gain_range()
-            gain = float(g[0]+g[1])/2
-        self.subdev.set_gain(gain)
-        self.subdev.set_bw(1e6)
-        r = self.usrp.tune(0, self.subdev, frequency + self.options.calibration)
+        self.src.set_bandwidth(capture_rate)
+        r = self.src.set_center_freq(self.options.frequency + self.options.calibration+ self.options.offset)
+        print 'set_center_freq: %d' % r
         if not r:
             raise RuntimeError("failed to set USRP frequency")
         # capture file
@@ -678,7 +689,7 @@ class p25_rx_block (stdgui2.std_top_block):
         else:
             self.capture_filename = None
         # everything else
-        self.__build_graph(self.usrp, capture_rate)
+        self.__build_graph(self.src, capture_rate)
 
     # Change the UI state
     #
@@ -743,7 +754,7 @@ class p25_rx_block (stdgui2.std_top_block):
         delta_hz *= self.symbol_deviation      
         delta_hz = max(delta_hz, -max_delta_hz)
         delta_hz = min(delta_hz, max_delta_hz)
-        self.channel_filter.set_center_freq(self.channel_offset - delta_hz)
+        self.channel_filter.set_center_freq(self.channel_offset - delta_hz+ self.options.offset)
 
     # Close an open file
     #
@@ -923,14 +934,14 @@ class p25_rx_block (stdgui2.std_top_block):
 
     # Open the USRP
     #
-    def open_usrp(self, subdev_spec, decim, gain, frequency, preserve):
+    def open_usrp(self):
         # try:
             self.info = {
                 "capture-rate": "unknown",
-                "center-freq": frequency,
+                "center-freq": self.options.frequency,
                 "source-dev": "USRP",
-                "source-decim": decim }
-            self.__set_rx_from_usrp(subdev_spec, decim, gain, frequency, preserve)
+                "source-decim": 1 }
+            self.__set_rx_from_osmosdr()
             self._set_titlebar("Capturing")
             self._set_state("CAPTURING")
         # except Exception, x:
@@ -940,7 +951,7 @@ class p25_rx_block (stdgui2.std_top_block):
     #
     def set_channel_offset(self, offset_hz, scale, units):
         self.channel_offset = -offset_hz
-        self.channel_filter.set_center_freq(self.channel_offset)
+        self.channel_filter.set_center_freq(self.channel_offset+ self.options.offset)
         self.frame.SetStatusText("Channel offset: " + str(offset_hz * scale) + units, 1)
 
     # Set the RF squelch threshold level
@@ -958,12 +969,12 @@ class p25_rx_block (stdgui2.std_top_block):
                 self.disconnect(self.source, self.baseband_amp, self.float_resamplers[self.current_speed], self.symbol_filter)
             else:
                 self.disconnect(self.mixer, self.lpf, self.arb_resampler, self.resamplers[idx], self.fm_demod, self.baseband_amp, self.symbol_filter)
-            self.disconnect(self.symbol_filter, self.fsk4_demod, self.buffer, self.slicer, self.sink_s)
+            self.disconnect(self.symbol_filter, self.fsk4_demod, self.buffer, self.slicer, self.sink_s, self.sink_imbe)
             if self.options.raw_symbols:
                 self.disconnect(self.slicer, self.sink_sf)
             self.fsk4_demod_connected = False
         if self.psk_demod_connected:
-            self.disconnect(self.mixer, self.lpf, self.arb_resampler, self.resamplers[idx], self.agc, self.symbol_filter_c, self.clock, self.diffdec, self.to_float, self.rescale, self.buffer, self.slicer, self.sink_s)
+            self.disconnect(self.mixer, self.lpf, self.arb_resampler, self.resamplers[idx], self.agc, self.symbol_filter_c, self.clock, self.diffdec, self.to_float, self.rescale, self.buffer, self.slicer, self.sink_s, self.sink_imbe)
             if self.options.raw_symbols:
                 self.disconnect(self.slicer, self.sink_sf)
             self.psk_demod_connected = False
@@ -972,7 +983,7 @@ class p25_rx_block (stdgui2.std_top_block):
 # assumes lock held or init
         self.disconnect_demods()
         idx = self.current_speed
-        self.connect(self.mixer, self.lpf, self.arb_resampler, self.resamplers[idx], self.agc, self.symbol_filter_c, self.clock, self.diffdec, self.to_float, self.rescale, self.buffer, self.slicer, self.sink_s)
+        self.connect(self.mixer, self.lpf, self.arb_resampler, self.resamplers[idx], self.agc, self.symbol_filter_c, self.clock, self.diffdec, self.to_float, self.rescale, self.buffer, self.slicer, self.sink_s, self.sink_imbe)
         if self.options.raw_symbols:
             self.connect(self.slicer, self.sink_sf)
         self.psk_demod_connected = True
@@ -985,7 +996,7 @@ class p25_rx_block (stdgui2.std_top_block):
             self.connect(self.source, self.baseband_amp, self.float_resamplers[self.current_speed], self.symbol_filter)
         else:
             self.connect(self.mixer, self.lpf, self.arb_resampler, self.resamplers[idx], self.fm_demod, self.baseband_amp, self.symbol_filter)
-        self.connect(self.symbol_filter, self.fsk4_demod, self.buffer, self.slicer, self.sink_s)
+        self.connect(self.symbol_filter, self.fsk4_demod, self.buffer, self.slicer, self.sink_s, self.sink_imbe)
         if self.options.raw_symbols:
             self.connect(self.slicer, self.sink_sf)
         self.fsk4_demod_connected = True
@@ -1287,7 +1298,7 @@ class datascope_sink_f(gr.hier_block2):
                                 gr.io_signature(0,0,0))
 
         msgq = gr.msg_queue(2)         # message queue that holds at most 2 messages
-        self.st = gr.message_sink(gr.sizeof_float, msgq, dont_block=1)
+        self.st = gr.message_sink(gr.sizeof_float, msgq, 1)
         self.connect((self, 0), self.st)
 
         self.win = datascope_window(datascope_win_info (msgq, sample_rate, frame_decim,
@@ -1506,7 +1517,7 @@ class constellation_plot_c(gr.hier_block2):
                                 gr.io_signature(0,0,0))
 
         msgq = gr.msg_queue(2)         # message queue that holds at most 2 messages
-        self.st = gr.message_sink(gr.sizeof_gr_complex, msgq, dont_block=1)
+        self.st = gr.message_sink(gr.sizeof_gr_complex, msgq, 1)
         self.connect((self, 0), self.st)
 
         self.win = constellation_plot_window(constellation_plot_win_info (msgq, sample_rate, frame_decim, None, title), parent, num_plots=num_plots)
@@ -1858,7 +1869,7 @@ class correlation_plot_f(gr.hier_block2):
                                 gr.io_signature(0,0,0))
 
         msgq = gr.msg_queue(2)         # message queue that holds at most 2 messages
-        self.st = gr.message_sink(gr.sizeof_float, msgq, dont_block=1)
+        self.st = gr.message_sink(gr.sizeof_float, msgq, 1)
         self.connect((self, 0), self.st)
 
         self.win = correlation_plot_window(correlation_plot_win_info (msgq, sps, frame_decim, None, title), parent, sps=sps)
