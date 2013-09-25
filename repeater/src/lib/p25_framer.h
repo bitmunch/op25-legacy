@@ -39,7 +39,7 @@ public:
 	uint32_t nac;		// extracted NAC
 	uint32_t duid;		// extracted DUID
 	bit_vector frame_body;	// all bits in frame
-	size_t frame_size;		// number of bits in frame_body
+	uint32_t frame_size;		// number of bits in frame_body
 	uint32_t bch_errors;		// number of errors detected in bch
 };
 

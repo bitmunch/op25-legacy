@@ -77,6 +77,7 @@ private:
 	typedef std::vector<bool> bit_vector;
 	bool header_codeword(uint64_t acc, uint32_t& nac, uint32_t& duid);
 	void proc_voice_unit(bit_vector& frame_body) ;
+	void process_tsbk(uint32_t const nac, uint8_t const tsbk_buf[]);
   // internal instance variables and state
 	int write_bufp;
 	int write_sock;
