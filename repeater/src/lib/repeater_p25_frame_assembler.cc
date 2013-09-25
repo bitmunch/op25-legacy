@@ -231,17 +231,21 @@ repeater_p25_frame_assembler::forecast(int nof_output_items, gr_vector_int &nof_
    std::fill(&nof_input_items_reqd[0], &nof_input_items_reqd[nof_inputs], nof_samples_reqd);
 }
 void 
-repeater_p25_frame_assembler::process_tsbk(uint32_t const nac, uint8_t const tsbk_buf[])
+repeater_p25_frame_assembler::process_duid(uint32_t const duid, uint32_t const nac, uint8_t const tsbk_buf[])
 {
 	char wbuf[12];
+	int p = 0;
 	if (!d_do_msgq)
 		return;
 	if (d_msg_queue->full_p())
 		return;
-	memcpy(wbuf, tsbk_buf, 10);
-	wbuf[10] = (nac >> 8) & 0xff;
-	wbuf[11] = nac & 0xff;
-	gr_message_sptr msg = gr_make_message_from_string(std::string(wbuf, 12), 0, 0, 0);
+	if (tsbk_buf) {
+		memcpy(wbuf, tsbk_buf, 10);	// copy tsbk (less crc)
+		p += 10;
+	}
+	wbuf[p++] = (nac >> 8) & 0xff;
+	wbuf[p++] = nac & 0xff;
+	gr_message_sptr msg = gr_make_message_from_string(std::string(wbuf, p), duid, 0, 0);
 	d_msg_queue->insert_tail(msg);
 //	msg.reset();
 }
@@ -259,6 +263,13 @@ repeater_p25_frame_assembler::general_work (int noutput_items,
     if(framer->rx_sym(in[i])) {   // complete frame was detected
 		if (d_debug >= 10) {
 			fprintf (stderr, "NAC 0x%X DUID 0x%X len %u errs %u ", framer->nac, framer->duid, framer->frame_size >> 1, framer->bch_errors);
+		}
+		if (framer->bch_errors >= 0 &&
+			((framer->duid == 0x03) ||
+			 (framer->duid == 0x05) ||
+			 (framer->duid == 0x0A) ||
+			 (framer->duid == 0x0F))) {
+			process_duid(framer->duid, framer->nac, NULL);
 		}
 		if (framer->duid == 0x07 && framer->bch_errors >= 0) {
 			unsigned int d, b;
@@ -279,17 +290,17 @@ repeater_p25_frame_assembler::general_work (int noutput_items,
 			if (framer->frame_size >= 360) {
 				rc = tsbk_deinterleave(bv1,48+64        , tsbk_buf);
 				if (rc == 0)
-					process_tsbk(framer->nac, tsbk_buf);
+					process_duid(framer->duid, framer->nac, tsbk_buf);
 			}
 			if (framer->frame_size >= 576) {
 				rc = tsbk_deinterleave(bv1,48+64+196    , tsbk_buf);
 				if (rc == 0)
-					process_tsbk(framer->nac, tsbk_buf);
+					process_duid(framer->duid, framer->nac, tsbk_buf);
 			}
 			if (framer->frame_size >= 720) {
 				rc = tsbk_deinterleave(bv1,48+64+196+196, tsbk_buf);
 				if (rc == 0)
-					process_tsbk(framer->nac, tsbk_buf);
+					process_duid(framer->duid, framer->nac, tsbk_buf);
 			}
 		}
 		if (d_debug >= 10 && framer->duid == 0x00) {
