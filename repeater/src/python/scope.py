@@ -36,6 +36,11 @@ import numpy
 import time
 import re
 try:
+    import Hamlib
+except:
+    pass
+
+try:
     import Numeric
 except:
     pass
@@ -48,6 +53,8 @@ from math import pi
 from optparse import OptionParser
 
 import gnuradio.wxgui.plot as plot
+
+import trunking
 
 speeds = [300, 600, 900, 1200, 1440, 1800, 1920, 2400, 2880, 3200, 3600, 3840, 4000, 4800, 6000, 6400, 7200, 8000, 9600, 14400, 19200]
 
@@ -76,9 +83,11 @@ class p25_rx_block (stdgui2.std_top_block):
         parser.add_option("-C", "--costas-alpha", type="eng_float", default=0.125, help="value of alpha for Costas loop", metavar="Hz")
         parser.add_option("-f", "--frequency", type="eng_float", default=0.0, help="USRP center frequency", metavar="Hz")
         parser.add_option("-F", "--ifile", type="string", default=None, help="read input from complex capture file")
+        parser.add_option("-H", "--hamlib-model", type="int", default=None, help="specify model for hamlib")
         parser.add_option("-s", "--seek", type="int", default=0, help="ifile seek in K")
         parser.add_option("-S", "--sample-rate", type="int", default=320e3, help="source samp rate")
         parser.add_option("-t", "--tone-detect", action="store_true", default=False, help="use experimental tone detect algorithm")
+        parser.add_option("-T", "--trunk-cc-freq", type="eng_float", default=None, help="trunk control channel frequency", metavar="Hz")
         parser.add_option("-v", "--verbosity", type="int", default=10, help="message debug level")
         parser.add_option("-V", "--vocoder", action="store_true", default=False, help="voice codec")
         parser.add_option("-o", "--offset", type="eng_float", default=0.0, help="tuning offset frequency [to circumvent DC offset]", metavar="Hz")
@@ -89,6 +98,8 @@ class p25_rx_block (stdgui2.std_top_block):
         parser.add_option("-R", "--rx-subdev-spec", type="subdev", default=(0, 0), help="select USRP Rx side A or B (default=A)")
         parser.add_option("-g", "--gain", type="eng_float", default=None, help="set USRP gain in dB (default is midpoint) or set audio gain")
         parser.add_option("-G", "--gain-mu", type="eng_float", default=0.025, help="gardner gain")
+        parser.add_option("-N", "--gains", type="string", default=None, help="gain settings")
+        parser.add_option("-O", "--audio-output", type="string", default="plughw:0,0", help="audio output device name")
         (options, args) = parser.parse_args()
         if len(args) != 0:
             parser.print_help()
@@ -107,7 +118,16 @@ class p25_rx_block (stdgui2.std_top_block):
             print "osmosdr source_c creation failure"
             ignore = True
 
-        print 'gain names ', self.src.get_gain_names()
+        gain_names = self.src.get_gain_names()
+        for name in gain_names:
+            range = self.src.get_gain_range(name)
+            print "gain: name: %s range: start %d stop %d step %d" % (name, range[0].start(), range[0].stop(), range[0].step())
+        if options.gains:
+            for tuple in options.gains.split(","):
+                name, gain = tuple.split(":")
+                gain = int(gain)
+                print "setting gain %s to %d" % (name, gain)
+                self.src.set_gain(gain, name)
 
         if options.audio:
             self.channel_rate = 48000
@@ -139,6 +159,24 @@ class p25_rx_block (stdgui2.std_top_block):
             if speeds[i] == _default_speed:
                 self.current_speed = i
                 self.default_speed_idx = i
+
+        if options.hamlib_model:
+            self.hamlib_attach(options.hamlib_model)
+
+        class _trunked_states(object):
+            ACQ = 0
+            CC = 1
+            TO_VC = 2
+            VC = 3
+            TO_CC = 4
+        self.trunked_states = _trunked_states
+
+        self.trunked_state = self.trunked_states.ACQ
+        if options.trunk_cc_freq:
+            if options.hamlib_model:
+                self.hamlib.set_freq(int(options.trunk_cc_freq))
+        # acquire trunk CC based on list of primary and alternates
+        self.trunked_state = self.trunked_states.CC
 
         # initialize the UI
         # 
@@ -200,7 +238,8 @@ class p25_rx_block (stdgui2.std_top_block):
 
         self.buffer = gr.copy(gr.sizeof_float)
 
-        msgq = gr.msg_queue(2)
+        msgq = gr.msg_queue(100)
+        self.du_watcher = du_queue_watcher(msgq, self.process_data_unit)
         udp_port = 0
         if self.options.wireshark:
             udp_port = WIRESHARK_PORT
@@ -208,12 +247,14 @@ class p25_rx_block (stdgui2.std_top_block):
             self.sink_sf = gr.file_sink(gr.sizeof_char, self.options.raw_symbols)
         do_imbe = 1
         do_output = 1
-        self.sink_s = repeater.p25_frame_assembler(self.options.wireshark_host, udp_port, self.options.verbosity, do_imbe, do_output, 0, msgq)
+        do_msgq = 1
+        self.sink_s = repeater.p25_frame_assembler(self.options.wireshark_host, udp_port, self.options.verbosity, do_imbe, do_output, do_msgq, msgq)
+        self.trunk_ctl = trunking.trunked_system(frequency_set = self.change_freq)
         if self.options.vocoder:
             self.sink_imbe = repeater.vocoder(0, 0, 0, '', 0, 0)
             self.audio_s2f = gr.short_to_float()
             self.audio_scaler = gr.multiply_const_ff(1 / 32768.0)
-            self.audio_output = audio.sink(8000, "pulse", True)
+            self.audio_output = audio.sink(8000, self.options.audio_output, True)
             self.connect(self.sink_imbe, self.audio_s2f, self.audio_scaler, self.audio_output)
         else:
             self.sink_imbe = gr.null_sink(gr.sizeof_char)
@@ -233,7 +274,7 @@ class p25_rx_block (stdgui2.std_top_block):
         self.fac_state = False
         self.fsk4_demod_connected = False
         self.psk_demod_connected = False
-        self.fsk4_demod_mode = True
+        self.fsk4_demod_mode = False
         self.corr_i_chan = False
 
         if self.baseband_input:
@@ -320,7 +361,7 @@ class p25_rx_block (stdgui2.std_top_block):
             self.__connect([[source, (self.mixer, 0)],
                             [self.lo, (self.mixer, 1)]])
             self.set_connection(fft=1)
-            self.connect_fsk4_demod()
+            self.connect_demods()
 
     # Connect up the flow graph
     #
@@ -588,6 +629,49 @@ class p25_rx_block (stdgui2.std_top_block):
                 callback=self.demod_type_chg)
 
         vbox.Add(hbox, 0, 0)
+
+    def change_freq(self, freq):
+        if self.trunked_state == self.trunked_states.CC:
+            print "%d: change frequency to: %f" % (self.trunked_state, float(freq) / 1000000.0)
+            self.trunked_state = self.trunked_states.TO_VC
+            if self.options.hamlib_model:
+                self.hamlib.set_freq(freq)
+            else:
+                self.set_freq(freq)
+
+    def hamlib_attach(self, model):
+        Hamlib.rig_set_debug (Hamlib.RIG_DEBUG_NONE)	# RIG_DEBUG_TRACE
+
+        self.hamlib = Hamlib.Rig (model)
+        self.hamlib.set_conf ("serial_speed","9600")
+        self.hamlib.set_conf ("retry","5")
+
+        self.hamlib.open ()
+
+    def process_data_unit(self, msg):
+        type = msg.type()
+        #print "type %d at %f state %d" %(type, time.time(), self.trunked_state)
+        s = msg.to_string()
+        t = 0
+        for c in s:
+                t = (t << 8) + ord(c)
+        nac = t & 0xffff
+        t = t >> 16
+        if type == 7:
+            self.trunk_ctl.decode_tsbk(t)
+            if self.trunked_state == self.trunked_states.TO_CC:
+                self.trunked_state = self.trunked_states.CC
+            #print self.trunk_ctl.to_string()
+        else:
+            if self.trunked_state == self.trunked_states.TO_VC:
+                self.trunked_state = self.trunked_states.VC
+            if self.trunked_state == self.trunked_states.VC and (type == 3 or type == 15):
+                self.trunked_state = self.trunked_states.TO_CC
+                print "%d: change frequency to: %f" % (self.trunked_state, float(self.options.trunk_cc_freq) / 1000000.0)
+                if self.options.hamlib_model:
+                    self.hamlib.set_freq(int(self.options.trunk_cc_freq))
+                else:
+                    self.set_freq(int(self.options.trunk_cc_freq))
 
     def set_gain(self, gain):
         if self.baseband_input:
@@ -1241,6 +1325,23 @@ class wizard_details_page(wx.wizard.WizardPageSimple):
     def get_details(self):
         ToDo = True
 
+
+# data unit receive queue
+#
+class du_queue_watcher(threading.Thread):
+
+    def __init__(self, msgq,  callback, **kwds):
+        threading.Thread.__init__ (self, **kwds)
+        self.setDaemon(1)
+        self.msgq = msgq
+        self.callback = callback
+        self.keep_running = True
+        self.start()
+
+    def run(self):
+        while(self.keep_running):
+            msg = self.msgq.delete_head()
+            self.callback(msg)
 
 # Frequency tracker
 #
